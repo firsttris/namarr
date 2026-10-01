@@ -16,6 +16,8 @@ import {
   type PreviewItem,
   type ProbeInfo,
   parse,
+  type Quality,
+  qualityOf,
   type Rule,
   resolveEpisodes,
   resolveInRoots,
@@ -31,6 +33,7 @@ import {
   countItemsByState,
   createJob,
   type Db,
+  findDoneItemByTarget,
   getItem,
   getJob,
   getSettings,
@@ -236,6 +239,17 @@ export class JobService {
         p.release.videoCodec ??= info.videoCodec;
       });
     }
+  }
+
+  /**
+   * What keep-better knows about a file: the parsed name (for the existing file the name it
+   * had before namarr renamed it, since the new name rarely says "BluRay") plus ffprobe.
+   */
+  private async quality(file: string, incoming?: JobItem): Promise<Quality> {
+    const release = incoming
+      ? (incoming.parsedJson?.release ?? parse(file).release)
+      : (findDoneItemByTarget(this.deps.db, file)?.parsedJson?.release ?? parse(file).release);
+    return qualityOf(release, await this.deps.probe?.(file));
   }
 
   private finishCancelled(job: Job) {
@@ -494,19 +508,33 @@ export class JobService {
       if (signal.aborted) break;
       try {
         const target = await resolveInRoots(item.targetPath!, settings.roots);
-        const result = await executeOperation({ from: item.sourcePath, to: target, action }, { conflict });
+        const quality =
+          conflict === "keep-better"
+            ? (file: string, role: string) => this.quality(file, role === "incoming" ? item : undefined)
+            : undefined;
+        const result = await executeOperation({ from: item.sourcePath, to: target, action }, { conflict, quality });
         if (result.status === "done") {
           this.record(jobId, item.id, result.record);
-          // Companions follow their main file with the same action.
+          // Companions follow their main file with the same action. Subtitles of a replaced
+          // worse file belong to it, so they are replaced too instead of compared by size.
+          const companionConflict = conflict === "keep-better" ? "overwrite" : conflict;
           const companionErrors: string[] = [];
           for (const c of item.companions) {
             if (!c.to) continue;
-            const cr = await executeOperation({ from: c.from, to: await resolveInRoots(c.to, settings.roots), action }, { conflict });
+            const cr = await executeOperation(
+              { from: c.from, to: await resolveInRoots(c.to, settings.roots), action },
+              { conflict: companionConflict },
+            );
             if (cr.status === "done") this.record(jobId, item.id, cr.record);
             else if (cr.status === "failed") companionErrors.push(`${path.basename(c.from)}: ${cr.error}`);
             else if (cr.status === "skipped") companionErrors.push(`${path.basename(c.from)}: ${cr.reason}`);
           }
-          updateItem(db, item.id, { state: "done", targetPath: result.record.to, error: companionErrors.join("; ") || null });
+          updateItem(db, item.id, {
+            state: "done",
+            targetPath: result.record.to,
+            error: companionErrors.join("; ") || null,
+            ...(result.note ? { reasons: [...item.reasons, result.note] } : {}),
+          });
           removeFromInbox(db, item.id);
           summary.done++;
           if (action === "move") await cleanupEmptyDirs(path.dirname(item.sourcePath), job.sourcePaths[0] ?? "/").catch(() => []);

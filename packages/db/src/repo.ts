@@ -178,6 +178,16 @@ export function knownSourcePaths(db: AnyDb, dir: string): Set<string> {
   return new Set(rows.map((r) => r.path));
 }
 
+/** The item whose file now lives at `targetPath`: its parsed name still knows source and quality. */
+export function findDoneItemByTarget(db: AnyDb, targetPath: string): JobItem | undefined {
+  return db
+    .select()
+    .from(jobItems)
+    .where(and(eq(jobItems.targetPath, targetPath), eq(jobItems.state, "done")))
+    .orderBy(desc(jobItems.id))
+    .get();
+}
+
 export function updateItem(db: AnyDb, id: number, values: Partial<NewJobItem>): JobItem | undefined {
   return db.update(jobItems).set(values).where(eq(jobItems.id, id)).returning().get();
 }

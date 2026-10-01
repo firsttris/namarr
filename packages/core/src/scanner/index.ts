@@ -123,16 +123,21 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
 export type ProbeInfo = {
   resolution?: string;
   videoCodec?: string;
-  audio: { codec: string; channels?: number; language?: string }[];
+  /** DV, HDR10, HLG; undefined for SDR. HDR10+ only shows in frame data and reads as HDR10. */
+  hdr?: string;
+  audio: { codec: string; profile?: string; channels?: number; language?: string }[];
   duration?: number;
 };
 
 type FfprobeStream = {
   codec_type?: string;
   codec_name?: string;
+  profile?: string;
   width?: number;
   height?: number;
   channels?: number;
+  color_transfer?: string;
+  side_data_list?: { side_data_type?: string }[];
   tags?: { language?: string };
 };
 
@@ -147,12 +152,20 @@ export function parseFfprobe(json: { streams?: FfprobeStream[]; format?: { durat
     const w = video.width;
     resolution = w >= 3200 ? "2160p" : w >= 1800 ? "1080p" : w >= 1200 ? "720p" : w >= 900 ? "576p" : "480p";
   }
+  const hdr = video?.side_data_list?.some((d) => /dovi|dolby vision/i.test(d.side_data_type ?? ""))
+    ? "DV"
+    : video?.color_transfer === "smpte2084"
+      ? "HDR10"
+      : video?.color_transfer === "arib-std-b67"
+        ? "HLG"
+        : undefined;
   return {
     resolution,
+    hdr,
     videoCodec: video?.codec_name ? (CODEC_NAMES[video.codec_name] ?? video.codec_name.toUpperCase()) : undefined,
     audio: streams
       .filter((s) => s.codec_type === "audio")
-      .map((s) => ({ codec: s.codec_name ?? "unknown", channels: s.channels, language: s.tags?.language })),
+      .map((s) => ({ codec: s.codec_name ?? "unknown", profile: s.profile, channels: s.channels, language: s.tags?.language })),
     duration: json.format?.duration ? Number(json.format.duration) : undefined,
   };
 }

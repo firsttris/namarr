@@ -87,6 +87,22 @@ describe("Scanner", () => {
   });
 });
 
+describe("ffprobe: HDR und Tonspur-Profil", () => {
+  const video = (extra: object) =>
+    parseFfprobe({ streams: [{ codec_type: "video", codec_name: "hevc", width: 3840, height: 2160, ...extra }] });
+  it("erkennt Dolby Vision, HDR10 und HLG", () => {
+    expect(video({ color_transfer: "smpte2084", side_data_list: [{ side_data_type: "DOVI configuration record" }] }).hdr).toBe("DV");
+    expect(video({ color_transfer: "smpte2084" }).hdr).toBe("HDR10");
+    expect(video({ color_transfer: "arib-std-b67" }).hdr).toBe("HLG");
+    expect(video({ color_transfer: "bt709" }).hdr).toBeUndefined();
+  });
+  it("behält das Audio-Profil (DTS-HD MA)", () => {
+    expect(parseFfprobe({ streams: [{ codec_type: "audio", codec_name: "dts", profile: "DTS-HD MA", channels: 8 }] }).audio).toEqual([
+      { codec: "dts", profile: "DTS-HD MA", channels: 8, language: undefined },
+    ]);
+  });
+});
+
 describe("Wurzelpfad-Prüfung", () => {
   it("erlaubt Pfade in der Wurzel, auch noch nicht existierende", async () => {
     await touch("data/a.mkv");

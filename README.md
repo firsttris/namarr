@@ -54,6 +54,8 @@ Healthcheck: `GET /api/health`. Live-Events: `GET /api/events` (Server-Sent Even
 
 **Workbench** (`/rename`): Ordner auf dem Server wählen, Modus *Media / Regeln / Beides*, Profil wählen. Die virtualisierte Vorschau zeigt alt → neu mit Diff-Hervorhebung, Serien-Gruppen, Begleitdateien (`↳ .de.srt`), Confidence-Badges, übersprungene Samples. Tastatur: ↑ ↓ wählen, Leertaste ein-/ausschließen, Enter öffnet den **MatchPicker**. Rechts: **Template-Editor** mit Token-Autovervollständigung (`{` tippen) und Live-Beispiel an der gewählten Datei, **Regel-Stack** mit Drag-and-Drop und Vorschau pro Regel. Unten: Aktion (Test, Move, Copy, Hardlink, Symlink, Umbenennen), Konfliktverhalten, Ziel, Ausführen.
 
+**Konfliktverhalten „Bessere behalten“** vergleicht nacheinander Auflösung, Quelle (Remux > BluRay > WEB-DL > WEBRip > HDTV > DVD), HDR (DV/HDR10+ > HDR10/HLG > SDR), Video-Codec (AV1 > H.265 > H.264), Ton (Codec, dann Kanäle), PROPER/REPACK und erst zum Schluss die Dateigröße – das erste Kriterium, in dem sich beide Dateien unterscheiden, entscheidet. Ein 4K-HEVC schlägt also ein größeres 1080p-H.264. Die Angaben kommen aus dem Dateinamen und, falls installiert, aus ffprobe (Auflösung, Codec, HDR, beste Tonspur). Für die vorhandene Datei nimmt namarr den Namen, den sie vor dem Umbenennen hatte, sonst wüsste es nichts über die Quelle. Was eine Seite nicht kennt, zählt nicht. Der Grund steht am Eintrag („Vorhandene Datei ist besser (Quelle: WEB vs BluRay)“), eine ersetzte Datei wird gesichert und beim Undo zurückgeholt; ihre Untertitel werden mit ersetzt.
+
 **Dashboard, Inbox, History, Profile, Watch-Folder, Einstellungen** wie im Design. Watch-Folder warten, bis Größe und mtime stabil sind, ignorieren `.part`/`.!qB`/`.tmp`, bündeln einen Release-Ordner zu einem Job und führen nur Treffer über der Auto-Schwelle aus (Standard-Aktion Hardlink, damit Seeding weiterläuft). Beim Start holen sie nach, was ankam, während namarr aus war: Videodateien, die noch kein Job kennt und die nach dem Anlegen des Watch-Folders entstanden sind – ein alter Bestand bleibt unberührt, dafür ist die Workbench da. Nach der Ausführung: Library-Refresh (Jellyfin, Emby, Plex) und Benachrichtigungen (ntfy, Gotify, Telegram, Discord, Webhook).
 
 ### Download-Clients (Hook)
@@ -139,7 +141,7 @@ Ein Bun-Prozess: `apps/server/server.ts` führt beim Start die Migrationen aus u
 | Parser | jede Regel einzeln, Ordnerkontext, Snapshots, YAML-Korpus |
 | Matcher | Jaro-Winkler, Jahr, Mehrdeutigkeit (The Office US/UK), Gruppierung (eine Suche pro Serie), Overrides, absolute Nummern |
 | Formatter / Regeln | Template-Sprache inkl. Fehlerpositionen, Presets, Snapshots; Property-Tests (fast-check): Sanitizing ist idempotent und erzeugt nie ungültige Pfade, Regeln ändern nie die Erweiterung |
-| FileOps | in temporären Ordnern: alle Aktionen, Konflikte, Sicherung beim Überschreiben, Undo mit Verweigerung bei veränderten Dateien, Abbruch mitten im Job |
+| FileOps | in temporären Ordnern: alle Aktionen, Konflikte, Qualitätsvergleich für „Bessere behalten“, Sicherung beim Überschreiben, Undo mit Verweigerung bei veränderten Dateien, Abbruch mitten im Job |
 | Provider | TMDB gegen aufgezeichnete Antworten (keine Live-API), Cache-TTL, 429-Retry, v3/v4-Auth |
 | DB / Server | Migrationen, Paging, Inbox, Dashboard-Zahlen; Job-Pipeline Ende zu Ende, Watch-Folder mit echten Dateien, Auth, SSE, Benachrichtigungen |
 | E2E | Playwright: Vorschau, MatchPicker, Freigabe, Hardlinks, Undo, Regel-Modus, History |

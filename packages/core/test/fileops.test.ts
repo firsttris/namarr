@@ -13,6 +13,7 @@ import {
   undoAll,
   undoOperation,
 } from "../src/fileops/index.ts";
+import type { Quality } from "../src/fileops/quality.ts";
 import { localize, tr } from "../src/i18n.ts";
 
 let tmp: string;
@@ -136,6 +137,39 @@ describe("Konflikte", () => {
     const big = await write("big.mkv", "even much much bigger content");
     done(await executeOperation({ from: big, to: p("target.mkv"), action: "copy" }, { conflict: "keep-better" }));
     expect(await read("target.mkv")).toBe("even much much bigger content");
+  });
+
+  it("keep-better vergleicht Auflösung, Quelle und Codec vor der Größe", async () => {
+    const releases: Record<string, Quality> = {
+      [p("uhd.mkv")]: { resolution: "2160p", source: "WEB-DL", videoCodec: "H.265" },
+      [p("target.mkv")]: { resolution: "1080p", source: "BluRay", videoCodec: "H.264" },
+      [p("sd.mkv")]: { resolution: "720p", source: "BluRay" },
+    };
+    const quality = (file: string) => releases[file];
+    await write("target.mkv", "a big 1080p BluRay");
+    const sd = await write("sd.mkv", "a much much bigger 720p file");
+    const skipped = await executeOperation({ from: sd, to: p("target.mkv"), action: "copy" }, { conflict: "keep-better", quality });
+    expect(skipped).toMatchObject({ status: "skipped" });
+    expect(localize((skipped as { reason: string }).reason, "en")).toBe("Existing file is better (Resolution: 720p vs 1080p)");
+
+    const uhd = await write("uhd.mkv", "4k");
+    const result = await executeOperation(
+      { from: uhd, to: p("target.mkv"), action: "copy" },
+      { conflict: "keep-better", quality, now: () => 7 },
+    );
+    const record = done(result);
+    expect(localize((result as { note?: string }).note!, "de")).toBe("Schlechtere Datei ersetzt (Auflösung: 2160p vs 1080p)");
+    expect(await read("target.mkv")).toBe("4k");
+    // undo brings the old file back
+    expect(await undoOperation(record)).toEqual({ status: "undone" });
+    expect(await read("target.mkv")).toBe("a big 1080p BluRay");
+  });
+
+  it("keep-better: gleiche Qualität und Größe bleibt liegen", async () => {
+    await write("target.mkv", "same");
+    const from = await write("a.mkv", "same");
+    const r = await executeOperation({ from, to: p("target.mkv"), action: "copy" }, { conflict: "keep-better" });
+    expect(localize((r as { reason: string }).reason, "en")).toBe("Existing file has the same quality");
   });
 
   it("Hardlink, der schon existiert, wird erkannt", async () => {

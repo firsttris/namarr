@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { tr } from "../i18n.ts";
 import { splitExtension } from "../parser/index.ts";
+import { compareQuality, type Quality } from "./quality.ts";
 
 export const ACTIONS = ["move", "copy", "hardlink", "symlink", "rename", "test"] as const;
 export const CONFLICT_POLICIES = ["skip", "overwrite", "suffix", "keep-better"] as const;
@@ -28,15 +29,19 @@ export type OperationRecord = {
 };
 
 export type OperationResult =
-  | { status: "done"; record: OperationRecord }
+  /** `note`: why keep-better replaced the existing file. */
+  | { status: "done"; record: OperationRecord; note?: string }
   | { status: "tested"; to: string; conflict: boolean }
   | { status: "skipped"; reason: string; to: string }
   | { status: "failed"; error: string };
 
 export type ExecuteOptions = {
   conflict?: ConflictPolicy;
-  /** Higher is better. Defaults to file size. */
-  quality?: (file: string, stats: Stats) => number | Promise<number>;
+  /**
+   * What `keep-better` compares: resolution, source, HDR, codecs, then size (see compareQuality).
+   * Without it only the size is known.
+   */
+  quality?: (file: string, role: "incoming" | "existing") => Quality | undefined | Promise<Quality | undefined>;
   /** Clock for backup names, injectable for tests. */
   now?: () => number;
 };
@@ -161,6 +166,7 @@ export async function executeOperation(op: PlannedOperation, options: ExecuteOpt
     if (op.action === "test") return { status: "tested", to, conflict: existing !== undefined };
 
     let backup: string | undefined;
+    let note: string | undefined;
     if (existing) {
       // Same file under another name (hardlink already there, case-only rename on macOS).
       if (existing.ino === source.ino && existing.dev === source.dev && op.action !== "rename") {
@@ -170,14 +176,21 @@ export async function executeOperation(op: PlannedOperation, options: ExecuteOpt
       if (policy === "suffix") to = await freeName(to);
       else {
         if (policy === "keep-better") {
-          const quality = options.quality ?? ((_f: string, s: Stats) => s.size);
-          const [mine, theirs] = await Promise.all([quality(from, source), quality(to, existing as Stats)]);
-          if (mine <= theirs)
+          const [mine, theirs] = await Promise.all([options.quality?.(from, "incoming"), options.quality?.(to, "existing")]);
+          const theirSize = existing.isSymbolicLink() ? ((await fs.stat(to).catch(() => undefined))?.size ?? 0) : existing.size;
+          const { result, reason } = compareQuality({ ...mine, size: source.size }, { ...theirs, size: theirSize });
+          if (result <= 0) {
+            const why = reason ? ` (${reason})` : "";
             return {
               status: "skipped",
-              reason: tr("Vorhandene Datei hat gleiche oder bessere Qualität", "Existing file has equal or better quality"),
+              reason:
+                result < 0
+                  ? `${tr("Vorhandene Datei ist besser", "Existing file is better")}${why}`
+                  : tr("Vorhandene Datei hat gleiche Qualität", "Existing file has the same quality"),
               to,
             };
+          }
+          note = `${tr("Schlechtere Datei ersetzt", "Replaced a worse file")} (${reason})`;
         }
         backup = `${to}.namarr-bak-${(options.now ?? Date.now)()}`;
         await fs.rename(to, backup);
@@ -196,6 +209,7 @@ export async function executeOperation(op: PlannedOperation, options: ExecuteOpt
     return {
       status: "done",
       record: { action: op.action, from, to, size: source.size, inode: after.ino, backup, createdDirs },
+      ...(note ? { note } : {}),
     };
   } catch (e) {
     return { status: "failed", error: (e as Error).message };
