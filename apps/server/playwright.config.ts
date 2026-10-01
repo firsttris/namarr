@@ -13,6 +13,8 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:8431",
     viewport: { width: 1440, height: 1000 },
+    // The workbench flows read German texts; i18n.spec.ts covers English.
+    locale: "de-DE",
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {},
   },
   webServer: {

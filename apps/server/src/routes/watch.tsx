@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button, Chip, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getProfiles, getWatchFolders, removeWatchFolder, saveWatchFolder } from "~/functions/library.functions";
 import { ago, pct } from "~/lib/format";
+import { useT } from "~/lib/i18n";
 
 export const Route = createFileRoute("/watch")({
   loader: () => getWatchFolders(),
@@ -17,6 +18,8 @@ type Draft = Pick<WatchFolder, "name" | "path" | "targetRoot" | "profileId" | "a
 const EMPTY: Draft = { name: "", path: "", targetRoot: "", profileId: null, autoThreshold: 0.9, stableSeconds: 30, enabled: true };
 
 function Watch() {
+  const t = useT();
+  const w = t.watch;
   const initial = Route.useLoaderData();
   const qc = useQueryClient();
   const { data = initial } = useQuery({ queryKey: ["watch"], queryFn: () => getWatchFolders(), initialData: initial });
@@ -32,12 +35,9 @@ function Watch() {
 
   return (
     <>
-      <PageHeader
-        title="Watch-Folder"
-        subtitle="Neue Downloads werden ohne Klick einsortiert, solange der Treffer sicher ist. Alles Unsichere wartet in der Inbox."
-      >
+      <PageHeader title={w.title} subtitle={w.subtitle}>
         <Button variant="accent" size="lg" onClick={() => setDraft({ ...EMPTY })}>
-          Watch-Folder anlegen
+          {w.create}
         </Button>
       </PageHeader>
       <ErrorNote error={save.error ?? remove.error} />
@@ -50,7 +50,7 @@ function Watch() {
               save.mutate(draft);
             }}
           >
-            <Field label="Name" htmlFor="w-name">
+            <Field label={t.common.name} htmlFor="w-name">
               <input
                 id="w-name"
                 className={inputClass}
@@ -59,13 +59,13 @@ function Watch() {
                 required
               />
             </Field>
-            <Field label="Profil" htmlFor="w-profile">
+            <Field label={t.common.profile} htmlFor="w-profile">
               <Select
                 id="w-profile"
                 value={draft.profileId ?? ""}
                 onChange={(e) => setDraft({ ...draft, profileId: e.target.value ? Number(e.target.value) : null })}
               >
-                <option value="">Standard (Jellyfin, Hardlink)</option>
+                <option value="">{w.defaultProfile}</option>
                 {profiles.data?.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -73,7 +73,7 @@ function Watch() {
                 ))}
               </Select>
             </Field>
-            <Field label="Überwachter Ordner" htmlFor="w-path">
+            <Field label={w.folder} htmlFor="w-path">
               <input
                 id="w-path"
                 className={cx(inputClass, "font-mono")}
@@ -83,7 +83,7 @@ function Watch() {
                 required
               />
             </Field>
-            <Field label="Ziel" htmlFor="w-target" hint="Gleicher Mount wie die Downloads, sonst sind keine Hardlinks möglich">
+            <Field label={t.common.target} htmlFor="w-target" hint={w.targetHint}>
               <input
                 id="w-target"
                 className={cx(inputClass, "font-mono")}
@@ -93,19 +93,19 @@ function Watch() {
                 required
               />
             </Field>
-            <Field label="Automatisch ab" htmlFor="w-auto">
+            <Field label={w.autoFrom} htmlFor="w-auto">
               <Select
                 id="w-auto"
                 value={draft.autoThreshold === null ? "never" : String(draft.autoThreshold)}
                 onChange={(e) => setDraft({ ...draft, autoThreshold: e.target.value === "never" ? null : Number(e.target.value) })}
               >
                 <option value="0.95">95 %</option>
-                <option value="0.9">90 % (empfohlen)</option>
+                <option value="0.9">{w.recommended("90 %")}</option>
                 <option value="0.8">80 %</option>
-                <option value="never">Immer prüfen</option>
+                <option value="never">{w.alwaysReview}</option>
               </Select>
             </Field>
-            <Field label="Datei gilt als fertig nach (Sekunden stabil)" htmlFor="w-stable">
+            <Field label={w.stable} htmlFor="w-stable">
               <input
                 id="w-stable"
                 type="number"
@@ -122,45 +122,45 @@ function Watch() {
                 onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })}
                 className="h-4 w-4"
               />
-              Aktiv
+              {w.enabled}
             </label>
             <div className="flex gap-2 md:col-span-2">
               <Button type="submit" variant="accent" size="lg" disabled={save.isPending}>
-                Speichern
+                {t.common.save}
               </Button>
               <Button size="lg" onClick={() => setDraft(null)}>
-                Abbrechen
+                {t.common.cancel}
               </Button>
             </div>
           </form>
         </Panel>
       )}
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-        {data.length === 0 && !draft && <Panel className="p-6 text-sm text-muted">Noch keine Watch-Folder.</Panel>}
+        {data.length === 0 && !draft && <Panel className="p-6 text-sm text-muted">{w.none}</Panel>}
         {data.map((f) => (
           <Panel key={f.id} className="flex flex-col gap-2.5 p-4">
             <div className="flex items-center gap-2">
               <span className={cx("h-2 w-2 rounded-full", f.enabled ? "bg-info" : "bg-faint")} />
               <div className="flex-grow text-sm font-semibold">{f.name}</div>
-              <div className="text-xs text-muted">{f.enabled ? `zuletzt ${ago(f.lastEventAt)}` : "pausiert"}</div>
+              <div className="text-xs text-muted">{f.enabled ? w.lastEvent(ago(t, f.lastEventAt)) : w.paused}</div>
             </div>
             <div className="font-mono text-xs text-soft">
               {f.path} → {f.targetRoot}
             </div>
             <div className="flex gap-1.5">
-              <Chip>{f.autoThreshold === null ? "Immer prüfen" : `Auto ab ${pct(f.autoThreshold)}`}</Chip>
-              <Chip>{f.stableSeconds} s stabil</Chip>
-              <Chip>{profiles.data?.find((p) => p.id === f.profileId)?.name ?? "Standard"}</Chip>
+              <Chip>{f.autoThreshold === null ? w.alwaysReview : t.dashboard.autoFrom(pct(f.autoThreshold))}</Chip>
+              <Chip>{t.dashboard.stableSeconds(f.stableSeconds)}</Chip>
+              <Chip>{profiles.data?.find((p) => p.id === f.profileId)?.name ?? w.standard}</Chip>
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => setDraft({ ...f })}>
-                Bearbeiten
+                {t.common.edit}
               </Button>
               <Button size="sm" onClick={() => save.mutate({ ...f, enabled: !f.enabled })}>
-                {f.enabled ? "Pausieren" : "Aktivieren"}
+                {f.enabled ? w.pause : w.activate}
               </Button>
-              <Button size="sm" onClick={() => confirm(`Watch-Folder „${f.name}“ entfernen?`) && remove.mutate(f.id)}>
-                Entfernen
+              <Button size="sm" onClick={() => confirm(w.confirmRemove(f.name)) && remove.mutate(f.id)}>
+                {t.common.remove}
               </Button>
             </div>
           </Panel>

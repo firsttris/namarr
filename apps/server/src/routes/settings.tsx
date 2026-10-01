@@ -5,6 +5,7 @@ import { useState } from "react";
 import { XIcon } from "~/components/icons";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getSettingsFn, saveSettings } from "~/functions/library.functions";
+import { LANGS, type Lang, useLang, useT } from "~/lib/i18n";
 
 export const Route = createFileRoute("/settings")({
   loader: () => getSettingsFn(),
@@ -12,6 +13,9 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
+  const t = useT();
+  const s = t.settings;
+  const { lang, setLang } = useLang();
   const initial = Route.useLoaderData();
   const router = useRouter();
   const qc = useQueryClient();
@@ -46,7 +50,7 @@ function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Einstellungen" subtitle="API-Keys, Sprache, Wurzelpfade, Benachrichtigungen." />
+      <PageHeader title={s.title} subtitle={s.subtitle} />
       <form
         className="flex max-w-3xl flex-col gap-5"
         onSubmit={(e) => {
@@ -55,17 +59,11 @@ function SettingsPage() {
         }}
       >
         <Panel className="flex flex-col gap-4 p-5">
-          <h2 className="m-0 text-base font-semibold">Metadaten</h2>
+          <h2 className="m-0 text-base font-semibold">{s.metadata}</h2>
           <Field
-            label="TMDB-API-Key (v3 oder v4-Token)"
+            label={s.tmdbKey}
             htmlFor="s-key"
-            hint={
-              initial.hasTmdbKey
-                ? `Gespeichert: ${initial.tmdbApiKey}. Leer lassen zum Behalten, „-“ zum Entfernen.`
-                : initial.demo
-                  ? "Kein Key: Demo-Katalog aktiv."
-                  : "Jeder Nutzer bringt seinen eigenen Key mit: themoviedb.org → Einstellungen → API."
-            }
+            hint={initial.hasTmdbKey ? s.keyStored(initial.tmdbApiKey ?? "") : initial.demo ? s.keyDemo : s.keyHelp}
           >
             <input
               id="s-key"
@@ -76,24 +74,29 @@ function SettingsPage() {
               onChange={(e) => setKey(e.target.value)}
             />
           </Field>
-          <Field label="Sprache der Titel" htmlFor="s-lang">
+          <Field label={s.titleLanguage} htmlFor="s-lang">
             <Select id="s-lang" value={language} onChange={(e) => setLanguage(e.target.value)}>
-              <option value="de-DE">Deutsch</option>
-              <option value="en-US">Englisch</option>
-              <option value="fr-FR">Französisch</option>
-              <option value="es-ES">Spanisch</option>
-              <option value="ja-JP">Japanisch</option>
+              {Object.entries(t.titleLanguages).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={s.uiLanguage} htmlFor="s-ui-lang">
+            <Select id="s-ui-lang" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+              {LANGS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
             </Select>
           </Field>
         </Panel>
 
         <Panel className="flex flex-col gap-4 p-5">
-          <h2 className="m-0 text-base font-semibold">Dateisystem</h2>
-          <Field
-            label="Erlaubte Wurzelpfade (einer pro Zeile)"
-            htmlFor="s-roots"
-            hint="namarr liest und schreibt nur innerhalb dieser Ordner."
-          >
+          <h2 className="m-0 text-base font-semibold">{s.filesystem}</h2>
+          <Field label={s.roots} htmlFor="s-roots" hint={s.rootsHint}>
             <textarea
               id="s-roots"
               rows={3}
@@ -102,7 +105,7 @@ function SettingsPage() {
               onChange={(e) => setRoots(e.target.value)}
             />
           </Field>
-          <Field label="Standard-Zielordner" htmlFor="s-target">
+          <Field label={s.defaultTarget} htmlFor="s-target">
             <input
               id="s-target"
               className={cx(inputClass, "font-mono")}
@@ -114,11 +117,11 @@ function SettingsPage() {
         </Panel>
 
         <Panel className="flex flex-col gap-3 p-5">
-          <h2 className="m-0 text-base font-semibold">Library-Refresh nach der Ausführung</h2>
+          <h2 className="m-0 text-base font-semibold">{s.refresh}</h2>
           {refresh.map((r, i) => (
             <div key={i} className="flex gap-2">
               <Select
-                aria-label="Server"
+                aria-label={s.server}
                 value={r.kind}
                 onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, kind: e.target.value as "plex" } : x)))}
               >
@@ -127,38 +130,38 @@ function SettingsPage() {
                 <option value="plex">Plex</option>
               </Select>
               <input
-                aria-label="URL"
+                aria-label={s.url}
                 className={cx(inputClass, "flex-grow")}
                 placeholder="http://jellyfin:8096"
                 value={r.url}
                 onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, url: e.target.value } : x)))}
               />
               <input
-                aria-label="Token"
+                aria-label={t.common.token}
                 type="password"
                 className={inputClass}
-                placeholder="API-Key / Token"
+                placeholder={s.apiToken}
                 value={r.token}
                 onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, token: e.target.value } : x)))}
               />
-              <Button aria-label="Entfernen" onClick={() => setRefresh(refresh.filter((_, k) => k !== i))}>
+              <Button aria-label={t.common.remove} onClick={() => setRefresh(refresh.filter((_, k) => k !== i))}>
                 <XIcon />
               </Button>
             </div>
           ))}
           <div>
             <Button size="sm" onClick={() => setRefresh([...refresh, { kind: "jellyfin", url: "", token: "" }])}>
-              Server hinzufügen
+              {s.addServer}
             </Button>
           </div>
         </Panel>
 
         <Panel className="flex flex-col gap-3 p-5">
-          <h2 className="m-0 text-base font-semibold">Benachrichtigungen</h2>
+          <h2 className="m-0 text-base font-semibold">{s.notifications}</h2>
           {notifications.map((n, i) => (
             <div key={i} className="flex gap-2">
               <Select
-                aria-label="Dienst"
+                aria-label={s.service}
                 value={n.kind}
                 onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, kind: e.target.value as "ntfy" } : x)))}
               >
@@ -169,39 +172,39 @@ function SettingsPage() {
                 <option value="webhook">Webhook</option>
               </Select>
               <input
-                aria-label="URL"
+                aria-label={s.url}
                 className={cx(inputClass, "flex-grow")}
                 placeholder="https://ntfy.sh/mein-topic"
                 value={n.url}
                 onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, url: e.target.value } : x)))}
               />
               <input
-                aria-label="Token"
+                aria-label={t.common.token}
                 type="password"
                 className={inputClass}
-                placeholder="Token (optional)"
+                placeholder={s.tokenOptional}
                 value={n.token ?? ""}
                 onChange={(e) =>
                   setNotifications(notifications.map((x, k) => (k === i ? { ...x, token: e.target.value || undefined } : x)))
                 }
               />
-              <Button aria-label="Entfernen" onClick={() => setNotifications(notifications.filter((_, k) => k !== i))}>
+              <Button aria-label={t.common.remove} onClick={() => setNotifications(notifications.filter((_, k) => k !== i))}>
                 <XIcon />
               </Button>
             </div>
           ))}
           <div>
             <Button size="sm" onClick={() => setNotifications([...notifications, { kind: "ntfy", url: "" }])}>
-              Benachrichtigung hinzufügen
+              {s.addNotification}
             </Button>
           </div>
         </Panel>
 
         <ErrorNote error={save.error} />
-        {save.isSuccess && <div className="text-sm text-[#4fd1a5]">Gespeichert.</div>}
+        {save.isSuccess && <div className="text-sm text-[#4fd1a5]">{t.common.saved}</div>}
         <div>
           <Button type="submit" variant="accent" size="lg" disabled={save.isPending}>
-            Speichern
+            {t.common.save}
           </Button>
         </div>
       </form>

@@ -1,9 +1,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { tr } from "./i18n.ts";
 
 export class PathOutsideRootError extends Error {
   constructor(readonly requested: string) {
-    super(`Pfad liegt außerhalb der erlaubten Wurzelpfade: ${requested}`);
+    super(tr(`Pfad liegt außerhalb der erlaubten Wurzelpfade: ${requested}`, `Path is outside the allowed root paths: ${requested}`));
     this.name = "PathOutsideRootError";
   }
 }

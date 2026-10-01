@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Button, cx, ErrorNote, inputClass, PageHeader, Panel } from "~/components/ui";
 import { undoJob } from "~/functions/jobs.functions";
 import { listHistory } from "~/functions/library.functions";
-import { ACTION_LABELS } from "~/lib/format";
+import { useLocalize, useT } from "~/lib/i18n";
 
 export const Route = createFileRoute("/history")({
   validateSearch: z.object({ q: z.string().optional(), undone: z.boolean().optional() }),
@@ -14,9 +14,11 @@ export const Route = createFileRoute("/history")({
   component: History,
 });
 
-const dt = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" });
-
 function History() {
+  const t = useT();
+  const h = t.history;
+  const localize = useLocalize();
+  const dt = new Intl.DateTimeFormat(t.locale, { dateStyle: "short", timeStyle: "short" });
   const search = Route.useSearch();
   const initial = Route.useLoaderData();
   const navigate = useNavigate();
@@ -35,7 +37,7 @@ function History() {
 
   return (
     <>
-      <PageHeader title="History" subtitle="Jede Operation ist rückgängig machbar, solange die Zieldatei unverändert ist." />
+      <PageHeader title={h.title} subtitle={h.subtitle} />
       <div className="flex flex-wrap items-end gap-3">
         <form
           role="search"
@@ -46,10 +48,16 @@ function History() {
           }}
         >
           <label htmlFor="hq" className="sr-only">
-            Operationen durchsuchen
+            {h.searchLabel}
           </label>
-          <input id="hq" className={cx(inputClass, "w-80")} placeholder="Pfad suchen" value={q} onChange={(e) => setQ(e.target.value)} />
-          <Button type="submit">Suchen</Button>
+          <input
+            id="hq"
+            className={cx(inputClass, "w-80")}
+            placeholder={h.searchPlaceholder}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Button type="submit">{t.common.search}</Button>
         </form>
         <label className="flex items-center gap-2 text-[13px] text-soft">
           <input
@@ -58,49 +66,48 @@ function History() {
             onChange={(e) => navigate({ to: "/history", search: { ...search, undone: e.target.checked || undefined } })}
             className="h-4 w-4"
           />
-          Rückgängig gemachte zeigen
+          {h.showUndone}
         </label>
         <div className="flex-grow" />
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (until && confirm(`Alle Operationen seit ${until.replace("T", " ")} rückgängig machen?`))
-              undo.mutate({ since: new Date(until).toISOString() });
+            if (until && confirm(h.confirmSince(until.replace("T", " ")))) undo.mutate({ since: new Date(until).toISOString() });
           }}
         >
           <label htmlFor="until" className="text-[13px] text-muted">
-            Alles rückgängig seit
+            {h.undoSince}
           </label>
           <input id="until" type="datetime-local" className={inputClass} value={until} onChange={(e) => setUntil(e.target.value)} />
           <Button type="submit" disabled={!until || undo.isPending}>
-            Rückgängig
+            {t.common.undo}
           </Button>
         </form>
       </div>
       <ErrorNote error={undo.error} />
       {undo.data && (
         <div className="text-sm text-muted">
-          {undo.data.undone} rückgängig gemacht
-          {undo.data.failed.length ? ` · ${undo.data.failed.length} verweigert: ${undo.data.failed[0]!.reason}` : ""}
+          {h.result(undo.data.undone)}
+          {undo.data.failed.length ? h.refused(undo.data.failed.length, localize(undo.data.failed[0]!.reason)) : ""}
         </div>
       )}
       <Panel>
         <div className="grid grid-cols-[130px_110px_minmax(0,1fr)_70px_120px] gap-4 border-b border-row px-5 py-2.5 text-xs text-muted">
-          <div>Zeitpunkt</div>
-          <div>Aktion</div>
-          <div>Quelle → Ziel</div>
-          <div>Job</div>
-          <div className="text-right">Undo</div>
+          <div>{h.time}</div>
+          <div>{t.common.action}</div>
+          <div>{h.fromTo}</div>
+          <div>{t.dashboard.job}</div>
+          <div className="text-right">{h.undoColumn}</div>
         </div>
-        {data.length === 0 && <p className="m-0 px-5 py-6 text-sm text-muted">Keine Operationen.</p>}
+        {data.length === 0 && <p className="m-0 px-5 py-6 text-sm text-muted">{h.empty}</p>}
         {data.map((op) => (
           <div
             key={op.id}
             className="grid grid-cols-[130px_110px_minmax(0,1fr)_70px_120px] items-center gap-4 border-b border-row px-5 py-2.5 text-[13px] last:border-b-0"
           >
             <div className="text-soft">{dt.format(new Date(op.executedAt))}</div>
-            <div className="text-soft">{ACTION_LABELS[op.action] ?? op.action}</div>
+            <div className="text-soft">{t.actions[op.action] ?? op.action}</div>
             <div className="flex min-w-0 flex-col font-mono text-xs">
               <span className="truncate text-muted" title={op.fromPath}>
                 {op.fromPath}
@@ -118,15 +125,15 @@ function History() {
             </div>
             <div className="text-right">
               {op.undoneAt ? (
-                <span className="text-xs text-faint">rückgängig</span>
+                <span className="text-xs text-faint">{h.undone}</span>
               ) : (
                 <Button
                   size="sm"
-                  aria-label={`${op.toPath.split("/").at(-1)} rückgängig machen`}
+                  aria-label={h.undoFile(op.toPath.split("/").at(-1)!)}
                   onClick={() => undo.mutate({ operationIds: [op.id] })}
                   disabled={undo.isPending}
                 >
-                  Rückgängig
+                  {t.common.undo}
                 </Button>
               )}
             </div>

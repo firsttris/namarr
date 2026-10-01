@@ -1,3 +1,4 @@
+import { tr } from "@namarr/core/i18n";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, or, type SQL, sql } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type * as schema from "./schema.ts";
@@ -105,7 +106,11 @@ export function updateJob(db: AnyDb, id: number, values: Partial<typeof jobs.$in
 export function failInterruptedJobs(db: AnyDb): number {
   const res = db
     .update(jobs)
-    .set({ status: "failed", error: "Server wurde während des Jobs beendet", finishedAt: new Date() })
+    .set({
+      status: "failed",
+      error: tr("Server wurde während des Jobs beendet", "The server stopped during the job"),
+      finishedAt: new Date(),
+    })
     .where(inArray(jobs.status, ["pending", "scanning", "matching", "executing"]))
     .returning({ id: jobs.id })
     .all();

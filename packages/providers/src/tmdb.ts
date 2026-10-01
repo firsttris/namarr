@@ -1,4 +1,5 @@
 import type { EpisodeInfo, EpisodeOrder, MediaCandidate, MetadataProvider } from "@namarr/core";
+import { tr } from "@namarr/core/i18n";
 import Bottleneck from "bottleneck";
 import { MemoryCache, type ProviderCache } from "./cache.ts";
 
@@ -87,7 +88,7 @@ export class TmdbProvider implements MetadataProvider {
       await new Promise((r) => setTimeout(r, Math.min(wait, 10_000)));
       return this.request(url, headers, attempt + 1);
     }
-    if (res.status === 401) throw new ProviderError("TMDB: API-Key ungültig", 401);
+    if (res.status === 401) throw new ProviderError(tr("TMDB: API-Key ungültig", "TMDB: invalid API key"), 401);
     if (!res.ok) throw new ProviderError(`TMDB: HTTP ${res.status}`, res.status);
     return res.json();
   }

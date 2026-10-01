@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { useLocalize } from "~/lib/i18n";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -118,11 +119,13 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
   );
 }
 
+/** An error from the server, in the viewer's language. */
 export function ErrorNote({ error }: { error: unknown }) {
+  const localize = useLocalize();
   if (!error) return null;
   return (
     <div role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
-      {error instanceof Error ? error.message : String(error)}
+      {localize(error instanceof Error ? error.message : String(error))}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { InboxRow } from "~/components/InboxRow";
 import { Button, ErrorNote, PageHeader, Panel } from "~/components/ui";
 import { approveInbox, getInbox } from "~/functions/library.functions";
+import { useT } from "~/lib/i18n";
 
 export const Route = createFileRoute("/inbox")({
   loader: () => getInbox(),
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/inbox")({
 });
 
 function Inbox() {
+  const t = useT();
   const initial = Route.useLoaderData();
   const qc = useQueryClient();
   const { data = initial } = useQuery({ queryKey: ["inbox"], queryFn: () => getInbox(), initialData: initial });
@@ -23,22 +25,15 @@ function Inbox() {
   });
   return (
     <>
-      <PageHeader
-        title="Inbox"
-        subtitle={`${data.length} unsichere ${data.length === 1 ? "Treffer warten" : "Treffer warten"} auf Freigabe oder Korrektur`}
-      >
+      <PageHeader title={t.inbox.title} subtitle={t.inbox.subtitle(data.length)}>
         <Button onClick={() => approve.mutate({ minConfidence: 0.8 })} disabled={approve.isPending || !data.length}>
-          Alle über 80 % freigeben
+          {t.dashboard.approveAbove80}
         </Button>
       </PageHeader>
       <ErrorNote error={approve.error} />
-      {approve.data && (
-        <div className="text-sm text-muted">
-          {approve.data.done} von {approve.data.approved} ausgeführt.
-        </div>
-      )}
+      {approve.data && <div className="text-sm text-muted">{t.inbox.result(approve.data.done, approve.data.approved)}</div>}
       <Panel>
-        {data.length === 0 && <p className="m-0 px-5 py-8 text-sm text-muted">Alles erledigt.</p>}
+        {data.length === 0 && <p className="m-0 px-5 py-8 text-sm text-muted">{t.inbox.empty}</p>}
         {data.map((entry, i) => (
           <InboxRow
             key={entry.item.id}

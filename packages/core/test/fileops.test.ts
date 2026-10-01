@@ -9,9 +9,11 @@ import {
   freeName,
   type OperationRecord,
   type OperationResult,
+  TARGET_EXISTS,
   undoAll,
   undoOperation,
 } from "../src/fileops/index.ts";
+import { localize, tr } from "../src/i18n.ts";
 
 let tmp: string;
 
@@ -95,7 +97,7 @@ describe("Konflikte", () => {
     await write("b.mkv", "old");
     expect(await executeOperation({ from, to: p("b.mkv"), action: "move" }, { conflict: "skip" })).toMatchObject({
       status: "skipped",
-      reason: "Ziel existiert bereits",
+      reason: TARGET_EXISTS,
     });
     expect(await read("a.mkv")).toBe("new");
     expect(await read("b.mkv")).toBe("old");
@@ -141,7 +143,7 @@ describe("Konflikte", () => {
     await fs.link(from, p("b.mkv"));
     expect(await executeOperation({ from, to: p("b.mkv"), action: "hardlink" }, { conflict: "overwrite" })).toMatchObject({
       status: "skipped",
-      reason: "Ziel ist bereits dieselbe Datei",
+      reason: tr("Ziel ist bereits dieselbe Datei", "Target is already the same file"),
     });
   });
 });
@@ -177,7 +179,10 @@ describe("Undo", () => {
     const from = await write("a.mkv");
     const record = done(await executeOperation({ from, to: p("b.mkv"), action: "move" }));
     await fs.writeFile(p("b.mkv"), "changed and longer");
-    expect(await undoOperation(record)).toMatchObject({ status: "failed", reason: "Zieldatei wurde seit der Ausführung verändert" });
+    const result = await undoOperation(record);
+    expect(result.status).toBe("failed");
+    expect(localize((result as { reason: string }).reason, "de")).toBe("Zieldatei wurde seit der Ausführung verändert");
+    expect(localize((result as { reason: string }).reason, "en")).toBe("Target file changed since it was renamed");
     expect(await read("b.mkv")).toBe("changed and longer");
   });
 

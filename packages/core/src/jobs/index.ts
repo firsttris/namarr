@@ -1,13 +1,16 @@
 import * as path from "node:path";
 import { formatPath, presetTemplate, type SanitizeOptions, sanitizeSegment } from "../formatter/index.ts";
-import { classify, type MatchResult } from "../matcher/index.ts";
+import { tr } from "../i18n.ts";
+import { classify, type MatchResult, NO_MATCH } from "../matcher/index.ts";
 import { applyRules, type Rule } from "../rules/index.ts";
 import type { Companion, ScannedFile } from "../scanner/index.ts";
 import type { Parsed } from "../types.ts";
-
 import type { ItemState } from "./states.ts";
 
 export * from "./states.ts";
+
+export const APPROVED = tr("Freigegeben", "Approved");
+const DUPLICATE_TARGET = tr("Doppeltes Ziel", "Duplicate target");
 
 export type Mode = "media" | "rules" | "both";
 
@@ -68,20 +71,25 @@ function companionTarget(target: string, companion: Companion): string {
 export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): PreviewItem[] {
   const items: PreviewItem[] = inputs.map(({ file, parsed, match, targetOverride, excluded, approved }) => {
     const base: PreviewItem = { source: file.path, state: "parsed", confidence: 1, reasons: [], companions: [] };
-    if (excluded) return { ...base, state: "skipped", reasons: ["Manuell ausgeschlossen"] };
-    if (parsed.sample) return { ...base, state: "skipped", reasons: ["Übersprungen: Sample-Datei"] };
+    if (excluded) return { ...base, state: "skipped", reasons: [tr("Manuell ausgeschlossen", "Excluded manually")] };
+    if (parsed.sample) return { ...base, state: "skipped", reasons: [tr("Übersprungen: Sample-Datei", "Skipped: sample file")] };
 
     let relative: string | undefined;
     if (targetOverride) {
       relative = targetOverride;
-      return { ...base, target: resolveTarget(relative, file, config), state: "ready", reasons: ["Manuell festgelegt"] };
+      return {
+        ...base,
+        target: resolveTarget(relative, file, config),
+        state: "ready",
+        reasons: [tr("Manuell festgelegt", "Set manually")],
+      };
     }
     if (config.mode === "rules") {
       relative = path.basename(file.path);
       return { ...base, target: resolveTarget(relative, file, config), state: "ready" };
     }
     if (!match?.best) {
-      return { ...base, state: "needs_review", confidence: match?.confidence ?? 0, reasons: match?.reasons ?? ["Kein Treffer gefunden"] };
+      return { ...base, state: "needs_review", confidence: match?.confidence ?? 0, reasons: match?.reasons ?? [NO_MATCH] };
     }
     const kind = match.best.kind === "series" ? "episode" : "movie";
     relative = formatPath(
@@ -95,7 +103,7 @@ export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): Pre
       target: resolveTarget(relative, file, config),
       state: decision === "auto" || approved ? "ready" : "needs_review",
       confidence: match.confidence,
-      reasons: approved && decision !== "auto" ? [...match.reasons, "Freigegeben"] : match.reasons,
+      reasons: approved && decision !== "auto" ? [...match.reasons, APPROVED] : match.reasons,
     };
   });
 
@@ -141,7 +149,7 @@ export function markDuplicates(items: PreviewItem[]): void {
       item.conflict = "duplicate";
       other.conflict = "duplicate";
       item.state = "needs_review";
-      if (!item.reasons.includes("Doppeltes Ziel")) item.reasons.push("Doppeltes Ziel");
+      if (!item.reasons.includes(DUPLICATE_TARGET)) item.reasons.push(DUPLICATE_TARGET);
     } else seen.set(key, item);
   }
 }

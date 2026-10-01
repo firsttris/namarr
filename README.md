@@ -55,6 +55,12 @@ Healthcheck: `GET /api/health`. Live-Events: `GET /api/events` (Server-Sent Even
 
 **Dashboard, Inbox, History, Profile, Watch-Folder, Einstellungen** wie im Design. Watch-Folder warten, bis Größe und mtime stabil sind, ignorieren `.part`/`.!qB`/`.tmp`, bündeln einen Release-Ordner zu einem Job und führen nur Treffer über der Auto-Schwelle aus (Standard-Aktion Hardlink, damit Seeding weiterläuft). Nach der Ausführung: Library-Refresh (Jellyfin, Emby, Plex) und Benachrichtigungen (ntfy, Gotify, Telegram, Discord, Webhook).
 
+### Sprachen
+
+Die Oberfläche gibt es auf Deutsch und Englisch. Beim ersten Besuch entscheidet die Browsersprache (alles außer Deutsch → Englisch), danach der Umschalter unten in der Navigation oder in den Einstellungen; die Wahl liegt im Cookie `namarr_lang`, damit schon das Server-Rendering stimmt. Meldungen vom Server (Gründe in der Vorschau, Fehler) werden zweisprachig übertragen und in der gewählten Sprache angezeigt. Die Sprache der Titel (TMDB) ist davon unabhängig und wird in den Einstellungen gesetzt.
+
+Neue Texte kommen nach `apps/server/src/lib/messages.ts`: `de` gibt die Struktur vor, `en` muss sie erfüllen (prüft tsc), Server-Texte entstehen mit `tr("…", "…")` aus `@namarr/core/i18n`.
+
 ### Template-Sprache
 
 ```

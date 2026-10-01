@@ -7,7 +7,8 @@ import { PreviewTable } from "~/components/PreviewTable";
 import { Button, cx, ErrorNote, PageHeader, Progress } from "~/components/ui";
 import { getJob, getJobItems, undoJob } from "~/functions/jobs.functions";
 import { useLive } from "~/lib/events";
-import { ACTION_LABELS, JOB_STATUS_LABELS, num, STATE_LABELS } from "~/lib/format";
+import { num } from "~/lib/format";
+import { useLocalize, useT } from "~/lib/i18n";
 
 const FILTERS: ItemStateName[] = ["ready", "needs_review", "done", "skipped", "failed", "undone"];
 
@@ -20,6 +21,8 @@ export const Route = createFileRoute("/jobs/$jobId")({
 });
 
 function JobDetail() {
+  const t = useT();
+  const localize = useLocalize();
   const jobId = Number(Route.useParams().jobId);
   const { state } = Route.useSearch();
   const qc = useQueryClient();
@@ -44,38 +47,36 @@ function JobDetail() {
   return (
     <>
       <PageHeader
-        title={`Job #${jobId}`}
-        subtitle={
-          j ? `${JOB_STATUS_LABELS[status]} · ${ACTION_LABELS[j.config.action] ?? j.config.action} · ${j.sourcePaths.join(", ")}` : "…"
-        }
+        title={t.job.title(jobId)}
+        subtitle={j ? `${t.jobStatus[status]} · ${t.actions[j.config.action] ?? j.config.action} · ${j.sourcePaths.join(", ")}` : "…"}
       >
         <Link to="/rename" search={{ job: jobId }} className="no-underline">
-          <Button>In der Workbench öffnen</Button>
+          <Button>{t.job.openWorkbench}</Button>
         </Link>
         <Button variant="light" onClick={() => undo.mutate()} disabled={!counts?.done || undo.isPending}>
-          Job rückgängig machen
+          {t.job.undoJob}
         </Button>
       </PageHeader>
       {live && live.total > 0 && <Progress value={live.done / live.total} />}
       <ErrorNote error={undo.error ?? items.error} />
       {undo.data && (
         <div className="text-sm text-muted">
-          {undo.data.undone} rückgängig gemacht
-          {undo.data.failed.length ? `, ${undo.data.failed.length} fehlgeschlagen: ${undo.data.failed[0]!.reason}` : ""}
+          {t.job.undoResult(undo.data.undone)}
+          {undo.data.failed.length ? t.job.undoFailed(undo.data.failed.length, localize(undo.data.failed[0]!.reason)) : ""}
         </div>
       )}
-      <nav aria-label="Filter nach Zustand" className="flex flex-wrap gap-2">
+      <nav aria-label={t.job.filter} className="flex flex-wrap gap-2">
         <Link to="/jobs/$jobId" params={{ jobId: String(jobId) }} search={{}} className={chip(!state)}>
-          Alle
+          {t.job.all}
         </Link>
         {FILTERS.map((s) => (
           <Link key={s} to="/jobs/$jobId" params={{ jobId: String(jobId) }} search={{ state: s }} className={chip(state === s)}>
-            {STATE_LABELS[s]} {counts ? num(counts[s]) : ""}
+            {t.states[s]} {counts ? num(counts[s], t.locale) : ""}
           </Link>
         ))}
       </nav>
       <section
-        aria-label="Dateien"
+        aria-label={t.job.files}
         className="flex flex-col overflow-hidden rounded-[14px] border border-line bg-panel"
         style={{ height: "calc(100vh - 260px)", minHeight: 400 }}
       >

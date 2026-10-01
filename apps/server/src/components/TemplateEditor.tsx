@@ -2,28 +2,8 @@ import { formatPath, PRESETS, TemplateError, TOKEN_NAMES } from "@namarr/core/fo
 import type { MatchResult } from "@namarr/core/matcher";
 import type { Parsed } from "@namarr/core/types";
 import { type KeyboardEvent, useMemo, useRef, useState } from "react";
+import { useLocalize, useT } from "~/lib/i18n";
 import { cx, Select } from "./ui";
-
-export const TOKEN_HELP: Record<string, string> = {
-  n: "Name",
-  y: "Jahr",
-  t: "Titel",
-  s00e00: "S01E02",
-  s00: "Staffel 01",
-  e00: "Folge 02",
-  sxe: "1x02",
-  vf: "Auflösung",
-  vc: "Video-Codec",
-  ac: "Audio",
-  lang: "Sprachen",
-  edition: "Edition",
-  group: "Gruppe",
-  part: "Teil",
-  absolute: "Absolute Nr.",
-  d: "Datum",
-  source: "Quelle",
-  orig: "Original",
-};
 
 export type Sample = { parsed: Parsed; match?: MatchResult | null; original: string };
 
@@ -38,6 +18,8 @@ type Props = {
 
 /** Template field with token chips, `{` autocompletion and a live example at the selected file. */
 export function TemplateEditor({ preset, template, kind, sample, onPreset, onTemplate }: Props) {
+  const m = useT();
+  const localize = useLocalize();
   const area = useRef<HTMLTextAreaElement>(null);
   const [suggest, setSuggest] = useState<{ query: string; at: number } | null>(null);
   const [active, setActive] = useState(0);
@@ -47,7 +29,7 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
   const setValue = (v: string) => onTemplate({ ...template, [kind]: v === presetValue ? undefined : v });
 
   const example = useMemo(() => {
-    if (!sample) return { text: "Datei in der Vorschau auswählen", error: false };
+    if (!sample) return { text: m.template.pickFile, error: false };
     try {
       return {
         text: formatPath(value, {
@@ -59,9 +41,9 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
         error: false,
       };
     } catch (e) {
-      return { text: e instanceof TemplateError ? e.message : String(e), error: true };
+      return { text: localize(e instanceof TemplateError ? e.message : String(e)), error: true };
     }
-  }, [value, sample]);
+  }, [value, sample, m, localize]);
 
   const options = suggest ? TOKEN_NAMES.filter((t) => t.startsWith(suggest.query)).slice(0, 8) : [];
 
@@ -101,9 +83,10 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
     <section aria-labelledby="fmt-h" className="flex flex-col gap-3 rounded-[14px] border border-line bg-panel p-4">
       <div className="flex items-center gap-2">
         <h2 id="fmt-h" className="m-0 flex-grow text-[15px] font-semibold">
-          Format <span className="text-xs font-normal text-muted">{kind === "episode" ? "Serien" : "Filme"}</span>
+          {m.template.format}{" "}
+          <span className="text-xs font-normal text-muted">{kind === "episode" ? m.common.series : m.common.movies}</span>
         </h2>
-        <Select aria-label="Preset" value={preset} onChange={(e) => onPreset(e.target.value)} className="h-8 text-xs">
+        <Select aria-label={m.template.preset} value={preset} onChange={(e) => onPreset(e.target.value)} className="h-8 text-xs">
           {Object.values(PRESETS).map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
@@ -113,7 +96,7 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
       </div>
       <div className="relative">
         <label htmlFor="tpl" className="sr-only">
-          Format-Template
+          {m.template.label}
         </label>
         <textarea
           id="tpl"
@@ -152,7 +135,7 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
                 )}
               >
                 <span>{`{${t}}`}</span>
-                <span className="font-sans text-muted">{TOKEN_HELP[t] ?? ""}</span>
+                <span className="font-sans text-muted">{m.template.tokens[t] ?? ""}</span>
               </div>
             ))}
           </div>
@@ -166,12 +149,12 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
             onClick={() => insert(t)}
             className="cursor-pointer rounded-md border-0 bg-chip px-[7px] py-[3px] font-mono text-[11px] text-chip-ink hover:bg-toggle"
           >
-            {`{${t}}`} {TOKEN_HELP[t]}
+            {`{${t}}`} {m.template.tokens[t]}
           </button>
         ))}
       </div>
       <div className="flex flex-col gap-1 rounded-lg bg-panel-2 px-3 py-2.5" aria-live="polite">
-        <div className="text-[11px] text-muted">Beispiel an ausgewählter Datei</div>
+        <div className="text-[11px] text-muted">{m.template.example}</div>
         <div className={cx("font-mono text-xs leading-normal break-all", example.error && "text-danger")}>{example.text}</div>
       </div>
     </section>

@@ -1,7 +1,11 @@
+import { tr } from "../i18n.ts";
 import type { EpisodeInfo, EpisodeOrder, MediaCandidate, MetadataProvider, Parsed } from "../types.ts";
 import { normalizeTitle, titleSimilarity } from "./similarity.ts";
 
 export * from "./similarity.ts";
+
+export const NO_MATCH = tr("Kein Treffer gefunden", "No match found");
+export const DOUBLE_EPISODE = tr("Doppelfolge", "Double episode");
 
 export const AUTO_THRESHOLD = 0.9;
 export const SUGGEST_THRESHOLD = 0.6;
@@ -72,7 +76,7 @@ export function rank(parsed: Parsed, candidates: MediaCandidate[]): { ranked: Sc
   const ranked = candidates.map((candidate) => ({ candidate, score: scoreCandidate(parsed, candidate) })).sort((a, b) => b.score - a.score);
   const reasons: string[] = [];
   const [first, second] = ranked;
-  if (!first || first.score < 0.5) return { ranked, confidence: 0, reasons: ["Kein Treffer gefunden"] };
+  if (!first || first.score < 0.5) return { ranked, confidence: 0, reasons: [NO_MATCH] };
   let confidence = first.score;
   if (second) {
     const gap = first.score - second.score;
@@ -80,12 +84,12 @@ export function rank(parsed: Parsed, candidates: MediaCandidate[]): { ranked: Sc
       confidence *= 0.75 + 5 * gap;
       reasons.push(
         normalizeTitle(first.candidate.title) === normalizeTitle(second.candidate.title)
-          ? "Mehrere Treffer mit gleichem Titel"
-          : "Zwei Kandidaten mit ähnlichem Score",
+          ? tr("Mehrere Treffer mit gleichem Titel", "Several matches with the same title")
+          : tr("Zwei Kandidaten mit ähnlichem Score", "Two candidates with a similar score"),
       );
     }
   }
-  if (parsed.year === undefined && parsed.kind.value === "movie") reasons.push("Kein Jahr erkannt");
+  if (parsed.year === undefined && parsed.kind.value === "movie") reasons.push(tr("Kein Jahr erkannt", "No year found"));
   return { ranked, confidence: Math.min(1, confidence), reasons };
 }
 
@@ -155,7 +159,7 @@ export async function matchAll(
 ): Promise<Map<string, MatchResult>> {
   const results = new Map<string, MatchResult>();
   for (const input of inputs) {
-    results.set(input.key, { episodes: [], alternatives: [], confidence: 0, reasons: ["Kein Titel erkannt"] });
+    results.set(input.key, { episodes: [], alternatives: [], confidence: 0, reasons: [tr("Kein Titel erkannt", "No title found")] });
   }
   const groups = groupInputs(inputs);
   const episodeCache = new Map<string, Promise<EpisodeInfo[]>>();
@@ -179,7 +183,7 @@ export async function matchAll(
     if (override) {
       best = await provider.details(group.kind, override.externalId, { language: options.language });
       confidence = 1;
-      reasons = ["Gespeicherte Entscheidung"];
+      reasons = [tr("Gespeicherte Entscheidung", "Saved decision")];
     } else {
       const search = group.kind === "series" ? provider.searchSeries : provider.searchMovie;
       const candidates = await search.call(provider, group.title, { year: group.year, language: options.language });
@@ -205,13 +209,17 @@ export async function matchAll(
         const wanted = item.parsed.date ? 1 : Math.max(1, item.parsed.episodes.length);
         if (result.episodes.length < wanted) {
           result.confidence *= item.parsed.episodes.length === 0 && !item.parsed.date ? 0.5 : 0.7;
-          result.reasons.push(item.parsed.episodes.length === 0 ? "Keine Episode erkannt" : "Episode nicht beim Anbieter gefunden");
+          result.reasons.push(
+            item.parsed.episodes.length === 0
+              ? tr("Keine Episode erkannt", "No episode found")
+              : tr("Episode nicht beim Anbieter gefunden", "Episode not found at the provider"),
+          );
         }
         if (item.parsed.absolute !== undefined && item.parsed.season === undefined) {
-          result.reasons.push("Absolute Nummer, Staffel geschätzt");
+          result.reasons.push(tr("Absolute Nummer, Staffel geschätzt", "Absolute number, season estimated"));
           result.confidence = Math.min(result.confidence, 0.85);
         }
-        if (item.parsed.episodes.length > 1) result.reasons.push("Doppelfolge");
+        if (item.parsed.episodes.length > 1) result.reasons.push(DOUBLE_EPISODE);
       }
       results.set(item.key, result);
     }

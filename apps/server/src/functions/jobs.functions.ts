@@ -1,8 +1,10 @@
 import { ACTIONS, CONFLICT_POLICIES } from "@namarr/core";
+import { tr } from "@namarr/core/i18n";
 import { countItemsByState, getJob as findJob, getProfile, getSettings, ITEM_STATES, listItems } from "@namarr/db";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { rulesSchema, templateSchema } from "~/lib/schemas";
+import { JOB_NOT_FOUND, NO_PROVIDER } from "~/server/jobs.server";
 import { authed } from "./middleware";
 
 const id = z.number().int().positive();
@@ -58,7 +60,7 @@ export const getJob = createServerFn({ method: "GET" })
   .validator(z.object({ jobId: id }))
   .handler(async ({ data, context: { rt } }) => {
     const job = findJob(rt.db, data.jobId);
-    if (!job) throw new Error("Job nicht gefunden");
+    if (!job) throw new Error(JOB_NOT_FOUND);
     return { job, counts: countItemsByState(rt.db, job.id) };
   });
 
@@ -139,7 +141,8 @@ export const undoJob = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data, context: { rt } }) => {
-    if (!data.jobId && !data.itemIds && !data.operationIds && !data.since) throw new Error("Nichts zum Rückgängigmachen angegeben");
+    if (!data.jobId && !data.itemIds && !data.operationIds && !data.since)
+      throw new Error(tr("Nichts zum Rückgängigmachen angegeben", "Nothing to undo given"));
     return rt.jobs.undo({ ...data, since: data.since ? new Date(data.since) : undefined });
   });
 
@@ -153,6 +156,6 @@ export const searchProvider = createServerFn({ method: "GET" })
   .validator(z.object({ q: z.string().min(1).max(200), kind: z.enum(["movie", "series"]), year: z.number().int().optional() }))
   .handler(async ({ data, context: { rt } }) => {
     const provider = rt.provider();
-    if (!provider) throw new Error("Kein Metadaten-Anbieter: TMDB-API-Key in den Einstellungen hinterlegen");
+    if (!provider) throw new Error(NO_PROVIDER);
     return data.kind === "movie" ? provider.searchMovie(data.q, { year: data.year }) : provider.searchSeries(data.q, { year: data.year });
   });

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { classify, matchAll, parse } from "@namarr/core";
+import { tr } from "@namarr/core/i18n";
 import { describe, expect, it } from "vitest";
 import { MemoryCache, ProviderError, TmdbProvider } from "../src/index.ts";
 
@@ -138,7 +139,7 @@ describe("TMDB-Provider", () => {
     expect(await tmdb.searchSeries("Severance")).toHaveLength(1);
 
     const bad = new TmdbProvider({ apiKey: "k", fetch: recorded({ "/3/": "401" }).fetchImpl, baseUrl: "https://api.test/3" });
-    await expect(bad.searchMovie("x")).rejects.toThrow(new ProviderError("TMDB: API-Key ungültig", 401));
+    await expect(bad.searchMovie("x")).rejects.toThrow(new ProviderError(tr("TMDB: API-Key ungültig", "TMDB: invalid API key"), 401));
   });
 
   it("Ende-zu-Ende: Parser + Matcher gegen aufgezeichnete Antworten", async () => {
