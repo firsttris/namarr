@@ -11,6 +11,8 @@ export type Env = {
   authHeader?: string;
   /** Allowed root paths seeded on first start (comma separated). */
   roots: string[];
+  /** Path prefixes of other containers mapped to namarr's view: `/downloads:/data/downloads`. */
+  pathMap: [from: string, to: string][];
   demo: boolean;
   logLevel: string;
 };
@@ -22,6 +24,11 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
     port: Number(env.NAMARR_PORT ?? env.PORT ?? 8420),
     token: env.NAMARR_TOKEN || undefined,
     authHeader: env.NAMARR_AUTH_HEADER || undefined,
+    pathMap: (env.NAMARR_PATH_MAP ?? "")
+      .split(",")
+      .map((pair) => pair.trim().split(":"))
+      .filter((p): p is [string, string] => p.length === 2 && Boolean(p[0]) && Boolean(p[1]))
+      .map(([from, to]) => [from.replace(/\/+$/, ""), to.replace(/\/+$/, "")]),
     roots: (env.NAMARR_ROOTS ?? "")
       .split(",")
       .map((r) => r.trim())

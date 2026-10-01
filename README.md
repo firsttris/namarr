@@ -45,6 +45,7 @@ Rootless bleibt `PUID` leer: Container-root ist bereits der eigene Nutzer, ein `
 | `NAMARR_CONFIG_DIR` | `/config` (Docker), `./config` | SQLite-Datenbank (WAL). |
 | `NAMARR_HOST` / `NAMARR_PORT` | `127.0.0.1` / `8420` | Außerhalb von Docker standardmäßig nur lokal erreichbar. |
 | `PUID` / `PGID` | `1000` | Der Server startet als root, übergibt `/config` und arbeitet dann als dieser Nutzer. |
+| `NAMARR_PATH_MAP` | – | Pfade anderer Container auf namarrs Sicht abbilden, z. B. `/downloads:/data/downloads` (mehrere durch Komma getrennt). Gilt für den Download-Client-Hook. |
 | `NAMARR_DEMO` | – | `1`: Offline-Demo-Katalog statt TMDB (UI ausprobieren, E2E-Tests). |
 
 Healthcheck: `GET /api/health`. Live-Events: `GET /api/events` (Server-Sent Events: `job.progress`, `item.updated`, `inbox.added`, `watch.detected`).
@@ -53,7 +54,34 @@ Healthcheck: `GET /api/health`. Live-Events: `GET /api/events` (Server-Sent Even
 
 **Workbench** (`/rename`): Ordner auf dem Server wählen, Modus *Media / Regeln / Beides*, Profil wählen. Die virtualisierte Vorschau zeigt alt → neu mit Diff-Hervorhebung, Serien-Gruppen, Begleitdateien (`↳ .de.srt`), Confidence-Badges, übersprungene Samples. Tastatur: ↑ ↓ wählen, Leertaste ein-/ausschließen, Enter öffnet den **MatchPicker**. Rechts: **Template-Editor** mit Token-Autovervollständigung (`{` tippen) und Live-Beispiel an der gewählten Datei, **Regel-Stack** mit Drag-and-Drop und Vorschau pro Regel. Unten: Aktion (Test, Move, Copy, Hardlink, Symlink, Umbenennen), Konfliktverhalten, Ziel, Ausführen.
 
-**Dashboard, Inbox, History, Profile, Watch-Folder, Einstellungen** wie im Design. Watch-Folder warten, bis Größe und mtime stabil sind, ignorieren `.part`/`.!qB`/`.tmp`, bündeln einen Release-Ordner zu einem Job und führen nur Treffer über der Auto-Schwelle aus (Standard-Aktion Hardlink, damit Seeding weiterläuft). Nach der Ausführung: Library-Refresh (Jellyfin, Emby, Plex) und Benachrichtigungen (ntfy, Gotify, Telegram, Discord, Webhook).
+**Dashboard, Inbox, History, Profile, Watch-Folder, Einstellungen** wie im Design. Watch-Folder warten, bis Größe und mtime stabil sind, ignorieren `.part`/`.!qB`/`.tmp`, bündeln einen Release-Ordner zu einem Job und führen nur Treffer über der Auto-Schwelle aus (Standard-Aktion Hardlink, damit Seeding weiterläuft). Beim Start holen sie nach, was ankam, während namarr aus war: Videodateien, die noch kein Job kennt und die nach dem Anlegen des Watch-Folders entstanden sind – ein alter Bestand bleibt unberührt, dafür ist die Workbench da. Nach der Ausführung: Library-Refresh (Jellyfin, Emby, Plex) und Benachrichtigungen (ntfy, Gotify, Telegram, Discord, Webhook).
+
+### Download-Clients (Hook)
+
+Statt (oder neben) einem Watch-Folder kann der Download-Client namarr nach jedem fertigen Download direkt aufrufen. Der Job läuft wie ein Watch-Job: sichere Treffer werden sofort umbenannt, unsichere warten in der Inbox.
+
+```bash
+curl -X POST http://namarr:8420/api/jobs \
+  -H "Authorization: Bearer $NAMARR_TOKEN" \
+  -d path="/data/downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP" -d profile=Serien
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `path` | Datei oder Ordner, wie der Client ihn sieht (`NAMARR_PATH_MAP` übersetzt ihn) |
+| `profile` | Profil-ID oder -Name (Format, Regeln, Aktion; `test` wird zu Hardlink) |
+| `watchFolder` | ID oder Name eines Watch-Folders: dessen Profil, Ziel und Auto-Schwelle |
+| `target` | Zielordner; sonst aus Profil, Watch-Folder oder Standard-Zielordner |
+| `review` | `true`: nichts läuft ohne Freigabe, alles landet in der Inbox |
+| `threshold` | Auto-Schwelle 0–1, Standard 0,9 |
+
+Felder gehen als JSON, Formular oder Query-Parameter. Antwort `202 {"jobId", "status", "url"}`; den Fortschritt liefert `GET /api/jobs/<id>`. Fehler kommen als `{"error"}` mit 400 (ungültig), 401 (Token), 403 (außerhalb der Wurzelpfade) oder 404 (Pfad, Profil oder Watch-Folder unbekannt).
+
+- **qBittorrent** → Optionen → Downloads → „Externes Programm beim Beenden eines Torrents ausführen“:
+  `curl -s -X POST http://namarr:8420/api/jobs -H "Authorization: Bearer TOKEN" --data-urlencode "path=%F" -d profile=Serien`
+  (`%F` ist der Inhaltspfad: Ordner bei mehreren Dateien, sonst die Datei.)
+- **SABnzbd / NZBGet**: ein Post-Processing-Skript mit derselben Zeile, `path` aus `$SAB_COMPLETE_DIR` bzw. `$NZBPP_DIRECTORY`.
+- Liegen Client und namarr in verschiedenen Containern mit unterschiedlichen Mounts, z. B. `/downloads` gegenüber `/data/downloads`, hilft `NAMARR_PATH_MAP=/downloads:/data/downloads`. Für Hardlinks müssen Downloads und Library trotzdem im selben Dateisystem liegen.
 
 ### Sprachen
 

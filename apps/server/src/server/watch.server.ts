@@ -1,7 +1,9 @@
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { VIDEO_EXTENSIONS } from "@namarr/core";
-import { type Db, getProfile, listWatchFolders, updateWatchFolder, type WatchFolder } from "@namarr/db";
+import { type Db, getProfile, knownSourcePaths, listWatchFolders, updateWatchFolder, type WatchFolder } from "@namarr/db";
 import { type FSWatcher, watch } from "chokidar";
+import { automaticConfig } from "./automation.server.ts";
 import type { EventBus } from "./events.server.ts";
 import type { JobService } from "./jobs.server.ts";
 
@@ -30,6 +32,8 @@ type Deps = {
 export class WatchService {
   private watchers = new Map<number, FSWatcher>();
   private pending = new Map<number, { files: Set<string>; timer: ReturnType<typeof setTimeout> }>();
+  /** Bumped by stop(): a catch-up of an older generation gives up. */
+  private generation = 0;
 
   constructor(
     private readonly deps: Deps,
@@ -54,6 +58,45 @@ export class WatchService {
     watcher.on("error", (err) => this.deps.log.error({ err, folder: folder.path }, "Watch-Folder-Fehler"));
     this.watchers.set(folder.id, watcher);
     this.deps.log.info({ folder: folder.path }, "Watch-Folder aktiv");
+    void this.catchUp(folder, this.generation).catch((err) => this.deps.log.error({ err, folder: folder.path }, "Abgleich fehlgeschlagen"));
+  }
+
+  /**
+   * Files that arrived while the server was down: chokidar only reports changes from now on.
+   * Taken are video files that no job knows yet and that appeared after the watch folder was
+   * created (ctime), so an old backlog is left alone; that is what the workbench is for.
+   * Files still being written are waited for until size and mtime stay put.
+   */
+  async catchUp(folder: WatchFolder, generation = this.generation): Promise<string[]> {
+    const known = knownSourcePaths(this.deps.db, folder.path);
+    // Some slack: file systems stamp ctime from a coarser clock than Date.now().
+    const since = folder.createdAt.getTime() - 2_000;
+    const candidates: { file: string; size: number; mtime: number }[] = [];
+    for (const file of await listFiles(folder.path)) {
+      if (!isCandidate(file) || known.has(file)) continue;
+      const st = await fs.stat(file).catch(() => undefined);
+      if (st?.isFile() && st.ctimeMs >= since) candidates.push({ file, size: st.size, mtime: st.mtimeMs });
+    }
+    if (!candidates.length) return [];
+    this.deps.log.info({ folder: folder.path, files: candidates.length }, "Watch-Folder: verpasste Dateien gefunden");
+
+    const taken: string[] = [];
+    let waiting = candidates;
+    while (waiting.length && generation === this.generation) {
+      await new Promise((r) => setTimeout(r, folder.stableSeconds * 1000));
+      if (generation !== this.generation) break;
+      const still: typeof waiting = [];
+      for (const c of waiting) {
+        const st = await fs.stat(c.file).catch(() => undefined);
+        if (!st) continue; // moved away meanwhile
+        if (st.size === c.size && st.mtimeMs === c.mtime) {
+          this.detected(folder, c.file);
+          taken.push(c.file);
+        } else still.push({ file: c.file, size: st.size, mtime: st.mtimeMs });
+      }
+      waiting = still;
+    }
+    return taken;
   }
 
   private detected(folder: WatchFolder, file: string) {
@@ -86,17 +129,7 @@ export class WatchService {
           kind: "watch",
           watchFolderId: folder.id,
           profileId: profile?.id ?? null,
-          config: {
-            mode: (profile?.mode as "media" | "rules" | "both" | undefined) ?? "media",
-            preset: profile?.preset ?? "jellyfin",
-            template: profile?.template ?? {},
-            rules: profile?.rulesJson ?? [],
-            action: profile?.action && profile.action !== "test" ? profile.action : "hardlink",
-            conflictPolicy: profile?.conflictPolicy ?? "skip",
-            targetRoot: folder.targetRoot,
-            autoThreshold: folder.autoThreshold ?? undefined,
-            alwaysReview: folder.autoThreshold === null,
-          },
+          config: automaticConfig(profile, { targetRoot: folder.targetRoot, autoThreshold: folder.autoThreshold }),
         });
       } catch (err) {
         this.deps.log.error({ err, root }, "Watch-Job konnte nicht angelegt werden");
@@ -105,11 +138,30 @@ export class WatchService {
   }
 
   async stop(): Promise<void> {
+    this.generation++;
     await Promise.all([...this.watchers.values()].map((w) => w.close()));
     this.watchers.clear();
     for (const b of this.pending.values()) clearTimeout(b.timer);
     this.pending.clear();
   }
+}
+
+/** All files below `dir`, without hidden folders and Synology's @eaDir. */
+async function listFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    if (e.name.startsWith(".") || e.name === "@eaDir") continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...(await listFiles(full)));
+    else if (e.isFile()) out.push(full);
+  }
+  return out;
 }
 
 function topFolder(root: string, file: string): string {

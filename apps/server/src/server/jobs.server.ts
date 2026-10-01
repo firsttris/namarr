@@ -39,6 +39,7 @@ import {
   type Job,
   type JobConfig,
   type JobItem,
+  type JobKind,
   listOperations,
   listOverrides,
   markUndone,
@@ -132,7 +133,7 @@ export class JobService {
     paths: string[];
     config: JobConfig;
     profileId?: number | null;
-    kind?: "manual" | "watch";
+    kind?: JobKind;
     watchFolderId?: number | null;
   }): Promise<Job> {
     const settings = this.settings();
@@ -210,7 +211,8 @@ export class JobService {
       this.progress(job, "ready", files.length, files.length);
       this.deps.log.info({ jobId, files: files.length, counts }, "Job analysiert");
 
-      if (job.kind === "watch") await this.autoProcess(jobId);
+      // Watch folders and download-client hooks run on their own: sure matches go through.
+      if (job.kind !== "manual") await this.autoProcess(jobId);
     } catch (e) {
       updateJob(db, jobId, { status: "failed", error: (e as Error).message, finishedAt: new Date() });
       this.deps.bus.emit({ type: "job.progress", jobId, status: "failed", done: 0, total: 0 });

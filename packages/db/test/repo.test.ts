@@ -15,6 +15,7 @@ import {
   insertItems,
   insertOperation,
   type JobConfig,
+  knownSourcePaths,
   listInbox,
   listItems,
   listOperations,
@@ -144,6 +145,22 @@ describe("Jobs und Items", () => {
     expect(failInterruptedJobs(db)).toBe(1);
     expect(getJob(db, a.id)).toMatchObject({ status: "failed" });
     expect(getJob(db, b.id)).toMatchObject({ status: "done" });
+  });
+});
+
+describe("Bekannte Quellpfade", () => {
+  it("nur unterhalb des Ordners, % und _ sind keine Wildcards", () => {
+    const db = fresh();
+    const job = createJob(db, { sourcePaths: ["/dl"], config });
+    insertItems(db, [
+      { jobId: job.id, sourcePath: "/dl/100%_done/a.mkv" },
+      { jobId: job.id, sourcePath: "/dl/b.mkv" },
+      { jobId: job.id, sourcePath: "/dl2/c.mkv" },
+      { jobId: job.id, sourcePath: "/dlx_y/d.mkv" },
+    ]);
+    expect([...knownSourcePaths(db, "/dl")].sort()).toEqual(["/dl/100%_done/a.mkv", "/dl/b.mkv"]);
+    expect([...knownSourcePaths(db, "/dl/100%_done/")]).toEqual(["/dl/100%_done/a.mkv"]);
+    expect([...knownSourcePaths(db, "/dl_")]).toEqual([]);
   });
 });
 

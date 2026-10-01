@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { classify, matchAll, parse } from "@namarr/core";
 import { tr } from "@namarr/core/i18n";
 import { describe, expect, it } from "vitest";
-import { MemoryCache, ProviderError, TmdbProvider } from "../src/index.ts";
+import { isPlaceholderTitle, MemoryCache, ProviderError, TmdbProvider } from "../src/index.ts";
 
 /** Replays recorded TMDB responses; no live API in CI. */
 function recorded(routes: Record<string, string>) {
@@ -80,6 +80,30 @@ describe("TMDB-Provider", () => {
       airDate: "2025-01-16",
       absolute: 4,
     });
+  });
+
+  it("unübersetzte Episodentitel kommen aus der Originalsprache, dann aus Englisch", async () => {
+    const r = recorded({
+      "/3/tv/95396/season/2?language=de-DE": "tv_95396_season_2_untranslated",
+      "/3/tv/95396/season/2?language=en-US": "tv_95396_season_2_en_us",
+      "/3/tv/95396/season/2?language=en&": "tv_95396_season_2_en",
+      ...routes,
+    });
+    const tmdb = new TmdbProvider({ apiKey: "k", language: "de-DE", fetch: r.fetchImpl, baseUrl: "https://api.test/3", rateLimit: 1000 });
+    const eps = await tmdb.episodes("95396", { season: 2 });
+    expect(eps.map((e) => e.title)).toEqual(["Hallo, Frau Cobel", "Goodbye, Mrs. Selvig", "Who Is Alive?"]);
+    // Only the season with gaps is fetched again
+    expect(r.calls.filter((c) => c.includes("/season/")).map((c) => new URL(`http://x${c}`).searchParams.get("language"))).toEqual([
+      "de-DE",
+      "en",
+      "en-US",
+    ]);
+  });
+
+  it("Platzhalter-Titel werden erkannt", () => {
+    for (const t of ["Episode 5", "Folge 12", "Épisode 3", "Episodio 7", "第5話", "12", "", undefined])
+      expect(isPlaceholderTitle(t)).toBe(true);
+    for (const t of ["Hallo, Frau Cobel", "Episode IV", "The 5th Episode", "Folge dem Licht"]) expect(isPlaceholderTitle(t)).toBe(false);
   });
 
   it("DVD-Reihenfolge über Episode Groups", async () => {

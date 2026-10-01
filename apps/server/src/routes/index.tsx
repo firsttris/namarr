@@ -175,7 +175,13 @@ function Dashboard() {
                 {job.sourcePaths.join(", ")}
               </div>
               <div className="text-soft">
-                {job.kind === "watch" ? d.triggerWatch : job.config.mode === "rules" ? d.triggerRules : d.triggerWorkbench}
+                {job.kind === "watch"
+                  ? d.triggerWatch
+                  : job.kind === "hook"
+                    ? d.triggerHook
+                    : job.config.mode === "rules"
+                      ? d.triggerRules
+                      : d.triggerWorkbench}
                 <span className="block text-xs text-faint">{t.actions[job.config.action] ?? job.config.action}</span>
               </div>
               <div className="flex items-center gap-2.5">
