@@ -11,3 +11,4 @@ dist
 coverage
 test-results
 playwright-report
+**/e2e/.tmp

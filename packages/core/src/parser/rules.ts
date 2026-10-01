@@ -37,11 +37,7 @@ function hit(ctx: ParseContext, rule: string, m: RegExpExecArray, boundsTitle = 
 }
 
 /** Runs `pattern` over the name and calls `onMatch` for every match not already consumed. */
-function scan(
-  ctx: ParseContext,
-  pattern: RegExp,
-  onMatch: (m: RegExpExecArray) => boolean | void,
-): void {
+function scan(ctx: ParseContext, pattern: RegExp, onMatch: (m: RegExpExecArray) => unknown): void {
   pattern.lastIndex = 0;
   for (let m = pattern.exec(ctx.name); m; m = pattern.exec(ctx.name)) {
     if (overlaps(ctx, m.index, m.index + m[0].length)) continue;
@@ -118,8 +114,7 @@ function setEpisode(ctx: ParseContext, season: number | undefined, episodes: num
   ctx.episodeConfidence = Math.max(ctx.episodeConfidence, confidence);
 }
 
-const hasEpisode = (ctx: ParseContext) =>
-  ctx.out.episodes.length > 0 || ctx.out.absolute !== undefined || ctx.out.date !== undefined;
+const hasEpisode = (ctx: ParseContext) => ctx.out.episodes.length > 0 || ctx.out.absolute !== undefined || ctx.out.date !== undefined;
 
 export const sampleRule: ParserRule = {
   name: "sample",
@@ -234,19 +229,24 @@ export const flagsRule: ParserRule = {
   },
 };
 
-export const editionRule = table("edition", (ctx, v) => (ctx.out.edition = v), [
-  [`directors?'?s?${SEP}?cut`, "Director's Cut"],
-  [`extended(?:${SEP}(?:cut|edition|version))?`, "Extended"],
-  [`theatrical(?:${SEP}(?:cut|edition))?`, "Theatrical Cut"],
-  [`final${SEP}cut`, "Final Cut"],
-  [`ultimate${SEP}edition`, "Ultimate Edition"],
-  [`special${SEP}edition`, "Special Edition"],
-  [`(?:4k${SEP})?remastered`, "Remastered"],
-  ["unrated", "Unrated"],
-  ["uncut", "Uncut"],
-  ["imax", "IMAX"],
-  ["criterion", "Criterion"],
-], true);
+export const editionRule = table(
+  "edition",
+  (ctx, v) => (ctx.out.edition = v),
+  [
+    [`directors?'?s?${SEP}?cut`, "Director's Cut"],
+    [`extended(?:${SEP}(?:cut|edition|version))?`, "Extended"],
+    [`theatrical(?:${SEP}(?:cut|edition))?`, "Theatrical Cut"],
+    [`final${SEP}cut`, "Final Cut"],
+    [`ultimate${SEP}edition`, "Ultimate Edition"],
+    [`special${SEP}edition`, "Special Edition"],
+    [`(?:4k${SEP})?remastered`, "Remastered"],
+    ["unrated", "Unrated"],
+    ["uncut", "Uncut"],
+    ["imax", "IMAX"],
+    ["criterion", "Criterion"],
+  ],
+  true,
+);
 
 /** Talk shows and daily news: Show.2026.09.28 */
 export const dateRule: ParserRule = {
@@ -270,8 +270,7 @@ export const seasonEpisodeRule: ParserRule = {
       const tail = m[3] ?? "";
       const rest = [...tail.matchAll(/\d+/g)].map((t) => Number(t[0]));
       const last = rest.at(-1);
-      const episodes =
-        last === undefined ? [first] : tail.includes("-") ? range(first, last) : [first, ...rest];
+      const episodes = last === undefined ? [first] : tail.includes("-") ? range(first, last) : [first, ...rest];
       setEpisode(ctx, Number(m[1]), episodes, 0.95);
       hit(ctx, "seasonEpisode", m);
       return false;

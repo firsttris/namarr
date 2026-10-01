@@ -1,3 +1,7 @@
+import { ACTIONS, type Action, CONFLICT_POLICIES, type ConflictPolicy } from "@namarr/core/fileops";
+import type { MatchResult } from "@namarr/core/matcher";
+import type { Rule } from "@namarr/core/rules";
+import type { Parsed } from "@namarr/core/types";
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -8,13 +12,15 @@ const createdAt = () => integer("created_at", { mode: "timestamp_ms" }).notNull(
 export const profiles = sqliteTable("profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  mode: text("mode", { enum: ["media", "rules", "both"] }).notNull().default("media"),
+  mode: text("mode", { enum: ["media", "rules", "both"] })
+    .notNull()
+    .default("media"),
   preset: text("preset").notNull().default("jellyfin"),
   /** `{ movie?: string; episode?: string }`; empty uses the preset. */
   template: text("template", { mode: "json" }).$type<{ movie?: string; episode?: string }>().notNull().default({}),
-  rulesJson: text("rules_json", { mode: "json" }).$type<unknown[]>().notNull().default([]),
-  action: text("action").notNull().default("test"),
-  conflictPolicy: text("conflict_policy").notNull().default("skip"),
+  rulesJson: text("rules_json", { mode: "json" }).$type<Rule[]>().notNull().default([]),
+  action: text("action", { enum: ACTIONS }).notNull().default("test"),
+  conflictPolicy: text("conflict_policy", { enum: CONFLICT_POLICIES }).notNull().default("skip"),
   targetRoot: text("target_root"),
   createdAt: createdAt(),
 });
@@ -37,13 +43,15 @@ export type JobConfig = {
   mode: "media" | "rules" | "both";
   preset?: string;
   template?: { movie?: string; episode?: string };
-  rules?: unknown[];
-  action: string;
-  conflictPolicy: string;
+  rules?: Rule[];
+  action: Action;
+  conflictPolicy: ConflictPolicy;
   targetRoot?: string;
   language?: string;
   order?: "aired" | "dvd" | "absolute";
   autoThreshold?: number;
+  /** Watch folders set to "Immer prüfen": nothing runs without approval. */
+  alwaysReview?: boolean;
   recursive?: boolean;
 };
 
@@ -53,7 +61,9 @@ export const jobs = sqliteTable(
   "jobs",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    kind: text("kind", { enum: ["manual", "watch"] }).notNull().default("manual"),
+    kind: text("kind", { enum: ["manual", "watch"] })
+      .notNull()
+      .default("manual"),
     profileId: integer("profile_id").references(() => profiles.id, { onDelete: "set null" }),
     watchFolderId: integer("watch_folder_id").references(() => watchFolders.id, { onDelete: "set null" }),
     status: text("status", { enum: JOB_STATUSES }).notNull().default("pending"),
@@ -79,8 +89,8 @@ export const jobItems = sqliteTable(
       .references(() => jobs.id, { onDelete: "cascade" }),
     sourcePath: text("source_path").notNull(),
     size: integer("size").notNull().default(0),
-    parsedJson: text("parsed_json", { mode: "json" }).$type<unknown>(),
-    matchJson: text("match_json", { mode: "json" }).$type<unknown>(),
+    parsedJson: text("parsed_json", { mode: "json" }).$type<Parsed>(),
+    matchJson: text("match_json", { mode: "json" }).$type<MatchResult | null>(),
     confidence: real("confidence").notNull().default(0),
     targetPath: text("target_path"),
     /** Target set by hand in the UI; wins over the template. */

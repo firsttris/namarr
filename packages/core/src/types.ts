@@ -58,9 +58,6 @@ export interface MetadataProvider {
   readonly name: string;
   searchMovie(query: string, opts?: { year?: number; language?: string }): Promise<MediaCandidate[]>;
   searchSeries(query: string, opts?: { year?: number; language?: string }): Promise<MediaCandidate[]>;
-  episodes(
-    seriesId: string,
-    opts?: { season?: number; language?: string; order?: EpisodeOrder },
-  ): Promise<EpisodeInfo[]>;
+  episodes(seriesId: string, opts?: { season?: number; language?: string; order?: EpisodeOrder }): Promise<EpisodeInfo[]>;
   details(kind: "movie" | "series", id: string, opts?: { language?: string }): Promise<MediaCandidate>;
 }

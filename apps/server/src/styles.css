@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* Tokens from the Namarr design canvas: dark by default, dense like Sonarr/Radarr. */
+@theme {
+  --color-bg: #0d0f13;
+  --color-nav: #111318;
+  --color-panel: #151820;
+  --color-panel-2: #1a1d25;
+  --color-panel-3: #13161c;
+  --color-field: #0f1116;
+  --color-line: #22262e;
+  --color-line-2: #262a33;
+  --color-line-3: #333844;
+  --color-row: #1f232b;
+  --color-ink: #e6e8ec;
+  --color-soft: #b3b9c4;
+  --color-muted: #9aa1ad;
+  --color-dim: #8c93a0;
+  --color-faint: #6d7482;
+  --color-chip: #232733;
+  --color-chip-ink: #c9ced7;
+  --color-active: #1c2029;
+  --color-toggle: #2a2f3a;
+  --color-accent: #f0a14a;
+  --color-accent-soft: #f6bd7a;
+  --color-accent-ink: #1a1206;
+  --color-info: #5fb3ff;
+  --color-danger: #ff8a7a;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Bricolage Grotesque", "IBM Plex Sans", sans-serif;
+}
+
+/* Base styles live in the base layer, so utilities like text-soft still win on links. */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    color-scheme: dark;
+  }
+
+  a {
+    color: var(--color-accent);
+  }
+  a:hover {
+    color: var(--color-accent-soft);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  input[type="checkbox"] {
+    accent-color: var(--color-accent);
+  }
+
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

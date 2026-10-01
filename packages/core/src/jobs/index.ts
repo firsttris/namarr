@@ -5,27 +5,9 @@ import { applyRules, type Rule } from "../rules/index.ts";
 import type { Companion, ScannedFile } from "../scanner/index.ts";
 import type { Parsed } from "../types.ts";
 
-/** parsed → matched → needs_review | ready → done | skipped | failed → undone */
-export type ItemState = "parsed" | "matched" | "needs_review" | "ready" | "done" | "skipped" | "failed" | "undone";
+import type { ItemState } from "./states.ts";
 
-const TRANSITIONS: Record<ItemState, ItemState[]> = {
-  parsed: ["matched", "needs_review", "ready", "skipped", "failed"],
-  matched: ["needs_review", "ready", "skipped", "failed"],
-  needs_review: ["ready", "skipped", "needs_review", "failed"],
-  ready: ["done", "skipped", "failed", "needs_review", "ready"],
-  done: ["undone", "failed"],
-  skipped: ["ready", "needs_review", "skipped"],
-  failed: ["ready", "needs_review", "failed", "done"],
-  undone: ["ready", "needs_review"],
-};
-
-export function canTransition(from: ItemState, to: ItemState): boolean {
-  return TRANSITIONS[from].includes(to);
-}
-
-export function assertTransition(from: ItemState, to: ItemState): void {
-  if (!canTransition(from, to)) throw new Error(`Ungültiger Zustandswechsel ${from} → ${to}`);
-}
+export * from "./states.ts";
 
 export type Mode = "media" | "rules" | "both";
 

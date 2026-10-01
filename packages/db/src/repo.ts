@@ -2,8 +2,8 @@ import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, or, type
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type * as schema from "./schema.ts";
 import {
-  inbox,
   ITEM_STATES,
+  inbox,
   type JobConfig,
   jobItems,
   jobs,
@@ -120,7 +120,13 @@ export function insertItems(db: AnyDb, items: NewJobItem[]): JobItem[] {
     const out: JobItem[] = [];
     // SQLite caps bound variables; insert in chunks.
     for (let i = 0; i < items.length; i += 200) {
-      out.push(...tx.insert(jobItems).values(items.slice(i, i + 200)).returning().all());
+      out.push(
+        ...tx
+          .insert(jobItems)
+          .values(items.slice(i, i + 200))
+          .returning()
+          .all(),
+      );
     }
     return out;
   });
@@ -216,9 +222,15 @@ export const removeFromInbox = (db: AnyDb, jobItemId: number) => db.delete(inbox
 
 export function listInbox(db: AnyDb, limit = 100) {
   return db
-    .select({ reason: inbox.reason, createdAt: inbox.createdAt, item: jobItems })
+    .select({
+      reason: inbox.reason,
+      createdAt: inbox.createdAt,
+      item: jobItems,
+      targetRoot: sql<string | null>`json_extract(${jobs.config}, '$.targetRoot')`,
+    })
     .from(inbox)
     .innerJoin(jobItems, eq(inbox.jobItemId, jobItems.id))
+    .innerJoin(jobs, eq(jobItems.jobId, jobs.id))
     .orderBy(desc(inbox.createdAt), desc(inbox.jobItemId))
     .limit(limit)
     .all();

@@ -47,8 +47,33 @@ export const FILTERS: Record<string, FilterFn> = {
 };
 
 export const TOKEN_NAMES = [
-  "n", "y", "s", "e", "s00", "e00", "s00e00", "sxe", "t", "absolute", "abs", "d", "vf", "vc", "ac", "af", "hdr",
-  "source", "group", "lang", "edition", "ext", "part", "id", "provider", "orig", "kind",
+  "n",
+  "y",
+  "s",
+  "e",
+  "s00",
+  "e00",
+  "s00e00",
+  "sxe",
+  "t",
+  "absolute",
+  "abs",
+  "d",
+  "vf",
+  "vc",
+  "ac",
+  "af",
+  "hdr",
+  "source",
+  "group",
+  "lang",
+  "edition",
+  "ext",
+  "part",
+  "id",
+  "provider",
+  "orig",
+  "kind",
 ] as const;
 
 export function parseTemplate(template: string): Node[] {
@@ -158,7 +183,7 @@ function unquote(arg: string): string {
 }
 
 /** Path separators inside a value would create folders the template never asked for. */
-function valueOf(values: Values, name: string): string {
+function tokenValue(values: Values, name: string): string {
   const v = values[name];
   return v === undefined || v === null ? "" : String(v).replace(/[\\/]+/g, "-");
 }
@@ -168,9 +193,9 @@ export function renderNodes(nodes: Node[], values: Values): string {
   for (const node of nodes) {
     if (node.type === "text") out += node.value;
     else if (node.type === "token") {
-      out += node.filters.reduce((v, f) => FILTERS[f.name]!(v, f.args), valueOf(values, node.name));
+      out += node.filters.reduce((v, f) => FILTERS[f.name]!(v, f.args), tokenValue(values, node.name));
     } else {
-      const present = valueOf(values, node.name) !== "";
+      const present = tokenValue(values, node.name) !== "";
       if (present !== node.negate) out += renderNodes(node.children, values);
     }
   }

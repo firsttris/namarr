@@ -138,9 +138,7 @@ function applyText(rule: Rule, value: string, entry: RuleEntry, index: number, r
     case "extension":
       return value;
     case "transliterate":
-      return rule.stripDiacritics === false
-        ? value.replace(/[äöüÄÖÜß]/g, (c) => FILTERS.ascii!(c, []))
-        : FILTERS.ascii!(value, []);
+      return rule.stripDiacritics === false ? value.replace(/[äöüÄÖÜß]/g, (c) => FILTERS.ascii!(c, [])) : FILTERS.ascii!(value, []);
     case "cutAfter": {
       if (!rule.pattern) return value;
       const m = pattern(rule.pattern, rule.regex, "iu", ruleIndex).exec(value);
@@ -176,11 +174,7 @@ export function previewRules(entries: RuleEntry[], rules: Rule[]): string[][] {
   rules.forEach((rule, ruleIndex) => {
     const prev = steps.at(-1)!;
     const order = rule.type === "numbering" && rule.sort === "name" ? nameOrder(prev) : undefined;
-    steps.push(
-      rule.enabled === false
-        ? prev
-        : prev.map((path, i) => applyRule(rule, path, entries[i]!, order ? order[i]! : i, ruleIndex)),
-    );
+    steps.push(rule.enabled === false ? prev : prev.map((path, i) => applyRule(rule, path, entries[i]!, order ? order[i]! : i, ruleIndex)));
   });
   return steps;
 }
@@ -191,7 +185,9 @@ const collator = new Intl.Collator("de", { numeric: true, sensitivity: "base" })
 function nameOrder(paths: string[]): number[] {
   const sorted = paths.map((p, i) => ({ p, i })).sort((a, b) => collator.compare(a.p, b.p));
   const rank: number[] = [];
-  sorted.forEach(({ i }, r) => (rank[i] = r));
+  sorted.forEach(({ i }, r) => {
+    rank[i] = r;
+  });
   return rank;
 }
 

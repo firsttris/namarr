@@ -14,7 +14,10 @@ export class FakeProvider implements MetadataProvider {
   ) {}
 
   private search(list: MediaCandidate[] = [], query: string) {
-    const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+    const words = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2);
     return list.filter((c) => words.some((w) => c.title.toLowerCase().includes(w)));
   }
 

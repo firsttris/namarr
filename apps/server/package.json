@@ -1,0 +1,35 @@
+{
+  "name": "@namarr/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bunx --bun vite dev --port 8420",
+    "build": "bunx --bun vite build",
+    "start": "bun run server.ts",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@namarr/core": "workspace:*",
+    "@namarr/db": "workspace:*",
+    "@namarr/providers": "workspace:*",
+    "@tanstack/react-query": "^5",
+    "@tanstack/react-router": "^1",
+    "@tanstack/react-start": "^1",
+    "@tanstack/react-virtual": "^3",
+    "chokidar": "^5",
+    "pino": "^10",
+    "react": "^19",
+    "react-dom": "^19",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6",
+    "tailwindcss": "^4",
+    "vite": "^8",
+    "@playwright/test": "^1"
+  }
+}

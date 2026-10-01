@@ -29,7 +29,11 @@ async function write(rel: string, content = "data") {
   return p(rel);
 }
 const read = (rel: string) => fs.readFile(p(rel), "utf8");
-const exists = (rel: string) => fs.access(p(rel)).then(() => true, () => false);
+const exists = (rel: string) =>
+  fs.access(p(rel)).then(
+    () => true,
+    () => false,
+  );
 function done(r: OperationResult): OperationRecord {
   if (r.status !== "done") throw new Error(`expected done, got ${JSON.stringify(r)}`);
   return r.record;

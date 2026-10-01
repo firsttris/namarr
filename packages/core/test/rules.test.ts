@@ -19,11 +19,17 @@ describe("Regel-Engine", () => {
   });
 
   it("ungültige Regex meldet die Regel", () => {
-    expect(() => one("a.txt", [{ type: "case", mode: "lower" }, { type: "replace", find: "(", replace: "", regex: true }])).toThrow(
-      RuleError,
-    );
+    expect(() =>
+      one("a.txt", [
+        { type: "case", mode: "lower" },
+        { type: "replace", find: "(", replace: "", regex: true },
+      ]),
+    ).toThrow(RuleError);
     try {
-      one("a.txt", [{ type: "case", mode: "lower" }, { type: "replace", find: "(", replace: "", regex: true }]);
+      one("a.txt", [
+        { type: "case", mode: "lower" },
+        { type: "replace", find: "(", replace: "", regex: true },
+      ]);
     } catch (e) {
       expect((e as RuleError).ruleIndex).toBe(1);
     }
@@ -114,9 +120,16 @@ describe("Regel-Engine", () => {
 
 const ruleArb: fc.Arbitrary<Rule> = fc.oneof(
   fc.record({ type: fc.constant("replace" as const), find: fc.string({ maxLength: 3 }), replace: fc.string({ maxLength: 5 }) }),
-  fc.record({ type: fc.constant("insert" as const), text: fc.string({ maxLength: 5 }), position: fc.oneof(fc.constant("start" as const), fc.constant("end" as const), fc.nat(10)) }),
+  fc.record({
+    type: fc.constant("insert" as const),
+    text: fc.string({ maxLength: 5 }),
+    position: fc.oneof(fc.constant("start" as const), fc.constant("end" as const), fc.nat(10)),
+  }),
   fc.record({ type: fc.constant("remove" as const), from: fc.nat(10), count: fc.nat(10) }),
-  fc.record({ type: fc.constant("case" as const), mode: fc.constantFrom("title" as const, "lower" as const, "upper" as const, "sentence" as const) }),
+  fc.record({
+    type: fc.constant("case" as const),
+    mode: fc.constantFrom("title" as const, "lower" as const, "upper" as const, "sentence" as const),
+  }),
   fc.record({ type: fc.constant("separators" as const), separator: fc.constantFrom(" ", ".", "_", "-") }),
   fc.record({ type: fc.constant("numbering" as const), start: fc.nat(100), padding: fc.nat(4) }),
   fc.record({ type: fc.constant("transliterate" as const) }),
@@ -125,15 +138,22 @@ const ruleArb: fc.Arbitrary<Rule> = fc.oneof(
 describe("Regel-Engine: Property-Tests", () => {
   it("nach dem Sanitizing ist jeder Name gültig", () => {
     fc.assert(
-      fc.property(fc.array(fc.string({ maxLength: 30 }), { minLength: 1, maxLength: 5 }), fc.array(ruleArb, { maxLength: 6 }), (names, rules) => {
-        const out = applyRules(names.map((n) => ({ path: `${n || "x"}.mkv` })), rules);
-        expect(out).toHaveLength(names.length);
-        for (const name of out) {
-          const safe = sanitizeSegment(name.split("/").at(-1) ?? "");
-          expect(safe.length).toBeGreaterThan(0);
-          expect(/[<>:"|?*\\/]/.test(safe)).toBe(false);
-        }
-      }),
+      fc.property(
+        fc.array(fc.string({ maxLength: 30 }), { minLength: 1, maxLength: 5 }),
+        fc.array(ruleArb, { maxLength: 6 }),
+        (names, rules) => {
+          const out = applyRules(
+            names.map((n) => ({ path: `${n || "x"}.mkv` })),
+            rules,
+          );
+          expect(out).toHaveLength(names.length);
+          for (const name of out) {
+            const safe = sanitizeSegment(name.split("/").at(-1) ?? "");
+            expect(safe.length).toBeGreaterThan(0);
+            expect(/[<>:"|?*\\/]/.test(safe)).toBe(false);
+          }
+        },
+      ),
       { numRuns: 300 },
     );
   });

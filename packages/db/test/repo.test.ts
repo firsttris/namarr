@@ -14,6 +14,7 @@ import {
   getWatchFolder,
   insertItems,
   insertOperation,
+  type JobConfig,
   listInbox,
   listItems,
   listOperations,
@@ -21,20 +22,22 @@ import {
   markUndone,
   openDatabase,
   removeFromInbox,
+  SqliteProviderCache,
   saveOverride,
   setSettings,
-  SqliteProviderCache,
   updateItem,
 } from "../src/index.ts";
 
-const config = { mode: "media" as const, action: "test", conflictPolicy: "skip" };
+const config: JobConfig = { mode: "media", action: "test", conflictPolicy: "skip" };
 const fresh = () => openDatabase(":memory:");
 
 describe("Migrationen", () => {
   it("legen alle Tabellen an und laufen idempotent", () => {
     const db = fresh();
     const tables = db.$client
-      .query("select name from sqlite_master where type='table' and name not like '\\_\\_%' escape '\\' and name != 'sqlite_sequence' order by name")
+      .query(
+        "select name from sqlite_master where type='table' and name not like '\\_\\_%' escape '\\' and name != 'sqlite_sequence' order by name",
+      )
       .all()
       .map((r) => (r as { name: string }).name);
     expect(tables).toEqual([
@@ -117,7 +120,12 @@ describe("Jobs und Items", () => {
     const db = fresh();
     const job = createJob(db, { sourcePaths: ["/x"], config: { ...config, rules: [{ type: "transliterate" }] } });
     const [item] = insertItems(db, [
-      { jobId: job.id, sourcePath: "/x/a.mkv", parsedJson: { title: "A", episodes: [1] }, reasons: ["Doppelfolge"] },
+      {
+        jobId: job.id,
+        sourcePath: "/x/a.mkv",
+        parsedJson: { kind: { value: "episode", confidence: 1 }, title: "A", episodes: [1], release: { languages: [] } },
+        reasons: ["Doppelfolge"],
+      },
     ]);
     updateItem(db, item!.id, { companions: [{ from: "/x/a.srt", to: "/y/a.srt" }] });
     expect(allItems(db, job.id)[0]).toMatchObject({

@@ -120,9 +120,21 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
   return { files, orphans };
 }
 
-export type ProbeInfo = { resolution?: string; videoCodec?: string; audio: { codec: string; channels?: number; language?: string }[]; duration?: number };
+export type ProbeInfo = {
+  resolution?: string;
+  videoCodec?: string;
+  audio: { codec: string; channels?: number; language?: string }[];
+  duration?: number;
+};
 
-type FfprobeStream = { codec_type?: string; codec_name?: string; width?: number; height?: number; channels?: number; tags?: { language?: string } };
+type FfprobeStream = {
+  codec_type?: string;
+  codec_name?: string;
+  width?: number;
+  height?: number;
+  channels?: number;
+  tags?: { language?: string };
+};
 
 const CODEC_NAMES: Record<string, string> = { h264: "H.264", hevc: "H.265", av1: "AV1", mpeg4: "XviD", vp9: "VP9" };
 

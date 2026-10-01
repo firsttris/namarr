@@ -152,6 +152,7 @@ describe("Sanitizing", () => {
     expect(sanitizePath("a//b/../c")).toBe("a/b/_/c");
   });
 
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters must never survive sanitizing
   const forbidden = /[<>:"|?*\\/\u0000-\u001f]/;
 
   it("Property: nie ungültige Segmente", () => {

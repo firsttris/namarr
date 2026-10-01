@@ -4,7 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./formatter": "./src/formatter/index.ts",
+    "./rules": "./src/rules/index.ts",
+    "./parser": "./src/parser/index.ts",
+    "./matcher": "./src/matcher/index.ts",
+    "./jobs/states": "./src/jobs/states.ts",
+    "./types": "./src/types.ts",
+    "./fileops": "./src/fileops/index.ts"
   },
   "dependencies": {
     "picomatch": "^4"

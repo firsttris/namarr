@@ -2,21 +2,28 @@
   "name": "namarr",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "bun run --cwd apps/server dev",
     "build": "bun run --cwd apps/server build",
     "start": "bun run --cwd apps/server start",
     "test": "bun --bun vitest run",
     "test:watch": "bun --bun vitest",
-    "typecheck": "tsc -b",
-    "corpus": "bun scripts/corpus.ts"
+    "typecheck": "tsc -p packages/core && tsc -p packages/providers && tsc -p packages/db && tsc -p apps/server",
+    "corpus": "bun scripts/corpus.ts",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "e2e": "bun run --cwd apps/server build && bun run --cwd apps/server e2e"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^22",
     "fast-check": "^4",
     "typescript": "^5.9",
-    "vitest": "^5"
+    "vitest": "^5",
+    "@biomejs/biome": "^2"
   }
 }

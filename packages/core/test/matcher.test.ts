@@ -122,9 +122,7 @@ describe("Gruppierung und matchAll", () => {
     const other: MediaCandidate = { provider: "tmdb", id: "1", kind: "series", title: "Office Space Show" };
     const provider = new FakeProvider({ series: [other, severance], episodes: { "95396": severanceEpisodes } });
     const input = [{ key: "x", parsed: parse("Sev.S02E01.mkv") }];
-    const result = (
-      await matchAll(input, provider, { overrides: [{ pattern: "Sev", provider: "tmdb", externalId: "95396" }] })
-    ).get("x")!;
+    const result = (await matchAll(input, provider, { overrides: [{ pattern: "Sev", provider: "tmdb", externalId: "95396" }] })).get("x")!;
     expect(result.best?.id).toBe("95396");
     expect(result.confidence).toBe(1);
     expect(result.overridden).toBe(true);

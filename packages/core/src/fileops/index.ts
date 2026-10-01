@@ -2,11 +2,11 @@ import { constants, type Stats } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-export type Action = "move" | "copy" | "hardlink" | "symlink" | "rename" | "test";
-export type ConflictPolicy = "skip" | "overwrite" | "suffix" | "keep-better";
+export const ACTIONS = ["move", "copy", "hardlink", "symlink", "rename", "test"] as const;
+export const CONFLICT_POLICIES = ["skip", "overwrite", "suffix", "keep-better"] as const;
 
-export const ACTIONS: Action[] = ["move", "copy", "hardlink", "symlink", "rename", "test"];
-export const CONFLICT_POLICIES: ConflictPolicy[] = ["skip", "overwrite", "suffix", "keep-better"];
+export type Action = (typeof ACTIONS)[number];
+export type ConflictPolicy = (typeof CONFLICT_POLICIES)[number];
 
 export type PlannedOperation = { from: string; to: string; action: Action };
 

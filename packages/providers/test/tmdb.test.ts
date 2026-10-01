@@ -34,7 +34,14 @@ const routes = {
 
 function provider(extra: Partial<ConstructorParameters<typeof TmdbProvider>[0]> = {}) {
   const r = recorded(routes);
-  const tmdb = new TmdbProvider({ apiKey: "k", language: "de-DE", fetch: r.fetchImpl, baseUrl: "https://api.test/3", rateLimit: 1000, ...extra });
+  const tmdb = new TmdbProvider({
+    apiKey: "k",
+    language: "de-DE",
+    fetch: r.fetchImpl,
+    baseUrl: "https://api.test/3",
+    rateLimit: 1000,
+    ...extra,
+  });
   return { tmdb, calls: r.calls };
 }
 

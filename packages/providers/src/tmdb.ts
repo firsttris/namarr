@@ -159,9 +159,7 @@ export class TmdbProvider implements MetadataProvider {
       .filter((n) => opts?.season === undefined || n === opts.season)
       .sort((a, b) => a - b);
     const lists = await Promise.all(
-      seasons.map((n) =>
-        this.get<{ episodes: TmdbEpisode[] }>(`/tv/${seriesId}/season/${n}`, { language }, this.ttl.details),
-      ),
+      seasons.map((n) => this.get<{ episodes: TmdbEpisode[] }>(`/tv/${seriesId}/season/${n}`, { language }, this.ttl.details)),
     );
     const all = lists.flatMap((l) => l.episodes).map((e) => this.episode(e));
     // Absolute numbers count through the regular seasons in aired order.
@@ -192,7 +190,13 @@ export class TmdbProvider implements MetadataProvider {
       for (const e of [...g.episodes].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))) {
         const season = type === GROUP_TYPE.absolute ? 1 : g.order;
         const episode = type === GROUP_TYPE.absolute ? ++abs : (e.order ?? 0) + 1;
-        out.push({ season, episode, absolute: type === GROUP_TYPE.absolute ? abs : undefined, title: e.name || undefined, airDate: e.air_date || undefined });
+        out.push({
+          season,
+          episode,
+          absolute: type === GROUP_TYPE.absolute ? abs : undefined,
+          title: e.name || undefined,
+          airDate: e.air_date || undefined,
+        });
       }
     }
     return out;

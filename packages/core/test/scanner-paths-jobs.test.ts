@@ -174,7 +174,13 @@ describe("Vorschau (Workbench-Szenario aus dem Design)", () => {
     const { files } = await scan(path.join(tmp, "photos"), { mode: "all" });
     const items = buildPreview(
       files.map((file) => ({ file, parsed: parse(file.relative) })),
-      { mode: "rules", rules: [{ type: "extension", case: "lower" }, { type: "insert", text: "Urlaub ", position: "start" }] },
+      {
+        mode: "rules",
+        rules: [
+          { type: "extension", case: "lower" },
+          { type: "insert", text: "Urlaub ", position: "start" },
+        ],
+      },
     );
     expect(items[0]).toMatchObject({ state: "ready", target: path.join(tmp, "photos/Urlaub IMG_1.jpg") });
   });

@@ -69,9 +69,7 @@ export function scoreCandidate(parsed: Parsed, candidate: MediaCandidate): numbe
 
 /** Ranks candidates and derives a confidence that drops when the top two are close. */
 export function rank(parsed: Parsed, candidates: MediaCandidate[]): { ranked: ScoredCandidate[]; confidence: number; reasons: string[] } {
-  const ranked = candidates
-    .map((candidate) => ({ candidate, score: scoreCandidate(parsed, candidate) }))
-    .sort((a, b) => b.score - a.score);
+  const ranked = candidates.map((candidate) => ({ candidate, score: scoreCandidate(parsed, candidate) })).sort((a, b) => b.score - a.score);
   const reasons: string[] = [];
   const [first, second] = ranked;
   if (!first || first.score < 0.5) return { ranked, confidence: 0, reasons: ["Kein Treffer gefunden"] };
