@@ -6,3 +6,4 @@
 config
 *.sqlite*
 .git
+docker

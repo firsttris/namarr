@@ -43,6 +43,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
+          file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -54,7 +55,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           BLOB=https://github.com/${{ github.repository }}/blob/main
-          sed -E -e "s#\]\((\./|/)?unraid/#](${BLOB}/unraid/#g" README.md > dockerhub-readme.md
+          sed -E -e "s#\]\((\./|/)?docker/#](${BLOB}/docker/#g" README.md > dockerhub-readme.md
       - name: Update Docker Hub description
         if: startsWith(github.ref, 'refs/tags/v')
         uses: peter-evans/dockerhub-description@v5

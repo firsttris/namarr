@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Build stage: install with Bun and bundle the server, client assets and all dependencies.
-FROM oven/bun:1.4 AS build
+FROM docker.io/oven/bun:1.4 AS build
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages/core/package.json packages/core/
@@ -12,10 +12,10 @@ COPY . .
 RUN bun run --cwd apps/server build
 
 # ffprobe for container metadata, as a static binary (multi-arch, no apt, no shared libs).
-FROM mwader/static-ffmpeg:7.1 AS ffmpeg
+FROM docker.io/mwader/static-ffmpeg:7.1 AS ffmpeg
 
 # Runtime: the slim Bun image plus the bundle. No node_modules: everything is in dist/.
-FROM oven/bun:1.4-slim AS runtime
+FROM docker.io/oven/bun:1.4-slim AS runtime
 WORKDIR /app
 COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 COPY --from=build /app/apps/server/dist ./dist
