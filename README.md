@@ -21,7 +21,21 @@ services:
       - /mnt/data:/data # Downloads und Library im selben Mount, sonst keine Hardlinks
 ```
 
-Danach `http://<host>:8420` öffnen, mit dem Token anmelden und unter **Einstellungen** den eigenen TMDB-API-Key eintragen (themoviedb.org → Einstellungen → API; v3-Key oder v4-Token). Für Unraid liegt ein Template unter [`unraid/namarr.xml`](unraid/namarr.xml).
+Danach `http://<host>:8420` öffnen, mit dem Token anmelden und unter **Einstellungen** den eigenen TMDB-API-Key eintragen (themoviedb.org → Einstellungen → API; v3-Key oder v4-Token).
+
+Alles rund ums Image liegt unter [`docker/`](docker/): [`Dockerfile`](docker/Dockerfile), [`compose.example.yml`](docker/compose.example.yml), ein Unraid-Template ([`unraid/namarr.xml`](docker/unraid/namarr.xml)) und ein Podman-Quadlet ([`quadlet/namarr.container`](docker/quadlet/namarr.container)). Images: `ghcr.io/firsttris/namarr` und `tristanteu/namarr` – `latest` und `x.y.z` für Releases, `edge` für den aktuellen Stand von `main`.
+
+### Podman (Quadlet)
+
+```sh
+mkdir -p ~/.config/containers/systemd ~/namarr/config
+cp docker/quadlet/namarr.container ~/.config/containers/systemd/   # /mnt/data darin anpassen
+printf 'mein-langes-token' | podman secret create namarr-token -
+systemctl --user daemon-reload && systemctl --user start namarr
+loginctl enable-linger $USER   # auch ohne Login nach dem Booten starten
+```
+
+Rootless bleibt `PUID` leer: Container-root ist bereits der eigene Nutzer, ein `PUID` würde auf eine fremde subuid gemappt. Rootful (`/etc/containers/systemd/`) wie bei Docker `PUID`/`PGID` setzen. Updates: `podman auto-update`.
 
 | Variable | Standard | Bedeutung |
 |---|---|---|

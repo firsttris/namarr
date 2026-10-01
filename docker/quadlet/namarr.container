@@ -1,0 +1,42 @@
+# namarr als Podman-Quadlet (systemd).
+#
+# Rootless (empfohlen): nach ~/.config/containers/systemd/namarr.container kopieren.
+# Rootful: nach /etc/containers/systemd/namarr.container kopieren, PUID/PGID unten setzen.
+#
+#   printf 'mein-langes-token' | podman secret create namarr-token -
+#   mkdir -p ~/namarr/config
+#   systemctl --user daemon-reload
+#   systemctl --user start namarr
+#   loginctl enable-linger $USER   # rootless: auch ohne Login nach dem Booten starten
+
+[Unit]
+Description=namarr – Medien-Matching und Regel-Umbenennung
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=namarr
+Image=ghcr.io/firsttris/namarr:latest
+# `podman auto-update` zieht neue Images und startet den Dienst neu.
+AutoUpdate=registry
+
+PublishPort=8420:8420
+Secret=namarr-token,type=env,target=NAMARR_TOKEN
+
+# Rootless: Container-root ist schon der eigene Host-Nutzer. Ein PUID würde auf eine
+# subuid gemappt und die Dateien gehörten auf dem Host einer fremden UID. Darum leer lassen.
+# Rootful: stattdessen z. B. PUID=1000 und PGID=1000 setzen.
+Environment=PUID=
+
+# %h = Home-Verzeichnis. :Z setzt das SELinux-Label (Fedora/RHEL); ohne SELinux schadet es nicht.
+# Downloads und Library im selben Mount, sonst sind keine Hardlinks möglich.
+Volume=%h/namarr/config:/config:Z
+Volume=/mnt/data:/data:Z
+
+[Service]
+Restart=always
+# Ein laufender Job darf beim Stoppen bis zu 10 s die aktuelle Datei fertig verarbeiten.
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
