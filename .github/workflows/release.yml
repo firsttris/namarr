@@ -1,9 +1,8 @@
 name: Release
 
+# Manual only: run from "main" for an edge image, or pick a "v*" tag for latest/x.y.z.
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -23,7 +23,7 @@ services:
 
 Danach `http://<host>:8420` öffnen, mit dem Token anmelden und unter **Einstellungen** den eigenen TMDB-API-Key eintragen (themoviedb.org → Einstellungen → API; v3-Key oder v4-Token).
 
-Alles rund ums Image liegt unter [`docker/`](docker/): [`Dockerfile`](docker/Dockerfile), [`compose.example.yml`](docker/compose.example.yml), ein Unraid-Template ([`unraid/namarr.xml`](docker/unraid/namarr.xml)) und ein Podman-Quadlet ([`quadlet/namarr.container`](docker/quadlet/namarr.container)). Images: `ghcr.io/firsttris/namarr` und `tristanteu/namarr` – `latest` und `x.y.z` für Releases, `edge` für den aktuellen Stand von `main`.
+Alles rund ums Image liegt unter [`docker/`](docker/): [`Dockerfile`](docker/Dockerfile), [`compose.example.yml`](docker/compose.example.yml), ein Unraid-Template ([`unraid/namarr.xml`](docker/unraid/namarr.xml)) und ein Podman-Quadlet ([`quadlet/namarr.container`](docker/quadlet/namarr.container)). Images: `ghcr.io/firsttris/namarr` und `tristanteu/namarr` – `latest` und `x.y.z` für Releases, `edge` für den aktuellen Stand von `main`. Gebaut und gepusht wird nur manuell über den Workflow „Release“ (Actions → Run workflow): auf `main` für `edge`, auf einem `v*`-Tag für `latest`/`x.y.z`.
 
 ### Podman (Quadlet)
 
