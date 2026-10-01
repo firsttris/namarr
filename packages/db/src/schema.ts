@@ -55,15 +55,17 @@ export type JobConfig = {
   recursive?: boolean;
 };
 
+/** manual: workbench; watch: a watch folder; hook: a download client via POST /api/jobs. */
+export const JOB_KINDS = ["manual", "watch", "hook"] as const;
+export type JobKind = (typeof JOB_KINDS)[number];
+
 export const JOB_STATUSES = ["pending", "scanning", "matching", "ready", "executing", "done", "failed", "cancelled", "undone"] as const;
 
 export const jobs = sqliteTable(
   "jobs",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    kind: text("kind", { enum: ["manual", "watch"] })
-      .notNull()
-      .default("manual"),
+    kind: text("kind", { enum: JOB_KINDS }).notNull().default("manual"),
     profileId: integer("profile_id").references(() => profiles.id, { onDelete: "set null" }),
     watchFolderId: integer("watch_folder_id").references(() => watchFolders.id, { onDelete: "set null" }),
     status: text("status", { enum: JOB_STATUSES }).notNull().default("pending"),

@@ -24,5 +24,8 @@ export default function setup() {
   const photos = path.join(root, "data/photos");
   fs.mkdirSync(photos, { recursive: true });
   for (const f of ["IMG_0003.JPG", "IMG_0001.JPG", "IMG_0002.JPG"]) fs.writeFileSync(path.join(photos, f), f);
+  const hook = path.join(root, "data/hook/Dark.S01.German.DL.1080p.WEB-GRP");
+  fs.mkdirSync(hook, { recursive: true });
+  fs.writeFileSync(path.join(hook, "Dark.S01E01.German.DL.1080p.WEB.h264-GRP.mkv"), "dark");
   fs.mkdirSync(path.join(root, "config"), { recursive: true });
 }

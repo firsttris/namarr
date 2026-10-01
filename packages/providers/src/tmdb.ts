@@ -36,8 +36,22 @@ type TmdbTv = {
   first_air_date?: string;
   poster_path?: string | null;
   number_of_episodes?: number;
+  original_language?: string;
   seasons?: { season_number: number; episode_count: number }[];
 };
+
+/**
+ * A title TMDB fills in when nobody translated the episode: "Episode 5", "Folge 5", "Épisode 5",
+ * a bare number, or nothing. Such a title must not end up in a file name.
+ */
+export function isPlaceholderTitle(title: string | undefined): boolean {
+  if (!title?.trim()) return true;
+  return (
+    /^(episode|folge|épisode|episodio|epizod|aflevering|afl\.?|odcinek|avsnitt|jakso|capítulo|エピソード|第)\s*\d+\s*(話)?$/i.test(
+      title.trim(),
+    ) || /^\d+$/.test(title.trim())
+  );
+}
 type TmdbEpisode = { season_number: number; episode_number: number; name?: string; air_date?: string | null; order?: number };
 type TmdbEpisodeGroup = { id: string; type: number; name: string; episode_count: number };
 
@@ -149,15 +163,40 @@ export class TmdbProvider implements MetadataProvider {
 
   async episodes(seriesId: string, opts?: { season?: number; language?: string; order?: EpisodeOrder }) {
     const language = this.language(opts);
-    const order = opts?.order ?? "aired";
+    const show = await this.get<TmdbTv>(`/tv/${seriesId}`, { language }, this.ttl.details);
+    const list = await this.episodesIn(seriesId, show, { ...opts, language });
+    // Untranslated titles: take them from the original language, then from English.
+    const fallbacks = [show.original_language, "en-US"].filter(
+      (l): l is string => Boolean(l) && l!.slice(0, 2) !== (language ?? "").slice(0, 2),
+    );
+    for (const fallback of [...new Set(fallbacks)]) {
+      const missing = list.filter((e) => isPlaceholderTitle(e.title));
+      if (!missing.length) break;
+      const other = await this.episodesIn(seriesId, show, { ...opts, language: fallback, seasons: new Set(missing.map((e) => e.season)) });
+      const byKey = new Map(other.map((e) => [`${e.season}x${e.episode}`, e.title]));
+      for (const e of missing) {
+        const title = byKey.get(`${e.season}x${e.episode}`);
+        if (!isPlaceholderTitle(title)) e.title = title;
+      }
+    }
+    return list;
+  }
+
+  /** Episodes in one language; `seasons` limits the fetch (fallback lookups). */
+  private async episodesIn(
+    seriesId: string,
+    show: TmdbTv,
+    opts: { season?: number; language?: string; order?: EpisodeOrder; seasons?: Set<number> },
+  ): Promise<EpisodeInfo[]> {
+    const { language } = opts;
+    const order = opts.order ?? "aired";
     if (order !== "aired") {
       const grouped = await this.groupedEpisodes(seriesId, GROUP_TYPE[order], language);
       if (grouped) return opts?.season === undefined ? grouped : grouped.filter((e) => e.season === opts.season);
     }
-    const show = await this.get<TmdbTv>(`/tv/${seriesId}`, { language }, this.ttl.details);
     const seasons = (show.seasons ?? [])
       .map((s) => s.season_number)
-      .filter((n) => opts?.season === undefined || n === opts.season)
+      .filter((n) => (opts.season === undefined || n === opts.season) && (!opts.seasons || opts.seasons.has(n)))
       .sort((a, b) => a - b);
     const lists = await Promise.all(
       seasons.map((n) => this.get<{ episodes: TmdbEpisode[] }>(`/tv/${seriesId}/season/${n}`, { language }, this.ttl.details)),

@@ -19,7 +19,9 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WatchRouteImport } from './routes/watch'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiJobsRouteImport } from './routes/api/jobs'
 import { Route as JobsJobIdRouteImport } from './routes/jobs.$jobId'
+import { Route as ApiJobsJobIdRouteImport } from './routes/api/jobs.$jobId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -71,10 +73,20 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiJobsRoute = ApiJobsRouteImport.update({
+  id: '/api/jobs',
+  path: '/api/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JobsJobIdRoute = JobsJobIdRouteImport.update({
   id: '/jobs/$jobId',
   path: '/jobs/$jobId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiJobsJobIdRoute = ApiJobsJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => ApiJobsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -88,7 +100,9 @@ export interface FileRoutesByFullPath {
   '/watch': typeof WatchRoute
   '/api/events': typeof ApiEventsRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/jobs': typeof ApiJobsRouteWithChildren
   '/jobs/$jobId': typeof JobsJobIdRoute
+  '/api/jobs/$jobId': typeof ApiJobsJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -101,7 +115,9 @@ export interface FileRoutesByTo {
   '/watch': typeof WatchRoute
   '/api/events': typeof ApiEventsRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/jobs': typeof ApiJobsRouteWithChildren
   '/jobs/$jobId': typeof JobsJobIdRoute
+  '/api/jobs/$jobId': typeof ApiJobsJobIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -115,7 +131,9 @@ export interface FileRoutesById {
   '/watch': typeof WatchRoute
   '/api/events': typeof ApiEventsRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/jobs': typeof ApiJobsRouteWithChildren
   '/jobs/$jobId': typeof JobsJobIdRoute
+  '/api/jobs/$jobId': typeof ApiJobsJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -130,7 +148,9 @@ export interface FileRouteTypes {
     | '/watch'
     | '/api/events'
     | '/api/health'
+    | '/api/jobs'
     | '/jobs/$jobId'
+    | '/api/jobs/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -143,7 +163,9 @@ export interface FileRouteTypes {
     | '/watch'
     | '/api/events'
     | '/api/health'
+    | '/api/jobs'
     | '/jobs/$jobId'
+    | '/api/jobs/$jobId'
   id:
     | '__root__'
     | '/'
@@ -156,7 +178,9 @@ export interface FileRouteTypes {
     | '/watch'
     | '/api/events'
     | '/api/health'
+    | '/api/jobs'
     | '/jobs/$jobId'
+    | '/api/jobs/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -170,6 +194,7 @@ export interface RootRouteChildren {
   WatchRoute: typeof WatchRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiJobsRoute: typeof ApiJobsRouteWithChildren
   JobsJobIdRoute: typeof JobsJobIdRoute
 }
 
@@ -245,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/jobs': {
+      id: '/api/jobs'
+      path: '/api/jobs'
+      fullPath: '/api/jobs'
+      preLoaderRoute: typeof ApiJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jobs/$jobId': {
       id: '/jobs/$jobId'
       path: '/jobs/$jobId'
@@ -252,8 +284,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsJobIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/jobs/$jobId': {
+      id: '/api/jobs/$jobId'
+      path: '/$jobId'
+      fullPath: '/api/jobs/$jobId'
+      preLoaderRoute: typeof ApiJobsJobIdRouteImport
+      parentRoute: typeof ApiJobsRoute
+    }
   }
 }
+
+interface ApiJobsRouteChildren {
+  ApiJobsJobIdRoute: typeof ApiJobsJobIdRoute
+}
+
+const ApiJobsRouteChildren: ApiJobsRouteChildren = {
+  ApiJobsJobIdRoute: ApiJobsJobIdRoute,
+}
+
+const ApiJobsRouteWithChildren =
+  ApiJobsRoute._addFileChildren(ApiJobsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -266,6 +316,7 @@ const rootRouteChildren: RootRouteChildren = {
   WatchRoute: WatchRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiJobsRoute: ApiJobsRouteWithChildren,
   JobsJobIdRoute: JobsJobIdRoute,
 }
 export const routeTree = rootRouteImport

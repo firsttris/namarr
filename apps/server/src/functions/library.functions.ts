@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { ACTIONS, CONFLICT_POLICIES, PathOutsideRootError, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
+import { ACTIONS, CONFLICT_POLICIES, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
 import { tr } from "@namarr/core/i18n";
 import {
   createProfile,
@@ -56,13 +56,7 @@ export const browseFolder = createServerFn({ method: "GET" })
     const { roots } = getSettings(rt.db);
     if (!data.path)
       return { path: null, parent: null, roots, entries: [] as { name: string; path: string; dir: boolean; video: boolean }[] };
-    let dir: string;
-    try {
-      dir = await resolveInRoots(data.path, roots);
-    } catch (e) {
-      if (e instanceof PathOutsideRootError) throw new Error(e.message);
-      throw e;
-    }
+    const dir = await resolveInRoots(data.path, roots);
     const dirents = await fs.readdir(dir, { withFileTypes: true });
     const entries = dirents
       .filter((d) => !d.name.startsWith(".") && d.name !== "@eaDir")

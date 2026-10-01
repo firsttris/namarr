@@ -6,6 +6,7 @@ import {
   ITEM_STATES,
   inbox,
   type JobConfig,
+  type JobKind,
   jobItems,
   jobs,
   matchOverrides,
@@ -87,7 +88,7 @@ export const deleteWatchFolder = (db: AnyDb, id: number) => db.delete(watchFolde
 
 export function createJob(
   db: AnyDb,
-  values: { kind?: "manual" | "watch"; profileId?: number | null; watchFolderId?: number | null; sourcePaths: string[]; config: JobConfig },
+  values: { kind?: JobKind; profileId?: number | null; watchFolderId?: number | null; sourcePaths: string[]; config: JobConfig },
 ): Job {
   return db.insert(jobs).values(values).returning().get();
 }
@@ -168,6 +169,13 @@ export function listItems(
 
 export function allItems(db: AnyDb, jobId: number): JobItem[] {
   return db.select().from(jobItems).where(eq(jobItems.jobId, jobId)).orderBy(asc(jobItems.id)).all();
+}
+
+/** Source paths below `dir` that some job already took (renamed, skipped or still pending). */
+export function knownSourcePaths(db: AnyDb, dir: string): Set<string> {
+  const prefix = `${dir.replace(/\/+$/, "").replace(/[%_\\]/g, "\\$&")}/%`;
+  const rows = db.select({ path: jobItems.sourcePath }).from(jobItems).where(sql`${jobItems.sourcePath} LIKE ${prefix} ESCAPE '\\'`).all();
+  return new Set(rows.map((r) => r.path));
 }
 
 export function updateItem(db: AnyDb, id: number, values: Partial<NewJobItem>): JobItem | undefined {
