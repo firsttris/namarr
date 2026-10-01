@@ -36,6 +36,8 @@ const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1"]);
 /** Outside loopback a token is mandatory: the server can move and delete files. */
 export function assertSafeBinding(env: Env): void {
   if (!LOOPBACK.has(env.host) && !env.token && !env.authHeader) {
-    throw new Error(`NAMARR_TOKEN fehlt: Ohne Token lauscht namarr nur auf 127.0.0.1 (angefragt: ${env.host}).`);
+    throw new Error(
+      `NAMARR_TOKEN is required: without a token namarr only listens on 127.0.0.1 (requested: ${env.host}). / NAMARR_TOKEN fehlt: Ohne Token lauscht namarr nur auf 127.0.0.1.`,
+    );
   }
 }

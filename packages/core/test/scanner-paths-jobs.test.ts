@@ -2,8 +2,9 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { tr } from "../src/i18n.ts";
 import { buildPreview, canTransition, type PreviewInput, summarize } from "../src/jobs/index.ts";
-import { matchAll } from "../src/matcher/index.ts";
+import { matchAll, NO_MATCH } from "../src/matcher/index.ts";
 import { parse } from "../src/parser/index.ts";
 import { isInside, PathOutsideRootError, resolveInRoots } from "../src/paths.ts";
 import { parseFfprobe, scan } from "../src/scanner/index.ts";
@@ -151,8 +152,8 @@ describe("Vorschau (Workbench-Szenario aus dem Design)", () => {
       },
     ]);
     expect(bySource(names[2]!).state).toBe("needs_review");
-    expect(bySource(names[3]!)).toMatchObject({ state: "skipped", reasons: ["Übersprungen: Sample-Datei"] });
-    expect(bySource(names[4]!)).toMatchObject({ state: "needs_review", reasons: ["Kein Treffer gefunden"] });
+    expect(bySource(names[3]!)).toMatchObject({ state: "skipped", reasons: [tr("Übersprungen: Sample-Datei", "Skipped: sample file")] });
+    expect(bySource(names[4]!)).toMatchObject({ state: "needs_review", reasons: [NO_MATCH] });
     expect(bySource(names[4]!).target).toBeUndefined();
     expect(summarize(items)).toEqual({ total: 5, ready: 2, review: 2, skipped: 1, conflicts: 0 });
   });

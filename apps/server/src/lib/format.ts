@@ -1,21 +1,21 @@
-const nf = new Intl.NumberFormat("de-DE");
+import type { Messages } from "./messages";
 
-export const num = (n: number) => nf.format(n);
+export const num = (n: number, locale = "de-DE") => new Intl.NumberFormat(locale).format(n);
 export const pct = (n: number) => `${Math.round(n * 100)} %`;
 
-export function ago(date: Date | string | number | null | undefined, now = Date.now()): string {
-  if (!date) return "noch nie";
+export function ago(t: Messages, date: Date | string | number | null | undefined, now = Date.now()): string {
+  if (!date) return t.time.never;
   const s = Math.max(0, Math.round((now - new Date(date).getTime()) / 1000));
-  if (s < 60) return "gerade eben";
-  if (s < 3600) return `vor ${Math.round(s / 60)} Min.`;
-  if (s < 86400) return `vor ${Math.round(s / 3600)} Std.`;
-  return `vor ${Math.round(s / 86400)} Tagen`;
+  if (s < 60) return t.time.justNow;
+  if (s < 3600) return t.time.minutes(Math.round(s / 60));
+  if (s < 86400) return t.time.hours(Math.round(s / 3600));
+  return t.time.days(Math.round(s / 86400));
 }
 
-export function greeting(hour = new Date().getHours()): string {
-  if (hour < 11) return "Guten Morgen";
-  if (hour < 18) return "Guten Tag";
-  return "Guten Abend";
+export function greeting(t: Messages, hour = new Date().getHours()): string {
+  if (hour < 11) return t.time.greetingMorning;
+  if (hour < 18) return t.time.greetingDay;
+  return t.time.greetingEvening;
 }
 
 /** Splits a target path into folder part and file name, for the two-tone rendering. */
@@ -47,49 +47,10 @@ export function diffWords(oldName: string, newName: string): { text: string; add
   const out: { text: string; added: boolean }[] = [];
   for (const p of parts) {
     const n = norm(p);
-    const added = n !== "" && !known.has(n) && !/^(mkv|mp4|avi|srt|season)$/.test(n);
+    const added = n !== "" && !known.has(n) && !/^(mkv|mp4|avi|srt|season|staffel)$/.test(n);
     const last = out.at(-1);
     if (last && (last.added === added || n === "")) last.text += p;
     else out.push({ text: p, added });
   }
   return out;
 }
-
-export const ACTION_LABELS: Record<string, string> = {
-  test: "Test (nur Vorschau)",
-  move: "Verschieben",
-  copy: "Kopieren",
-  hardlink: "Hardlink",
-  symlink: "Symlink",
-  rename: "Umbenennen am Ort",
-};
-
-export const CONFLICT_LABELS: Record<string, string> = {
-  skip: "Überspringen",
-  overwrite: "Überschreiben",
-  suffix: "Suffix anhängen",
-  "keep-better": "Bessere behalten",
-};
-
-export const STATE_LABELS: Record<string, string> = {
-  parsed: "erkannt",
-  matched: "zugeordnet",
-  needs_review: "prüfen",
-  ready: "bereit",
-  done: "erledigt",
-  skipped: "übersprungen",
-  failed: "fehlgeschlagen",
-  undone: "rückgängig",
-};
-
-export const JOB_STATUS_LABELS: Record<string, string> = {
-  pending: "Wartet",
-  scanning: "Scannt",
-  matching: "Ordnet zu",
-  ready: "Vorschau bereit",
-  executing: "Läuft",
-  done: "Fertig",
-  failed: "Fehlgeschlagen",
-  cancelled: "Abgebrochen",
-  undone: "Rückgängig gemacht",
-};

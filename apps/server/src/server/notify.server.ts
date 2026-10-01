@@ -1,13 +1,16 @@
+import { type Lang, langOf } from "@namarr/core/i18n";
 import type { Settings } from "@namarr/db";
 
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
 export type JobSummary = { jobId: number; done: number; failed: number; skipped: number; source: string };
 
-export function summaryText(s: JobSummary): string {
-  const parts = [`${s.done} umbenannt`];
-  if (s.skipped) parts.push(`${s.skipped} übersprungen`);
-  if (s.failed) parts.push(`${s.failed} fehlgeschlagen`);
+/** The notification text, in the language set for titles (`de-DE` → German, else English). */
+export function summaryText(s: JobSummary, lang: Lang = "de"): string {
+  const de = lang === "de";
+  const parts = [de ? `${s.done} umbenannt` : `${s.done} renamed`];
+  if (s.skipped) parts.push(de ? `${s.skipped} übersprungen` : `${s.skipped} skipped`);
+  if (s.failed) parts.push(de ? `${s.failed} fehlgeschlagen` : `${s.failed} failed`);
   return `namarr Job #${s.jobId}: ${parts.join(", ")} (${s.source})`;
 }
 
@@ -73,7 +76,7 @@ export async function afterExecution(
 ): Promise<void> {
   const requests = [
     ...(summary.done > 0 ? settings.libraryRefresh.map(refreshRequest) : []),
-    ...settings.notifications.map((n) => notificationRequest(n, summaryText(summary))),
+    ...settings.notifications.map((n) => notificationRequest(n, summaryText(summary, langOf(settings.language)))),
   ];
   await Promise.all(
     requests.map(async ({ url, init }) => {

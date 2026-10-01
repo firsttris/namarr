@@ -21,6 +21,8 @@ import {
   resolveInRoots,
   type ScannedFile,
   scan,
+  TARGET_EXISTS,
+  tr,
   undoOperation,
 } from "@namarr/core";
 import {
@@ -59,6 +61,14 @@ export type JobServiceDeps = {
   probe?: (file: string) => Promise<ProbeInfo | undefined>;
 };
 
+export const JOB_BUSY = tr("Job läuft noch", "Job is still running");
+export const JOB_NOT_FOUND = tr("Job nicht gefunden", "Job not found");
+export const NO_PROVIDER = tr(
+  "Kein Metadaten-Anbieter: TMDB-API-Key in den Einstellungen hinterlegen",
+  "No metadata provider: add a TMDB API key in the settings",
+);
+export const ALWAYS_REVIEW = tr("Immer prüfen", "Always review");
+
 /** Thrown for user errors; the message is shown in the UI. */
 export class JobError extends Error {
   override name = "JobError";
@@ -96,7 +106,7 @@ export class JobService {
 
   /** Previews and items of a job that is scanning, matching or executing are not editable. */
   private assertIdle(job: Job) {
-    if (["pending", "scanning", "matching", "executing"].includes(job.status)) throw new JobError("Job läuft noch");
+    if (["pending", "scanning", "matching", "executing"].includes(job.status)) throw new JobError(JOB_BUSY);
   }
 
   /** Waits until everything queued so far has finished (tests, shutdown). */
@@ -179,7 +189,7 @@ export class JobService {
       if (mode !== "rules") {
         const settings = this.settings();
         const provider = this.deps.provider(settings);
-        if (!provider) throw new JobError("Kein Metadaten-Anbieter: TMDB-API-Key in den Einstellungen hinterlegen");
+        if (!provider) throw new JobError(NO_PROVIDER);
         this.progress(job, "matching", 0, files.length);
         matches = await matchAll(
           rows.map((r, i) => ({ key: String(r.id), parsed: parsed[i]! })),
@@ -244,8 +254,8 @@ export class JobService {
         continue;
       }
       if (item.state !== "needs_review" && item.state !== "ready") continue;
-      const reason = item.reasons[0] ?? "Treffer unter der Auto-Schwelle";
-      addToInbox(db, item.id, always ? `Immer prüfen${item.reasons[0] ? `: ${reason}` : ""}` : reason);
+      const reason = item.reasons[0] ?? tr("Treffer unter der Auto-Schwelle", "Match below the auto threshold");
+      addToInbox(db, item.id, always ? (item.reasons[0] ? `${ALWAYS_REVIEW}: ${reason}` : ALWAYS_REVIEW) : reason);
       updateItem(db, item.id, { state: "needs_review" });
       review.push(item.id);
     }
@@ -301,7 +311,7 @@ export class JobService {
     patch?: Partial<Pick<JobConfig, "mode" | "preset" | "template" | "rules">> & { targetRoot?: string | null },
   ) {
     const job = getJob(this.deps.db, jobId);
-    if (!job) throw new JobError("Job nicht gefunden");
+    if (!job) throw new JobError(JOB_NOT_FOUND);
     this.assertIdle(job);
     return this.computePreview(jobId, patch);
   }
@@ -312,7 +322,7 @@ export class JobService {
   ) {
     const { db } = this.deps;
     let job = getJob(db, jobId);
-    if (!job) throw new JobError("Job nicht gefunden");
+    if (!job) throw new JobError(JOB_NOT_FOUND);
     if (patch) {
       const { targetRoot, ...rest } = patch;
       const config: JobConfig = { ...job.config, ...rest };
@@ -351,7 +361,7 @@ export class JobService {
           await fs.lstat(item.target);
           if (item.target !== item.source) {
             item.conflict = "exists";
-            item.reasons = [...item.reasons, "Ziel existiert bereits"];
+            item.reasons = [...item.reasons, TARGET_EXISTS];
           }
         } catch {
           // free
@@ -375,8 +385,8 @@ export class JobService {
   ) {
     const { db } = this.deps;
     const item = getItem(db, itemId);
-    if (!item) throw new JobError("Datei nicht gefunden");
-    if (item.state === "done") throw new JobError("Bereits ausgeführt: erst rückgängig machen");
+    if (!item) throw new JobError(tr("Datei nicht gefunden", "File not found"));
+    if (item.state === "done") throw new JobError(tr("Bereits ausgeführt: erst rückgängig machen", "Already renamed: undo it first"));
     const job = getJob(db, item.jobId)!;
     this.assertIdle(job);
     const values: Parameters<typeof updateItem>[2] = {};
@@ -384,7 +394,7 @@ export class JobService {
     if (change.match) {
       const settings = this.settings();
       const provider = this.deps.provider(settings);
-      if (!provider) throw new JobError("Kein Metadaten-Anbieter konfiguriert");
+      if (!provider) throw new JobError(NO_PROVIDER);
       const best = await provider.details(change.match.kind, change.match.id, { language: settings.language });
       const parsed = item.parsedJson as Parsed;
       const episodes =
@@ -397,7 +407,7 @@ export class JobService {
         episodes,
         alternatives: previous?.alternatives ?? [],
         confidence: 1,
-        reasons: ["Manuell gewählt"],
+        reasons: [tr("Manuell gewählt", "Chosen manually")],
         overridden: true,
       };
       values.matchJson = match;
@@ -452,7 +462,7 @@ export class JobService {
   executeNow(jobId: number, options: { action?: Action; conflictPolicy?: ConflictPolicy; itemIds?: number[] } = {}) {
     const { db } = this.deps;
     const job = getJob(db, jobId);
-    if (!job) throw new JobError("Job nicht gefunden");
+    if (!job) throw new JobError(JOB_NOT_FOUND);
     this.assertIdle(job);
     if (options.action || options.conflictPolicy) {
       updateJob(db, jobId, {
@@ -499,7 +509,9 @@ export class JobService {
           summary.done++;
           if (action === "move") await cleanupEmptyDirs(path.dirname(item.sourcePath), job.sourcePaths[0] ?? "/").catch(() => []);
         } else if (result.status === "tested") {
-          updateItem(db, item.id, { reasons: [...item.reasons, result.conflict ? "Test: Ziel existiert" : "Test: OK"] });
+          updateItem(db, item.id, {
+            reasons: [...item.reasons, result.conflict ? tr("Test: Ziel existiert", "Test: target exists") : tr("Test: OK", "Test: OK")],
+          });
         } else if (result.status === "skipped") {
           updateItem(db, item.id, { state: "skipped", reasons: [...item.reasons, result.reason] });
           summary.skipped++;

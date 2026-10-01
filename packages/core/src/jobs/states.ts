@@ -1,3 +1,5 @@
+import { tr } from "../i18n.ts";
+
 /** parsed → matched → needs_review | ready → done | skipped | failed → undone */
 export type ItemState = "parsed" | "matched" | "needs_review" | "ready" | "done" | "skipped" | "failed" | "undone";
 
@@ -17,5 +19,5 @@ export function canTransition(from: ItemState, to: ItemState): boolean {
 }
 
 export function assertTransition(from: ItemState, to: ItemState): void {
-  if (!canTransition(from, to)) throw new Error(`Ungültiger Zustandswechsel ${from} → ${to}`);
+  if (!canTransition(from, to)) throw new Error(tr(`Ungültiger Zustandswechsel ${from} → ${to}`, `Invalid state change ${from} → ${to}`));
 }

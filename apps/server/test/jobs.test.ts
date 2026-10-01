@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { APPROVED, DOUBLE_EPISODE, localize } from "@namarr/core";
 import {
   allItems,
   createWatchFolder,
@@ -225,7 +226,7 @@ describe("JobService: Review-Fixes", () => {
     await jobs.recompute(job.id, { template: { episode: "{n}/{s00e00}" } });
     const after = allItems(db, job.id).find((i) => i.id === double.id)!;
     expect(after.state).toBe("ready");
-    expect(after.reasons).toContain("Freigegeben");
+    expect(after.reasons).toContain(APPROVED);
   });
 
   it("mehrere Freigaben auf einmal: eine Neuberechnung pro Job", async () => {
@@ -283,7 +284,8 @@ describe("JobService: Review-Fixes", () => {
     await jobs.executeNow(job.id);
     const e1 = allItems(db, job.id).find((i) => i.id === by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").id)!;
     expect(e1.state).toBe("done");
-    expect(e1.error).toContain("Ziel existiert bereits");
+    expect(localize(e1.error, "de")).toContain("Ziel existiert bereits");
+    expect(localize(e1.error, "en")).toContain("Target already exists");
   });
 });
 
@@ -296,7 +298,7 @@ describe("JobService: Watch-Jobs", () => {
     expect(await exists(path.join(media(), "Severance (2022)/Season 02/Severance (2022) - S02E02 - Goodbye, Mrs. Selvig.mkv"))).toBe(true);
     const inbox = listInbox(db);
     expect(inbox.map((e) => path.basename(e.item.sourcePath))).toEqual(["severance.204-205.720p.mkv"]);
-    expect(inbox[0]!.reason).toBe("Doppelfolge");
+    expect(inbox[0]!.reason).toBe(DOUBLE_EPISODE);
     expect(events.some((e) => e.type === "inbox.added")).toBe(true);
   });
 
@@ -305,7 +307,7 @@ describe("JobService: Watch-Jobs", () => {
     await jobs.idle();
     expect(await fs.readdir(media())).toEqual([]);
     expect(listInbox(db)).toHaveLength(3);
-    expect(listInbox(db).every((e) => e.reason.startsWith("Immer prüfen"))).toBe(true);
+    expect(listInbox(db).every((e) => localize(e.reason, "de").startsWith("Immer prüfen"))).toBe(true);
     expect(getJob(db, job.id)!.status).toBe("ready");
   });
 });

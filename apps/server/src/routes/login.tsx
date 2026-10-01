@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
+import { LanguageSwitch } from "~/components/AppShell";
 import { Logo } from "~/components/icons";
 import { Button, ErrorNote, inputClass } from "~/components/ui";
 import { login } from "~/functions/auth.functions";
+import { useT } from "~/lib/i18n";
 
 export const Route = createFileRoute("/login")({
   validateSearch: z.object({ next: z.string().optional() }),
@@ -11,6 +13,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
+  const t = useT();
   const { next } = Route.useSearch();
   const navigate = useNavigate();
   const [token, setToken] = useState("");
@@ -40,10 +43,11 @@ function Login() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
             <Logo />
           </div>
-          <h1 className="m-0 font-display text-[22px] font-bold">namarr</h1>
+          <h1 className="m-0 flex-grow font-display text-[22px] font-bold">namarr</h1>
+          <LanguageSwitch />
         </div>
         <label htmlFor="token" className="text-[13px] text-muted">
-          Zugangs-Token (NAMARR_TOKEN)
+          {t.login.token}
         </label>
         <input
           id="token"
@@ -56,7 +60,7 @@ function Login() {
         />
         <ErrorNote error={error} />
         <Button type="submit" variant="accent" size="lg" disabled={busy}>
-          Anmelden
+          {t.login.submit}
         </Button>
       </form>
     </main>

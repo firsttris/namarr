@@ -1,4 +1,5 @@
 import { FILTERS } from "../formatter/template.ts";
+import { tr } from "../i18n.ts";
 
 /** Which part of the path a rule rewrites. */
 export type RuleTarget = "name" | "extension" | "full";
@@ -65,7 +66,10 @@ function pattern(find: string, regex: boolean | undefined, flags: string, index:
   try {
     return new RegExp(regex ? find : escapeRegex(find), flags);
   } catch (e) {
-    throw new RuleError(`Ungültiger regulärer Ausdruck: ${(e as Error).message}`, index);
+    throw new RuleError(
+      tr(`Ungültiger regulärer Ausdruck: ${(e as Error).message}`, `Invalid regular expression: ${(e as Error).message}`),
+      index,
+    );
   }
 }
 
@@ -195,28 +199,28 @@ export function applyRules(entries: RuleEntry[], rules: Rule[]): string[] {
   return previewRules(entries, rules).at(-1)!;
 }
 
-/** Short German label for the rule stack UI. */
+/** Short label for the rule stack UI, in both languages (see `localize`). */
 export function describeRule(rule: Rule): string {
   switch (rule.type) {
     case "replace":
-      return `Ersetzen ${rule.find} → "${rule.replace}"`;
+      return tr(`Ersetzen ${rule.find} → "${rule.replace}"`, `Replace ${rule.find} → "${rule.replace}"`);
     case "insert":
-      return `Einfügen "${rule.text}"`;
+      return tr(`Einfügen "${rule.text}"`, `Insert "${rule.text}"`);
     case "remove":
-      return `Löschen ab ${rule.from}`;
+      return tr(`Löschen ab ${rule.from}`, `Delete from ${rule.from}`);
     case "case":
-      return `Schreibweise: ${rule.mode}`;
+      return tr(`Schreibweise: ${rule.mode}`, `Case: ${rule.mode}`);
     case "separators":
-      return `Trenner: "${rule.separator}"`;
+      return tr(`Trenner: "${rule.separator}"`, `Separator: "${rule.separator}"`);
     case "numbering":
-      return `Nummerierung ab ${rule.start ?? 1}`;
+      return tr(`Nummerierung ab ${rule.start ?? 1}`, `Numbering from ${rule.start ?? 1}`);
     case "date":
-      return `Datum ${rule.format ?? "YYYY-MM-DD"}`;
+      return tr(`Datum ${rule.format ?? "YYYY-MM-DD"}`, `Date ${rule.format ?? "YYYY-MM-DD"}`);
     case "extension":
-      return `Erweiterung ${rule.to ?? rule.case ?? ""}`;
+      return tr(`Erweiterung ${rule.to ?? rule.case ?? ""}`, `Extension ${rule.to ?? rule.case ?? ""}`);
     case "transliterate":
-      return "Umlaute ersetzen ä → ae";
+      return tr("Umlaute ersetzen ä → ae", "Transliterate ä → ae");
     case "cutAfter":
-      return `Abschneiden ab "${rule.pattern}"`;
+      return tr(`Abschneiden ab "${rule.pattern}"`, `Cut from "${rule.pattern}"`);
   }
 }

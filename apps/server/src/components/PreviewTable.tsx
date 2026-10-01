@@ -2,7 +2,8 @@ import type { MatchResult } from "@namarr/core/matcher";
 import type { JobItem } from "@namarr/db/types";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type KeyboardEvent, useMemo, useRef } from "react";
-import { diffWords, pct, STATE_LABELS, splitTarget } from "~/lib/format";
+import { diffWords, pct, splitTarget } from "~/lib/format";
+import { useLocalize, useT } from "~/lib/i18n";
 import { Arrow } from "./icons";
 import { Button, cx, Poster } from "./ui";
 
@@ -50,6 +51,7 @@ type Props = {
 };
 
 export function PreviewTable({ items, targetRoot, sourceRoot, selectedId, onSelect, onToggle, onSearch }: Props) {
+  const t = useT();
   const rows = useMemo(() => buildRows(items), [items]);
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -90,7 +92,7 @@ export function PreviewTable({ items, targetRoot, sourceRoot, selectedId, onSele
       onKeyDown={onKeyDown}
       role="grid"
       aria-activedescendant={selectedId ? `row-${selectedId}` : undefined}
-      aria-label="Vorschau: Pfeiltasten wählen, Leertaste schließt ein oder aus, Enter sucht einen anderen Treffer"
+      aria-label={t.preview.grid}
       aria-rowcount={rows.length}
       className="min-h-0 flex-grow overflow-auto outline-none"
     >
@@ -153,13 +155,14 @@ function companionLabel(to: string, main: string | null) {
 }
 
 function GroupRow({ match, count }: { match: MatchResult; count: number }) {
+  const t = useT();
   const best = match.best!;
   const season = match.episodes[0]?.season;
   return (
     // biome-ignore lint/a11y/useFocusableInteractive: rows are reached through the grid's aria-activedescendant
     <div role="row" className={cx(GRID, "border-b border-line bg-panel-2 py-1.5")}>
       <div />
-      <div className="text-xs text-muted">Serie erkannt · {count} Dateien</div>
+      <div className="text-xs text-muted">{t.preview.seriesFound(count)}</div>
       <div />
       <div className="flex items-center gap-2.5">
         <Poster title={best.title} src={best.poster} size="sm" />
@@ -169,7 +172,7 @@ function GroupRow({ match, count }: { match: MatchResult; count: number }) {
         </div>
         <div className="text-xs text-muted">
           {best.provider.toUpperCase()} {best.id}
-          {season !== undefined ? ` · Staffel ${season}` : ""}
+          {season !== undefined ? t.preview.season(season) : ""}
         </div>
       </div>
     </div>
@@ -193,6 +196,8 @@ function ItemRow({
   onToggle: () => void;
   onSearch: () => void;
 }) {
+  const t = useT();
+  const localize = useLocalize();
   const review = item.state === "needs_review";
   const skipped = item.state === "skipped" || item.excluded;
   const done = item.state === "done";
@@ -220,7 +225,7 @@ function ItemRow({
         onChange={onToggle}
         onClick={(e) => e.stopPropagation()}
         disabled={done}
-        aria-label={`${fileName} einbeziehen`}
+        aria-label={t.preview.include(fileName)}
         className="h-4 w-4"
       />
       <div className={cx("truncate font-mono text-xs", skipped ? "text-faint line-through" : "text-muted")} title={item.sourcePath}>
@@ -241,10 +246,12 @@ function ItemRow({
       </div>
       <div className="flex min-w-0 items-center gap-2">
         {skipped ? (
-          <div className="text-xs text-muted">{item.excluded ? "Ausgeschlossen" : (item.reasons.at(-1) ?? "Übersprungen")}</div>
+          <div className="text-xs text-muted">
+            {item.excluded ? t.preview.excluded : item.reasons.length ? localize(item.reasons.at(-1)) : t.preview.skipped}
+          </div>
         ) : !target ? (
           <>
-            <div className="flex-grow text-xs text-muted">{item.reasons[0] ?? "Kein Treffer gefunden"}</div>
+            <div className="flex-grow text-xs text-muted">{item.reasons.length ? localize(item.reasons[0]) : t.preview.noMatch}</div>
             <Button
               size="sm"
               onClick={(e) => {
@@ -252,7 +259,7 @@ function ItemRow({
                 onSearch();
               }}
             >
-              Manuell suchen
+              {t.preview.searchManually}
             </Button>
           </>
         ) : (
@@ -271,17 +278,17 @@ function ItemRow({
                   "flex-shrink-0 rounded-md px-2 py-[3px] text-[11px] font-semibold",
                   done ? "bg-[#4fd1a5]/15 text-[#4fd1a5]" : failed ? "bg-danger/15 text-danger" : "bg-accent/15 text-accent-soft",
                 )}
-                title={item.error ?? item.reasons.join(" · ")}
+                title={localize(item.error ?? item.reasons.join(" · "))}
               >
                 {done
-                  ? STATE_LABELS.done
+                  ? t.states.done
                   : failed
-                    ? STATE_LABELS.failed
+                    ? t.states.failed
                     : item.conflict
                       ? item.conflict === "duplicate"
-                        ? "doppelt"
-                        : "Konflikt"
-                      : `${pct(item.confidence)} prüfen`}
+                        ? t.preview.duplicate
+                        : t.preview.conflict
+                      : t.preview.review(pct(item.confidence))}
               </span>
             )}
           </>

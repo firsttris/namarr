@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { ACTIONS, CONFLICT_POLICIES, PathOutsideRootError, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
+import { tr } from "@namarr/core/i18n";
 import {
   createProfile,
   createWatchFolder,
@@ -207,9 +208,9 @@ export const saveSettings = createServerFn({ method: "POST" })
   .handler(async ({ data, context: { rt } }) => {
     if (data.roots) {
       for (const r of data.roots) {
-        if (!path.isAbsolute(r)) throw new Error(`Wurzelpfad muss absolut sein: ${r}`);
+        if (!path.isAbsolute(r)) throw new Error(tr(`Wurzelpfad muss absolut sein: ${r}`, `Root path must be absolute: ${r}`));
         const st = await fs.stat(r).catch(() => undefined);
-        if (!st?.isDirectory()) throw new Error(`Ordner existiert nicht: ${r}`);
+        if (!st?.isDirectory()) throw new Error(tr(`Ordner existiert nicht: ${r}`, `Folder does not exist: ${r}`));
       }
     }
     // An empty key field keeps the stored key; "-" removes it.
@@ -226,4 +227,5 @@ export const getShellInfo = createServerFn({ method: "GET" })
     inboxOpen: dashboardStats(rt.db).inboxOpen,
     host: `${rt.env.host}:${rt.env.port}`,
     demo: rt.env.demo,
+    authRequired: Boolean(rt.env.token || rt.env.authHeader),
   }));

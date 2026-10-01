@@ -11,7 +11,8 @@
     "./matcher": "./src/matcher/index.ts",
     "./jobs/states": "./src/jobs/states.ts",
     "./types": "./src/types.ts",
-    "./fileops": "./src/fileops/index.ts"
+    "./fileops": "./src/fileops/index.ts",
+    "./i18n": "./src/i18n.ts"
   },
   "dependencies": {
     "picomatch": "^4"

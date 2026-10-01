@@ -2,13 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { browseFolder } from "~/functions/library.functions";
+import { useT } from "~/lib/i18n";
 import { FileIcon, FolderIcon } from "./icons";
 import { Button, cx, ErrorNote } from "./ui";
 
 type Props = { initial?: string; onChoose: (path: string) => void; chooseLabel?: string };
 
 /** Server-side folder browser, limited to the allowed root paths. */
-export function FolderBrowser({ initial, onChoose, chooseLabel = "Diesen Ordner wählen" }: Props) {
+export function FolderBrowser({ initial, onChoose, chooseLabel }: Props) {
+  const t = useT();
   const [path, setPath] = useState<string | undefined>(initial);
   const q = useQuery({ queryKey: ["browse", path ?? ""], queryFn: () => browseFolder({ data: { path } }) });
   const data = q.data;
@@ -16,10 +18,10 @@ export function FolderBrowser({ initial, onChoose, chooseLabel = "Diesen Ordner 
   if (data && !data.path) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="text-sm text-muted">Wurzelpfade</div>
+        <div className="text-sm text-muted">{t.folders.roots}</div>
         {data.roots.length === 0 && (
           <p className="m-0 text-sm text-muted">
-            Noch keine Wurzelpfade freigegeben. <Link to="/settings">In den Einstellungen festlegen</Link>
+            {t.folders.noRoots} <Link to="/settings">{t.folders.setRoots}</Link>
           </p>
         )}
         {data.roots.map((r) => (
@@ -36,15 +38,15 @@ export function FolderBrowser({ initial, onChoose, chooseLabel = "Diesen Ordner 
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-grow truncate font-mono text-[13px] text-ink">{data?.path ?? path}</div>
         <Button size="sm" onClick={() => setPath(data?.parent ?? undefined)} disabled={!data}>
-          {data?.parent ? "Eine Ebene hoch" : "Wurzelpfade"}
+          {data?.parent ? t.folders.up : t.folders.roots}
         </Button>
         <Button size="sm" variant="accent" onClick={() => data?.path && onChoose(data.path)} disabled={!data?.path}>
-          {chooseLabel}
+          {chooseLabel ?? t.folders.choose}
         </Button>
       </div>
       <ErrorNote error={q.error} />
-      <ul className="m-0 flex max-h-[420px] list-none flex-col overflow-auto p-0" aria-label="Ordnerinhalt">
-        {data?.entries.length === 0 && <li className="py-2 text-sm text-muted">Leer.</li>}
+      <ul className="m-0 flex max-h-[420px] list-none flex-col overflow-auto p-0" aria-label={t.folders.contents}>
+        {data?.entries.length === 0 && <li className="py-2 text-sm text-muted">{t.folders.empty}</li>}
         {data?.entries.map((e) => (
           <li key={e.path}>
             {e.dir ? (

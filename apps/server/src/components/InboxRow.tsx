@@ -2,6 +2,7 @@ import type { MatchResult } from "@namarr/core/matcher";
 import type { Parsed } from "@namarr/core/types";
 import { Link } from "@tanstack/react-router";
 import { pct, splitTarget } from "~/lib/format";
+import { useLocalize, useT } from "~/lib/i18n";
 import { Button, Poster, Progress } from "./ui";
 
 export type InboxEntry = {
@@ -20,6 +21,8 @@ export type InboxEntry = {
 
 /** One uncertain match: old name, proposed name, why it waits, confidence, approve. */
 export function InboxRow({ entry, onApprove, busy, last }: { entry: InboxEntry; onApprove: () => void; busy?: boolean; last?: boolean }) {
+  const t = useT();
+  const localize = useLocalize();
   const { item } = entry;
   const match = item.matchJson as MatchResult | null;
   const parsed = item.parsedJson as Parsed | null;
@@ -40,10 +43,10 @@ export function InboxRow({ entry, onApprove, busy, last }: { entry: InboxEntry; 
               {target.file}
             </>
           ) : (
-            <span className="text-muted">Kein Ziel</span>
+            <span className="text-muted">{t.inbox.noTarget}</span>
           )}
         </div>
-        <div className="text-xs text-muted">{entry.reason}</div>
+        <div className="text-xs text-muted">{localize(entry.reason)}</div>
       </div>
       <div className="flex w-24 flex-shrink-0 flex-col gap-1.5">
         <div className="text-[13px] font-semibold">{pct(item.confidence)}</div>
@@ -51,10 +54,10 @@ export function InboxRow({ entry, onApprove, busy, last }: { entry: InboxEntry; 
       </div>
       <div className="flex flex-shrink-0 gap-2">
         <Link to="/rename" search={{ job: item.jobId, item: item.id }} className="no-underline">
-          <Button>Ändern</Button>
+          <Button>{t.common.change}</Button>
         </Link>
-        <Button variant="light" onClick={onApprove} disabled={busy || !item.targetPath} aria-label={`${fileName} freigeben`}>
-          Freigeben
+        <Button variant="light" onClick={onApprove} disabled={busy || !item.targetPath} aria-label={t.inbox.approveFile(fileName)}>
+          {t.common.approve}
         </Button>
       </div>
     </div>

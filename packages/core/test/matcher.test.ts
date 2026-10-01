@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { localize } from "../src/i18n.ts";
 import {
   classify,
+  DOUBLE_EPISODE,
   groupInputs,
   jaroWinkler,
   matchAll,
+  NO_MATCH,
   normalizeTitle,
   rank,
   resolveEpisodes,
@@ -57,13 +60,14 @@ describe("Bewertung", () => {
     const uk: MediaCandidate = { provider: "tmdb", id: "2996", kind: "series", title: "The Office", year: 2001 };
     const { confidence, reasons } = rank(parsed, [us, uk]);
     expect(confidence).toBeLessThan(0.9);
-    expect(reasons).toContain("Mehrere Treffer mit gleichem Titel");
+    expect(reasons.map((r) => localize(r, "de"))).toContain("Mehrere Treffer mit gleichem Titel");
+    expect(reasons.map((r) => localize(r, "en"))).toContain("Several matches with the same title");
   });
 
   it("ohne passenden Kandidaten: Confidence 0", () => {
     const { confidence, reasons } = rank(parse("video_2024_final_v2.mp4"), [dune2021]);
     expect(confidence).toBe(0);
-    expect(reasons).toEqual(["Kein Treffer gefunden"]);
+    expect(reasons).toEqual([NO_MATCH]);
   });
 
   it("Episodenzahl über der Anzahl der Serie wird bestraft", () => {
@@ -103,7 +107,7 @@ describe("Gruppierung und matchAll", () => {
 
     const double = results.get("severance.204-205.720p.mkv")!;
     expect(double.episodes.map((e) => e.episode)).toEqual([4, 5]);
-    expect(double.reasons).toContain("Doppelfolge");
+    expect(double.reasons).toContain(DOUBLE_EPISODE);
     expect(classify(double.confidence)).toBe("suggest");
 
     expect(results.get("Severance/Staffel 2/06.mkv")!.episodes[0]?.title).toBe("Attila");
@@ -114,7 +118,7 @@ describe("Gruppierung und matchAll", () => {
     const provider = new FakeProvider({ series: [severance], episodes: { "95396": severanceEpisodes } });
     const input = [{ key: "x", parsed: parse("Severance.S02E09.1080p.mkv") }];
     const result = (await matchAll(input, provider)).get("x")!;
-    expect(result.reasons).toContain("Episode nicht beim Anbieter gefunden");
+    expect(result.reasons.map((r) => localize(r, "de"))).toContain("Episode nicht beim Anbieter gefunden");
     expect(classify(result.confidence)).not.toBe("auto");
   });
 

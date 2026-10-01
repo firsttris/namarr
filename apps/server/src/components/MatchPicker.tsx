@@ -4,6 +4,7 @@ import type { JobItem } from "@namarr/db/types";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { searchProvider } from "~/functions/jobs.functions";
+import { useT } from "~/lib/i18n";
 import { Button, cx, ErrorNote, inputClass, Poster, Select } from "./ui";
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
 
 /** Search dialog: posters, year, episode count, alternatives from the matcher first. */
 export function MatchPicker({ item, onClose, onPick }: Props) {
+  const t = useT();
   const dialog = useRef<HTMLDialogElement>(null);
   const parsed = item?.parsedJson as Parsed | undefined;
   const match = item?.matchJson as MatchResult | null | undefined;
@@ -59,10 +61,10 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
       <div className="flex flex-col gap-4 p-5">
         <div className="flex items-center gap-2">
           <h2 id="picker-h" className="m-0 flex-grow text-base font-semibold">
-            Treffer wählen
+            {t.picker.title}
           </h2>
           <Button size="sm" onClick={() => dialog.current?.close()}>
-            Schließen
+            {t.common.close}
           </Button>
         </div>
         <div className="truncate font-mono text-xs text-muted">{item?.sourcePath.split("/").at(-1)}</div>
@@ -74,21 +76,21 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
           }}
         >
           <label htmlFor="picker-q" className="sr-only">
-            Suchbegriff
+            {t.picker.query}
           </label>
           <input id="picker-q" className={cx(inputClass, "flex-grow")} value={q} onChange={(e) => setQ(e.target.value)} />
-          <Select aria-label="Art" value={kind} onChange={(e) => setKind(e.target.value as "movie" | "series")}>
-            <option value="series">Serie</option>
-            <option value="movie">Film</option>
+          <Select aria-label={t.picker.kind} value={kind} onChange={(e) => setKind(e.target.value as "movie" | "series")}>
+            <option value="series">{t.common.seriesOne}</option>
+            <option value="movie">{t.common.movieOne}</option>
           </Select>
           <Button type="submit" variant="light">
-            Suchen
+            {t.common.search}
           </Button>
         </form>
         <ErrorNote error={results.error ?? error} />
         <ul className="m-0 flex max-h-[420px] list-none flex-col gap-1 overflow-auto p-0">
-          {results.isFetching && !list.length && <li className="text-sm text-muted">Suche läuft…</li>}
-          {!results.isFetching && !list.length && submitted && <li className="text-sm text-muted">Keine Treffer.</li>}
+          {results.isFetching && !list.length && <li className="text-sm text-muted">{t.picker.searching}</li>}
+          {!results.isFetching && !list.length && submitted && <li className="text-sm text-muted">{t.picker.none}</li>}
           {list.map((c) => (
             <li key={`${c.provider}-${c.id}`}>
               <button
@@ -119,8 +121,8 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
                   <div className="text-xs text-muted">
                     {c.provider.toUpperCase()} {c.id}
                     {c.originalTitle ? ` · ${c.originalTitle}` : ""}
-                    {c.episodeCount ? ` · ${c.episodeCount} Folgen` : ""}
-                    {match?.best?.id === c.id ? " · aktueller Treffer" : ""}
+                    {c.episodeCount ? t.picker.episodes(c.episodeCount) : ""}
+                    {match?.best?.id === c.id ? t.picker.current : ""}
                   </div>
                 </div>
                 {busy === c.id && <span className="text-xs text-muted">…</span>}
@@ -130,7 +132,7 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
         </ul>
         <label className="flex items-center gap-2 text-[13px] text-soft">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4" />
-          Entscheidung merken („{parsed?.title ?? "dieser Titel"}“ ist immer dieser Treffer)
+          {t.picker.remember(parsed?.title ?? t.picker.thisTitle)}
         </label>
       </div>
     </dialog>

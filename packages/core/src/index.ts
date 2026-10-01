@@ -1,5 +1,6 @@
 export * from "./fileops/index.ts";
 export * from "./formatter/index.ts";
+export * from "./i18n.ts";
 export * from "./jobs/index.ts";
 export * from "./matcher/index.ts";
 export * from "./parser/index.ts";

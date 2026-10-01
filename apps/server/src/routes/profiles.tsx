@@ -7,7 +7,7 @@ import { RuleStack } from "~/components/RuleStack";
 import { TemplateEditor } from "~/components/TemplateEditor";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getProfiles, removeProfile, saveProfile } from "~/functions/library.functions";
-import { ACTION_LABELS, CONFLICT_LABELS } from "~/lib/format";
+import { useT } from "~/lib/i18n";
 
 export const Route = createFileRoute("/profiles")({
   validateSearch: z.object({ id: z.coerce.number().optional() }),
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/profiles")({
 type Draft = Omit<Profile, "id" | "createdAt"> & { id?: number };
 
 const EMPTY: Draft = {
-  name: "Neues Profil",
+  name: "",
   mode: "media",
   preset: "jellyfin",
   template: {},
@@ -29,6 +29,7 @@ const EMPTY: Draft = {
 };
 
 function Profiles() {
+  const t = useT();
   const initial = Route.useLoaderData();
   const { id } = Route.useSearch();
   const qc = useQueryClient();
@@ -65,14 +66,14 @@ function Profiles() {
 
   return (
     <>
-      <PageHeader title="Profile" subtitle="Wiederverwendbare Setups: Template, Regeln, Aktion, Konfliktverhalten.">
-        <Button variant="accent" size="lg" onClick={() => setDraft({ ...EMPTY })}>
-          Neues Profil
+      <PageHeader title={t.profiles.title} subtitle={t.profiles.subtitle}>
+        <Button variant="accent" size="lg" onClick={() => setDraft({ ...EMPTY, name: t.profiles.new })}>
+          {t.profiles.new}
         </Button>
       </PageHeader>
       <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
         <Panel className="flex flex-col p-2">
-          {data.length === 0 && <p className="m-0 p-3 text-sm text-muted">Noch keine Profile.</p>}
+          {data.length === 0 && <p className="m-0 p-3 text-sm text-muted">{t.profiles.none}</p>}
           {data.map((p) => (
             <Link
               key={p.id}
@@ -85,7 +86,7 @@ function Profiles() {
             >
               <div className="font-semibold">{p.name}</div>
               <div className="text-xs text-muted">
-                {p.mode === "media" ? "Media" : p.mode === "rules" ? "Regeln" : "Beides"} · {ACTION_LABELS[p.action] ?? p.action}
+                {t.modes[p.mode]} · {t.actions[p.action] ?? p.action}
               </div>
             </Link>
           ))}
@@ -99,7 +100,7 @@ function Profiles() {
             }}
           >
             <Panel className="grid gap-4 p-5 md:grid-cols-2">
-              <Field label="Name" htmlFor="p-name">
+              <Field label={t.common.name} htmlFor="p-name">
                 <input
                   id="p-name"
                   className={inputClass}
@@ -108,40 +109,40 @@ function Profiles() {
                   required
                 />
               </Field>
-              <Field label="Modus" htmlFor="p-mode">
+              <Field label={t.common.mode} htmlFor="p-mode">
                 <Select id="p-mode" value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as Draft["mode"] })}>
-                  <option value="media">Media</option>
-                  <option value="rules">Regeln</option>
-                  <option value="both">Beides</option>
+                  <option value="media">{t.modes.media}</option>
+                  <option value="rules">{t.modes.rules}</option>
+                  <option value="both">{t.modes.both}</option>
                 </Select>
               </Field>
-              <Field label="Aktion" htmlFor="p-action">
+              <Field label={t.common.action} htmlFor="p-action">
                 <Select
                   id="p-action"
                   value={draft.action}
                   onChange={(e) => setDraft({ ...draft, action: e.target.value as Draft["action"] })}
                 >
-                  {Object.entries(ACTION_LABELS).map(([k, v]) => (
+                  {Object.entries(t.actions).map(([k, v]) => (
                     <option key={k} value={k}>
                       {v}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field label="Konflikte" htmlFor="p-conflict">
+              <Field label={t.common.conflicts} htmlFor="p-conflict">
                 <Select
                   id="p-conflict"
                   value={draft.conflictPolicy}
                   onChange={(e) => setDraft({ ...draft, conflictPolicy: e.target.value as Draft["conflictPolicy"] })}
                 >
-                  {Object.entries(CONFLICT_LABELS).map(([k, v]) => (
+                  {Object.entries(t.conflictPolicies).map(([k, v]) => (
                     <option key={k} value={k}>
                       {v}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field label="Zielordner" htmlFor="p-target" hint="Absoluter Pfad innerhalb der Wurzelpfade; leer = neben der Quelle">
+              <Field label={t.profiles.targetRoot} htmlFor="p-target" hint={t.profiles.targetHint}>
                 <input
                   id="p-target"
                   className={cx(inputClass, "font-mono")}
@@ -152,7 +153,7 @@ function Profiles() {
             </Panel>
             {draft.mode !== "rules" && (
               <div className="flex flex-col gap-2">
-                <div role="group" aria-label="Template für" className="flex gap-2">
+                <div role="group" aria-label={t.profiles.templateFor} className="flex gap-2">
                   {(["episode", "movie"] as const).map((k) => (
                     <Button
                       key={k}
@@ -161,7 +162,7 @@ function Profiles() {
                       className={kind === k ? "bg-toggle" : undefined}
                       onClick={() => setKind(k)}
                     >
-                      {k === "episode" ? "Serien" : "Filme"}
+                      {k === "episode" ? t.common.series : t.common.movies}
                     </Button>
                   ))}
                 </div>
@@ -185,22 +186,22 @@ function Profiles() {
             <ErrorNote error={save.error ?? remove.error} />
             <div className="flex gap-2">
               <Button type="submit" variant="accent" size="lg" disabled={save.isPending}>
-                Speichern
+                {t.common.save}
               </Button>
               {draft.id && (
-                <Button size="lg" onClick={() => confirm(`Profil „${draft.name}“ löschen?`) && remove.mutate(draft.id!)}>
-                  Löschen
+                <Button size="lg" onClick={() => confirm(t.profiles.confirmDelete(draft.name)) && remove.mutate(draft.id!)}>
+                  {t.profiles.delete}
                 </Button>
               )}
               {draft.id && (
                 <Link to="/rename" search={{ profile: draft.id }} className="no-underline">
-                  <Button size="lg">In der Workbench verwenden</Button>
+                  <Button size="lg">{t.profiles.useInWorkbench}</Button>
                 </Link>
               )}
             </div>
           </form>
         ) : (
-          <Panel className="p-6 text-sm text-muted">Profil links wählen oder neu anlegen.</Panel>
+          <Panel className="p-6 text-sm text-muted">{t.profiles.pick}</Panel>
         )}
       </div>
     </>
