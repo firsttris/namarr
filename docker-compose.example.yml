@@ -1,0 +1,12 @@
+services:
+  namarr:
+    image: ghcr.io/firsttris/namarr:latest
+    ports: ["8420:8420"]
+    environment:
+      PUID: 1000
+      PGID: 1000
+      NAMARR_TOKEN: change-me
+    volumes:
+      - ./config:/config
+      - /mnt/data:/data # Downloads und Library im selben Mount, sonst keine Hardlinks
+    restart: unless-stopped

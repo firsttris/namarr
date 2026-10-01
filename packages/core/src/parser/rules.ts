@@ -299,7 +299,8 @@ export const verboseEpisodeRule: ParserRule = {
     if (hasEpisode(ctx)) return;
     const word = `(?:staffel|season|series)`;
     const ep = `(?:folge|episode|ep|e)`;
-    scan(ctx, re(`${word}${SEP}*(\\d{1,2})(?:${SEP}*${ep}${SEP}*(\\d{1,3}))?`), (m) => {
+    // The number follows the word directly: "The Final Season - 28" is an absolute episode, not season 28.
+    scan(ctx, re(`${word}[ ._]?(\\d{1,2})(?:${SEP}*${ep}${SEP}*(\\d{1,3}))?`), (m) => {
       if (m[2]) setEpisode(ctx, Number(m[1]), [Number(m[2])], 0.9);
       else ctx.out.season ??= Number(m[1]);
       hit(ctx, "verboseEpisode", m);

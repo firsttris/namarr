@@ -3,15 +3,20 @@
  * other request to TanStack Start, and starts the runtime (migrations, job worker, watch
  * folders) once at boot instead of on the first request.
  */
+import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { assertSafeBinding, readEnv } from "./src/server/env.server.ts";
+import { dropPrivileges } from "./src/server/privileges.server.ts";
 import { runtime } from "./src/server/runtime.server.ts";
 
 const env = readEnv();
 assertSafeBinding(env);
+const ids = dropPrivileges(env.configDir);
 const rt = runtime();
+if (ids) rt.log.info(ids, "Läuft als PUID/PGID");
 
-const dist = path.join(import.meta.dir, "dist");
+// Next to the sources (bun run server.ts) or bundled into dist/ (Docker).
+const dist = existsSync(path.join(import.meta.dir, "server/server.js")) ? import.meta.dir : path.join(import.meta.dir, "dist");
 const { default: handler } = (await import(path.join(dist, "server/server.js"))) as {
   default: { fetch: (req: Request) => Promise<Response> };
 };

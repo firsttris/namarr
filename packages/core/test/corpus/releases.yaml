@@ -182,3 +182,65 @@
 - name: IMG_1234.jpg
   category: movie
   expect: { kind: unknown }
+
+# --- Zweite Runde: schwierigere Namen ---
+- name: Marvels.Agents.of.S.H.I.E.L.D.S01E01.720p.HDTV.x264-KILLERS.mkv
+  category: series
+  expect: { kind: episode, title: Marvels Agents of S H I E L D, season: 1, episodes: [1], group: KILLERS }
+- name: Mr.Robot.S04E13.Hello.Elliot.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTb.mkv
+  category: series
+  expect: { kind: episode, title: Mr Robot, season: 4, episodes: [13], group: NTb, audioChannels: "5.1" }
+- name: Twin Peaks (1990) - S01E01 - Pilot.mkv
+  category: series
+  expect: { kind: episode, title: Twin Peaks, year: 1990, season: 1, episodes: [1] }
+- name: How.I.Met.Your.Mother.S09E23E24.Last.Forever.720p.mkv
+  category: series
+  expect: { kind: episode, title: How I Met Your Mother, season: 9, episodes: [23, 24] }
+- name: Sherlock.3x02.The.Sign.of.Three.720p.HDTV.mkv
+  category: series
+  expect: { kind: episode, title: Sherlock, season: 3, episodes: [2] }
+- name: 13.Reasons.Why.S01E01.720p.mkv
+  category: series
+  expect: { kind: episode, title: 13 Reasons Why, season: 1, episodes: [1] }
+- name: 24.S01E01.12.00.A.M.-1.00.A.M.DVDRip.mkv
+  category: series
+  expect: { kind: episode, title: "24", season: 1, episodes: [1] }
+- name: S.W.A.T.2017.S07E01.1080p.mkv
+  category: series
+  expect: { kind: episode, title: S W A T, year: 2017, season: 7, episodes: [1] }
+- name: Planet.Earth.II.2016.S01E01.2160p.UHD.BluRay.mkv
+  category: series
+  expect: { kind: episode, title: Planet Earth II, year: 2016, season: 1, episodes: [1] }
+- name: Star.Wars.Episode.IV.A.New.Hope.1977.1080p.BluRay.x264.mkv
+  category: movie
+  expect: { kind: movie, title: Star Wars Episode IV A New Hope, year: 1977 }
+- name: Blade Runner 2049 (2017).mkv
+  category: movie
+  expect: { kind: movie, title: Blade Runner 2049, year: 2017 }
+- name: Alien.Romulus.2024.1080p.WEB.H264-LAZYCUNTS.mkv
+  category: movie
+  expect: { kind: movie, title: Alien Romulus, year: 2024, group: LAZYCUNTS }
+- name: Die.Hard.1988.German.AC3D.DL.1080p.BluRay.x264-GRP.mkv
+  category: german
+  expect: { kind: movie, title: Die Hard, year: 1988, languages: [de, en] }
+- name: Joker.Folie.a.Deux.2024.German.DL.EAC3.1080p.AMZN.WEB.H264-ZeroTwo.mkv
+  category: german
+  expect: { kind: movie, title: Joker Folie a Deux, year: 2024, languages: [de, en], audioCodec: DD+, group: ZeroTwo }
+- name: Oppenheimer.2023.German.DL.2160p.UHD.BluRay.HDR.HEVC.Remux-pmHD.mkv
+  category: german
+  expect: { kind: movie, title: Oppenheimer, year: 2023, source: Remux, group: pmHD }
+- name: Der.Bergdoktor.S16E01.GERMAN.720p.WEB.h264-WvF.mkv
+  category: german
+  expect: { kind: episode, title: Der Bergdoktor, season: 16, episodes: [1], languages: [de], group: WvF }
+- name: Monk.S01.COMPLETE.German.DL.DVDRip.x264-GRP
+  category: german
+  expect: { kind: episode, title: Monk, season: 1, episodes: [] }
+- name: Tatort - Folge 1150 - Wir kriegen euch alle.mp4
+  category: german
+  expect: { kind: episode, title: Tatort, episodes: [1150] }
+- name: "[Erai-raws] Shingeki no Kyojin - The Final Season - 28 [1080p].mkv"
+  category: anime
+  expect: { kind: episode, title: Shingeki no Kyojin - The Final Season, absolute: 28, season: null }
+- name: Pokemon.S01E01.Pokemon.I.Choose.You.DVDRip.mkv
+  category: anime
+  expect: { kind: episode, title: Pokemon, season: 1, episodes: [1], source: DVD }

@@ -14,6 +14,7 @@ import {
   type PreviewConfig,
   type PreviewInput,
   type PreviewItem,
+  type ProbeInfo,
   parse,
   type Rule,
   resolveEpisodes,
@@ -54,6 +55,8 @@ export type JobServiceDeps = {
   provider: (settings: Settings) => MetadataProvider | undefined;
   log: { info: (o: object | string, msg?: string) => void; error: (o: object | string, msg?: string) => void };
   notify?: (settings: Settings, summary: JobSummary) => Promise<void>;
+  /** Container metadata (ffprobe); undefined when unavailable. */
+  probe?: (file: string) => Promise<ProbeInfo | undefined>;
 };
 
 /** Thrown for user errors; the message is shown in the UI. */
@@ -148,6 +151,7 @@ export class JobService {
         }
       }
       if (signal.aborted) return this.finishCancelled(job);
+      if (mode !== "rules") await this.probeMissing(files, parsed);
 
       const rows = insertItems(
         db,
@@ -191,6 +195,24 @@ export class JobService {
       updateJob(db, jobId, { status: "failed", error: (e as Error).message, finishedAt: new Date() });
       this.deps.bus.emit({ type: "job.progress", jobId, status: "failed", done: 0, total: 0 });
       throw e;
+    }
+  }
+
+  /**
+   * Names without resolution or codec ("Severance/Staffel 2/06.mkv"): read them from the
+   * container with ffprobe, if installed (it is in the Docker image). Four at a time.
+   */
+  private async probeMissing(files: ScannedFile[], parsed: Parsed[]) {
+    const todo = files.map((f, i) => ({ f, p: parsed[i]! })).filter(({ p }) => !p.release.resolution || !p.release.videoCodec);
+    for (let i = 0; i < todo.length; i += 4) {
+      const infos = await Promise.all(todo.slice(i, i + 4).map(({ f }) => this.deps.probe?.(f.path)));
+      if (i === 0 && infos[0] === undefined) return; // no ffprobe: don't try the rest
+      infos.forEach((info, k) => {
+        const { p } = todo[i + k]!;
+        if (!info) return;
+        p.release.resolution ??= info.resolution;
+        p.release.videoCodec ??= info.videoCodec;
+      });
     }
   }
 

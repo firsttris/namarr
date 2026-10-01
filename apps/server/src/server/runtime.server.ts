@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { MetadataProvider } from "@namarr/core";
+import { type MetadataProvider, probe } from "@namarr/core";
 import { type Db, failInterruptedJobs, getSettings, openDatabase, type Settings, SqliteProviderCache, setSettings } from "@namarr/db";
 import { DemoProvider, TmdbProvider } from "@namarr/providers";
 import pino from "pino";
@@ -55,7 +55,7 @@ export function runtime(): Runtime {
     if (tmdb?.key !== key) tmdb = { key, client: new TmdbProvider({ apiKey: s.tmdbApiKey, language: s.language, cache }) };
     return tmdb.client;
   };
-  const jobs = new JobService({ db, bus, provider, log });
+  const jobs = new JobService({ db, bus, provider, log, probe: (file) => probe(file) });
   const watch = new WatchService({ db, bus, jobs, log });
   const rt: Runtime = { env, db, bus, jobs, watch, provider: () => provider(getSettings(db)), log, startedAt: new Date() };
   holder[KEY] = rt;

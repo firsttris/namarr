@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "bunx --bun vite dev --port 8420",
-    "build": "bunx --bun vite build",
-    "start": "bun run server.ts",
+    "build": "bunx --bun vite build && bun build server.ts --target=bun --outfile=dist/entry.js",
+    "start": "bun run dist/entry.js",
     "e2e": "playwright test"
   },
   "dependencies": {

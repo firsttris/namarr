@@ -13,7 +13,7 @@
     "test": "bun --bun vitest run",
     "test:watch": "bun --bun vitest",
     "typecheck": "tsc -p packages/core && tsc -p packages/providers && tsc -p packages/db && tsc -p apps/server",
-    "corpus": "bun scripts/corpus.ts",
+    "corpus": "bun scripts/corpus.ts --verbose",
     "lint": "biome check .",
     "format": "biome check --write .",
     "e2e": "bun run --cwd apps/server build && bun run --cwd apps/server e2e"
@@ -24,6 +24,7 @@
     "fast-check": "^4",
     "typescript": "^5.9",
     "vitest": "^5",
-    "@biomejs/biome": "^2"
+    "@biomejs/biome": "^2",
+    "yaml": "^2"
   }
 }

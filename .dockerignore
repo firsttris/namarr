@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/.tmp
+**/test-results
+**/playwright-report
+config
+*.sqlite*
+.git

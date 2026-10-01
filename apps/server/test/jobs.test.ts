@@ -240,6 +240,29 @@ describe("JobService: Watch-Jobs", () => {
   });
 });
 
+describe("JobService: ffprobe", () => {
+  it("ergänzt fehlende Auflösung und Codec aus dem Container", async () => {
+    const probe = vi.fn(async () => ({ resolution: "2160p", videoCodec: "H.265", audio: [] }));
+    jobs = new JobService({ db, bus, provider: () => new DemoProvider(), log, notify, probe });
+    const { by } = await analyzed({ template: { episode: "{n} {s00e00} {vf} {vc}" } });
+    expect(probe).toHaveBeenCalledTimes(2); // only the two names without codec
+    expect(by("severance.204-205.720p.mkv").targetPath).toBe(path.join(media(), "Severance S02E04-E05 720p H.265.mkv"));
+    expect(by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").targetPath).toBe(path.join(media(), "Severance S02E01 1080p H.264.mkv"));
+  });
+
+  it("ohne ffprobe wird nach dem ersten Versuch abgebrochen", async () => {
+    const probe = vi.fn(async () => undefined);
+    jobs = new JobService({ db, bus, provider: () => new DemoProvider(), log, notify, probe });
+    await touch("downloads/tv/a.s01e01.mkv");
+    await touch("downloads/tv/b.s01e01.mkv");
+    await touch("downloads/tv/c.s01e01.mkv");
+    await touch("downloads/tv/d.s01e01.mkv");
+    await touch("downloads/tv/e.s01e01.mkv");
+    await analyzed();
+    expect(probe).toHaveBeenCalledTimes(4);
+  });
+});
+
 describe("JobService: Abbruch", () => {
   it("cancel bricht die Analyse ab", async () => {
     const job = await jobs.create({ paths: [tv()], config: config() });

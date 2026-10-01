@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>namarr</Name>
+  <Repository>ghcr.io/firsttris/namarr:latest</Repository>
+  <Registry>https://github.com/firsttris/namarr/pkgs/container/namarr</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/firsttris/namarr/issues</Support>
+  <Project>https://github.com/firsttris/namarr</Project>
+  <Overview>FileBot und ReNamer in einer Web-UI: Medien per TMDB erkennen und nach Plex/Jellyfin-Schema umbenennen, freie Umbenennungsregeln, Watch-Folder, Vorschau vor jeder Aktion und Undo für alles. Downloads und Library müssen im selben Mount liegen (/data), sonst sind keine Hardlinks möglich (TRaSH-Guides-Ordnerstruktur).</Overview>
+  <Category>MediaApp:Video Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8420]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/firsttris/namarr/main/apps/server/public/favicon.svg</Icon>
+  <ExtraParams>--init</ExtraParams>
+  <Config Name="WebUI" Target="8420" Default="8420" Mode="tcp" Description="Port der Web-UI" Type="Port" Display="always" Required="true" Configurable="true">8420</Config>
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/namarr" Mode="rw" Description="Datenbank und Einstellungen" Type="Path" Display="always" Required="true" Configurable="true">/mnt/user/appdata/namarr</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/data" Mode="rw" Description="Downloads und Library im selben Share (für Hardlinks)" Type="Path" Display="always" Required="true" Configurable="true">/mnt/user/data</Config>
+  <Config Name="Token" Target="NAMARR_TOKEN" Default="" Mode="" Description="Pflicht: Zugangs-Token für Web-UI und API" Type="Variable" Display="always" Required="true" Configurable="true" Mask="true"></Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User-ID für geschriebene Dateien (Unraid: 99 = nobody)" Type="Variable" Display="advanced" Required="false" Configurable="true">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Gruppen-ID (Unraid: 100 = users)" Type="Variable" Display="advanced" Required="false" Configurable="true">100</Config>
+</Container>
