@@ -1,0 +1,22 @@
+{
+  "name": "namarr",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "bun run --cwd apps/server dev",
+    "build": "bun run --cwd apps/server build",
+    "start": "bun run --cwd apps/server start",
+    "test": "bun --bun vitest run",
+    "test:watch": "bun --bun vitest",
+    "typecheck": "tsc -b",
+    "corpus": "bun scripts/corpus.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^22",
+    "fast-check": "^4",
+    "typescript": "^5.9",
+    "vitest": "^5"
+  }
+}

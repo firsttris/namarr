@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatPath mit Presets > Snapshot aller Presets 1`] = `
+{
+  "emby": "Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv",
+  "jellyfin": "Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv",
+  "kodi": "Severance/Season 2/Severance - 2x01 - Hallo, Frau Cobel.mkv",
+  "plex": "Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv",
+}
+`;

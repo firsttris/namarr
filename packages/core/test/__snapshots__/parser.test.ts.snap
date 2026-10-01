@@ -1,0 +1,118 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Snapshots > [SubsPlease] Frieren - 12 (1080p).mkv 1`] = `
+{
+  "absolute": 12,
+  "episodes": [
+    12,
+  ],
+  "extension": "mkv",
+  "kind": {
+    "confidence": 0.8,
+    "value": "episode",
+  },
+  "release": {
+    "group": "SubsPlease",
+    "languages": [],
+    "resolution": "1080p",
+  },
+  "title": "Frieren",
+}
+`;
+
+exports[`Snapshots > Das.Boot.1981.Directors.Cut.German.DL.1080p.BluRay.mkv 1`] = `
+{
+  "edition": "Director's Cut",
+  "episodes": [],
+  "extension": "mkv",
+  "kind": {
+    "confidence": 0.85,
+    "value": "movie",
+  },
+  "release": {
+    "languages": [
+      "de",
+      "en",
+    ],
+    "resolution": "1080p",
+    "source": "BluRay",
+  },
+  "title": "Das Boot",
+  "year": 1981,
+}
+`;
+
+exports[`Snapshots > The.Office.US.S03E05.720p.WEB.x264-GRP.mkv 1`] = `
+{
+  "episodes": [
+    5,
+  ],
+  "extension": "mkv",
+  "kind": {
+    "confidence": 0.95,
+    "value": "episode",
+  },
+  "release": {
+    "group": "GRP",
+    "languages": [],
+    "resolution": "720p",
+    "source": "WEB",
+    "videoCodec": "H.264",
+  },
+  "season": 3,
+  "title": "The Office US",
+}
+`;
+
+exports[`Snapshots > dune.part.two.2024.2160p.mkv 1`] = `
+{
+  "episodes": [],
+  "extension": "mkv",
+  "kind": {
+    "confidence": 0.85,
+    "value": "movie",
+  },
+  "release": {
+    "languages": [],
+    "resolution": "2160p",
+  },
+  "title": "dune part two",
+  "year": 2024,
+}
+`;
+
+exports[`Snapshots > severance.204-205.720p.mkv 1`] = `
+{
+  "episodes": [
+    4,
+    5,
+  ],
+  "extension": "mkv",
+  "kind": {
+    "confidence": 0.6,
+    "value": "episode",
+  },
+  "release": {
+    "languages": [],
+    "resolution": "720p",
+  },
+  "season": 2,
+  "title": "severance",
+}
+`;
+
+exports[`Snapshots > video_2024_final_v2.mp4 1`] = `
+{
+  "episodes": [],
+  "extension": "mp4",
+  "kind": {
+    "confidence": 0.6,
+    "value": "movie",
+  },
+  "release": {
+    "languages": [],
+  },
+  "title": "video",
+  "year": 2024,
+}
+`;

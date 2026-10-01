@@ -1,0 +1,19 @@
+{
+  "name": "@namarr/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@namarr/core": "workspace:*",
+    "drizzle-orm": "^0.45"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31"
+  }
+}

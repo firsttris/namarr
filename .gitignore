@@ -1,0 +1,13 @@
+node_modules
+dist
+.output
+.vinxi
+.nitro
+.tanstack
+*.tsbuildinfo
+/config
+*.sqlite
+*.sqlite-*
+coverage
+test-results
+playwright-report

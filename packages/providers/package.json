@@ -1,0 +1,13 @@
+{
+  "name": "@namarr/providers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@namarr/core": "workspace:*",
+    "bottleneck": "^2.19.5"
+  }
+}
