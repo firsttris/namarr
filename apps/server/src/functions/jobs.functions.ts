@@ -1,6 +1,6 @@
 import { ACTIONS, CONFLICT_POLICIES } from "@namarr/core";
 import { tr } from "@namarr/core/i18n";
-import { countItemsByState, getJob as findJob, getProfile, getSettings, ITEM_STATES, listItems } from "@namarr/db";
+import { countItemsByState, getJob as findJob, getProfile, getSettings, ITEM_STATES, listItems, SERIES_PROVIDERS } from "@namarr/db";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { rulesSchema, templateSchema } from "~/lib/schemas";
@@ -26,6 +26,7 @@ export const createJob = createServerFn({ method: "POST" })
       conflictPolicy: z.enum(CONFLICT_POLICIES).optional(),
       targetRoot: z.string().optional(),
       order: z.enum(["aired", "dvd", "absolute"]).optional(),
+      provider: z.enum(SERIES_PROVIDERS).optional(),
       language: z.string().optional(),
       recursive: z.boolean().optional(),
     }),
@@ -48,6 +49,7 @@ export const createJob = createServerFn({ method: "POST" })
         // Rule mode renames in place unless a target is chosen explicitly.
         targetRoot: data.targetRoot ?? profile?.targetRoot ?? (mode === "rules" ? undefined : settings.defaultTargetRoot),
         order: data.order,
+        provider: data.provider ?? profile?.provider ?? undefined,
         language: data.language,
         recursive: data.recursive,
       },
@@ -153,9 +155,12 @@ export const cancelJob = createServerFn({ method: "POST" })
 
 export const searchProvider = createServerFn({ method: "GET" })
   .middleware([authed])
-  .validator(z.object({ q: z.string().min(1).max(200), kind: z.enum(["movie", "series"]), year: z.number().int().optional() }))
+  .validator(
+    z.object({ q: z.string().min(1).max(200), kind: z.enum(["movie", "series"]), year: z.number().int().optional(), jobId: id.optional() }),
+  )
   .handler(async ({ data, context: { rt } }) => {
-    const provider = rt.provider();
+    // The job's series source, so the picker offers what the job matches against.
+    const provider = rt.provider({ series: data.jobId ? findJob(rt.db, data.jobId)?.config.provider : undefined });
     if (!provider) throw new Error(NO_PROVIDER);
     return data.kind === "movie" ? provider.searchMovie(data.q, { year: data.year }) : provider.searchSeries(data.q, { year: data.year });
   });

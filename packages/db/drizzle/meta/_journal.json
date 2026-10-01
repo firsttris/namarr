@@ -15,6 +15,13 @@
       "when": 1790839323017,
       "tag": "0001_item_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790882847913,
+      "tag": "0002_profile_provider",
+      "breakpoints": true
     }
   ]
 }

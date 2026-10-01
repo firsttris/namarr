@@ -9,10 +9,12 @@ import {
   type JobKind,
   jobItems,
   jobs,
+  type MovieProvider,
   matchOverrides,
   operations,
   profiles,
   providerCache,
+  type SeriesProvider,
   settings,
   watchFolders,
 } from "./schema.ts";
@@ -35,6 +37,14 @@ export type ItemStateName = (typeof ITEM_STATES)[number];
 
 export type Settings = {
   tmdbApiKey?: string;
+  tvdbApiKey?: string;
+  /** Subscriber PIN for a user-supported TheTVDB key. */
+  tvdbPin?: string;
+  /** Client registered at anidb.net, with its version. */
+  anidbClient?: string;
+  anidbClientVersion?: string;
+  seriesProvider?: SeriesProvider;
+  movieProvider?: MovieProvider;
   language: string;
   roots: string[];
   defaultTargetRoot?: string;
@@ -42,7 +52,14 @@ export type Settings = {
   libraryRefresh: { kind: "jellyfin" | "plex" | "emby"; url: string; token: string }[];
 };
 
-export const DEFAULT_SETTINGS: Settings = { language: "de-DE", roots: [], notifications: [], libraryRefresh: [] };
+export const DEFAULT_SETTINGS: Settings = {
+  language: "de-DE",
+  seriesProvider: "tmdb",
+  movieProvider: "tmdb",
+  roots: [],
+  notifications: [],
+  libraryRefresh: [],
+};
 
 export function getSettings(db: AnyDb): Settings {
   const rows = db.select().from(settings).all();

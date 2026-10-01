@@ -152,6 +152,60 @@ describe("Gruppierung und matchAll", () => {
   });
 });
 
+describe("IDs aus dem Ordnernamen", () => {
+  const ds9: MediaCandidate = { provider: "tvdb", id: "72073", kind: "series", title: "Star Trek: Deep Space Nine", year: 1993 };
+  class ById extends FakeProvider {
+    found: unknown[] = [];
+    async findById(_kind: "movie" | "series", ids: { tvdb?: string }) {
+      this.found.push(ids);
+      return ids.tvdb === "72073" ? ds9 : undefined;
+    }
+  }
+
+  it("die ID entscheidet ohne Suche, mit voller Sicherheit", async () => {
+    const provider = new ById({ episodes: { "72073": [{ season: 1, episode: 7, title: "Q-Less" }] } });
+    const files = [{ key: "a", parsed: parse("/tv/DS9 [tvdbid-72073]/Season 01/ds9.s01e07.mkv") }];
+    const result = (await matchAll(files, provider)).get("a")!;
+    expect(result).toMatchObject({ best: ds9, confidence: 1, episodes: [{ title: "Q-Less" }] });
+    expect(localize(result.reasons[0]!, "en")).toBe("ID from the folder name");
+    expect(provider.calls.searchSeries).toBe(0);
+  });
+
+  it("passt keine ID, wird wie gewohnt gesucht", async () => {
+    const provider = new ById({ series: [severance], episodes: { "95396": severanceEpisodes } });
+    const files = [{ key: "a", parsed: parse("/tv/Severance [tvdbid-1]/Severance.S02E01.mkv") }];
+    expect((await matchAll(files, provider)).get("a")!.best).toEqual(severance);
+    expect(provider.calls.searchSeries).toBe(1);
+  });
+});
+
+describe("Anbieter mit einem Eintrag pro Staffel (AniDB)", () => {
+  const frieren2: MediaCandidate = {
+    provider: "anidb",
+    id: "18290",
+    kind: "series",
+    title: "Sousou no Frieren (2026)",
+    seasonsAsEntries: true,
+  };
+  const provider = new FakeProvider({
+    series: [frieren2],
+    episodes: { "18290": [1, 2, 3, 4, 5].map((n) => ({ season: 1, episode: n, absolute: n, title: `Folge ${n}` })) },
+  });
+
+  it("S02E05 ist Folge 5 des gefundenen Eintrags, mit Hinweis zum Prüfen", async () => {
+    const result = (await matchAll([{ key: "a", parsed: parse("Sousou.no.Frieren.S02E05.1080p.WEB.mkv") }], provider)).get("a")!;
+    expect(result.episodes).toEqual([{ season: 1, episode: 5, absolute: 5, title: "Folge 5" }]);
+    expect(result.confidence).toBeLessThanOrEqual(0.7);
+    expect(localize(result.reasons.at(-1)!, "de")).toContain("Staffel 2 ist beim Anbieter ein eigener Eintrag");
+  });
+
+  it("Staffel 1 bleibt unverändert", async () => {
+    const result = (await matchAll([{ key: "a", parsed: parse("Sousou.no.Frieren.S01E03.1080p.WEB.mkv") }], provider)).get("a")!;
+    expect(result.episodes[0]).toMatchObject({ episode: 3 });
+    expect(result.reasons.join()).not.toContain("eigener Eintrag");
+  });
+});
+
 describe("resolveEpisodes", () => {
   it("absolute Nummer über die Liste des Anbieters", () => {
     const parsed = parse("[SubsPlease] Severance - 10 (1080p).mkv");

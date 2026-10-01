@@ -40,8 +40,8 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
   }, [item, parsed]);
 
   const results = useQuery({
-    queryKey: ["search", kind, submitted],
-    queryFn: () => searchProvider({ data: { q: submitted, kind } }),
+    queryKey: ["search", kind, submitted, item?.jobId],
+    queryFn: () => searchProvider({ data: { q: submitted, kind, jobId: item?.jobId } }),
     enabled: Boolean(item && submitted),
   });
 

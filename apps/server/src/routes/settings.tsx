@@ -1,4 +1,4 @@
-import type { Settings } from "@namarr/db/types";
+import type { MovieProvider, SeriesProvider, Settings } from "@namarr/db/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -6,6 +6,7 @@ import { XIcon } from "~/components/icons";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getSettingsFn, saveSettings } from "~/functions/library.functions";
 import { LANGS, type Lang, useLang, useT } from "~/lib/i18n";
+import { MOVIE_SOURCES, SERIES_SOURCES } from "~/lib/providers";
 
 export const Route = createFileRoute("/settings")({
   loader: () => getSettingsFn(),
@@ -20,17 +21,38 @@ function SettingsPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [key, setKey] = useState("");
+  const [seriesProvider, setSeriesProvider] = useState<SeriesProvider>(initial.seriesProvider ?? "tmdb");
+  const [movieProvider, setMovieProvider] = useState<MovieProvider>(initial.movieProvider ?? "tmdb");
+  const [tvdbKey, setTvdbKey] = useState("");
+  const [tvdbPin, setTvdbPin] = useState("");
+  const [anidbClient, setAnidbClient] = useState(initial.anidbClient ?? "");
+  const [anidbVersion, setAnidbVersion] = useState(initial.anidbClientVersion ?? "1");
   const [language, setLanguage] = useState(initial.language);
   const [roots, setRoots] = useState(initial.roots.join("\n"));
   const [defaultTarget, setDefaultTarget] = useState(initial.defaultTargetRoot ?? "");
   const [notifications, setNotifications] = useState<Settings["notifications"]>(initial.notifications);
   const [refresh, setRefresh] = useState<Settings["libraryRefresh"]>(initial.libraryRefresh);
 
+  // A chosen source without credentials only fails at the next job: say so here already.
+  const configured: Record<SeriesProvider, boolean> = {
+    tmdb: initial.hasTmdbKey || Boolean(key) || initial.demo,
+    tvdb: initial.hasTvdbKey || Boolean(tvdbKey),
+    tvmaze: true,
+    anidb: Boolean(anidbClient),
+  };
+  const missing = [...new Set<SeriesProvider>([seriesProvider, movieProvider])].filter((p) => !configured[p]);
+
   const save = useMutation({
     mutationFn: () =>
       saveSettings({
         data: {
           tmdbApiKey: key || undefined,
+          tvdbApiKey: tvdbKey || undefined,
+          tvdbPin: tvdbPin || undefined,
+          anidbClient,
+          anidbClientVersion: anidbVersion,
+          seriesProvider,
+          movieProvider,
           language,
           roots: roots
             .split("\n")
@@ -43,6 +65,8 @@ function SettingsPage() {
       }),
     onSuccess: () => {
       setKey("");
+      setTvdbKey("");
+      setTvdbPin("");
       qc.invalidateQueries();
       router.invalidate();
     },
@@ -74,6 +98,71 @@ function SettingsPage() {
               onChange={(e) => setKey(e.target.value)}
             />
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={s.seriesProvider} htmlFor="s-series" hint={s.providerHint[seriesProvider]}>
+              <Select id="s-series" value={seriesProvider} onChange={(e) => setSeriesProvider(e.target.value as SeriesProvider)}>
+                {SERIES_SOURCES.map((p) => (
+                  <option key={p} value={p}>
+                    {t.providers[p]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={s.movieProvider} htmlFor="s-movies">
+              <Select id="s-movies" value={movieProvider} onChange={(e) => setMovieProvider(e.target.value as MovieProvider)}>
+                {MOVIE_SOURCES.map((p) => (
+                  <option key={p} value={p}>
+                    {t.providers[p]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          {missing.length > 0 && (
+            <p role="status" className="m-0 text-[13px] text-accent">
+              {missing.map((p) => s.missingAccess(t.providers[p])).join(" ")}
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={s.tvdbKey} htmlFor="s-tvdb" hint={initial.hasTvdbKey ? s.keyStored(initial.tvdbApiKey ?? "") : s.tvdbHelp}>
+              <input
+                id="s-tvdb"
+                type="password"
+                autoComplete="off"
+                className={inputClass}
+                value={tvdbKey}
+                onChange={(e) => setTvdbKey(e.target.value)}
+              />
+            </Field>
+            <Field label={s.tvdbPin} htmlFor="s-tvdb-pin" hint={initial.tvdbPin ? s.keyStored(initial.tvdbPin) : undefined}>
+              <input
+                id="s-tvdb-pin"
+                type="password"
+                autoComplete="off"
+                className={inputClass}
+                value={tvdbPin}
+                onChange={(e) => setTvdbPin(e.target.value)}
+              />
+            </Field>
+            <Field label={s.anidbClient} htmlFor="s-anidb" hint={s.anidbHelp}>
+              <input
+                id="s-anidb"
+                autoComplete="off"
+                className={inputClass}
+                value={anidbClient}
+                onChange={(e) => setAnidbClient(e.target.value)}
+              />
+            </Field>
+            <Field label={s.anidbClientVersion} htmlFor="s-anidb-ver">
+              <input
+                id="s-anidb-ver"
+                inputMode="numeric"
+                className={inputClass}
+                value={anidbVersion}
+                onChange={(e) => setAnidbVersion(e.target.value)}
+              />
+            </Field>
+          </div>
           <Field label={s.titleLanguage} htmlFor="s-lang">
             <Select id="s-lang" value={language} onChange={(e) => setLanguage(e.target.value)}>
               {Object.entries(t.titleLanguages).map(([id, label]) => (

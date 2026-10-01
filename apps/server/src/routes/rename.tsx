@@ -2,7 +2,7 @@ import type { Action, ConflictPolicy } from "@namarr/core/fileops";
 import type { MatchResult } from "@namarr/core/matcher";
 import type { Rule } from "@namarr/core/rules";
 import type { Parsed } from "@namarr/core/types";
-import type { JobItem } from "@namarr/db/types";
+import type { JobItem, SeriesProvider } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -19,6 +19,7 @@ import { getProfiles, getSettingsFn } from "~/functions/library.functions";
 import { useLive } from "~/lib/events";
 import { num, pct } from "~/lib/format";
 import { type Messages, useLocalize, useT } from "~/lib/i18n";
+import { SERIES_SOURCES } from "~/lib/providers";
 
 type Mode = "media" | "rules" | "both";
 
@@ -222,7 +223,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
     },
   });
   const rematch = useMutation({
-    mutationFn: (extra: { paths?: string[]; order?: "aired" | "dvd" | "absolute"; language?: string }) => {
+    mutationFn: (extra: { paths?: string[]; order?: "aired" | "dvd" | "absolute"; language?: string; provider?: SeriesProvider }) => {
       const j = job.data!.job;
       return createJob({
         data: {
@@ -233,6 +234,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
           rules: config?.rules,
           targetRoot: j.config.targetRoot,
           order: extra.order ?? j.config.order,
+          provider: extra.provider ?? j.config.provider,
           language: extra.language ?? j.config.language,
         },
       });
@@ -311,10 +313,18 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
         {config?.mode !== "rules" && (
           <>
             <label htmlFor="prov" className="text-[13px] text-muted">
-              {t.common.source}
+              {t.common.seriesSource}
             </label>
-            <Select id="prov" value="tmdb" onChange={() => {}}>
-              <option value="tmdb">{wb.provider(kind)}</option>
+            <Select
+              id="prov"
+              value={j?.config.provider ?? settings.data?.seriesProvider ?? "tmdb"}
+              onChange={(e) => rematch.mutate({ provider: e.target.value as SeriesProvider })}
+            >
+              {SERIES_SOURCES.map((p) => (
+                <option key={p} value={p}>
+                  {t.providers[p]}
+                </option>
+              ))}
             </Select>
             <label htmlFor="order" className="ml-2 text-[13px] text-muted">
               {wb.order}

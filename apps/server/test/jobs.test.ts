@@ -112,7 +112,7 @@ describe("JobService: Analyse", () => {
     jobs = new JobService({ db, bus, provider: () => undefined, log, notify });
     const job = await jobs.create({ paths: [tv()], config: config() });
     await jobs.idle();
-    expect(getJob(db, job.id)).toMatchObject({ status: "failed", error: expect.stringContaining("TMDB-API-Key") });
+    expect(getJob(db, job.id)).toMatchObject({ status: "failed", error: expect.stringContaining("TMDB, TheTVDB oder AniDB") });
   });
 
   it("Regel-Modus benennt ohne Matching am Ort um", async () => {

@@ -15,6 +15,9 @@ import {
   listOperations,
   listProfiles,
   listWatchFolders,
+  MOVIE_PROVIDERS,
+  SERIES_PROVIDERS,
+  type Settings,
   setSettings,
   updateProfile,
   updateWatchFolder,
@@ -114,6 +117,7 @@ const profileInput = z.object({
   action: z.enum(ACTIONS),
   conflictPolicy: z.enum(CONFLICT_POLICIES),
   targetRoot: z.string().nullable(),
+  provider: z.enum(SERIES_PROVIDERS).nullable().optional(),
 });
 
 export const getProfiles = createServerFn({ method: "GET" })
@@ -182,7 +186,15 @@ export const getSettingsFn = createServerFn({ method: "GET" })
   .middleware([authed])
   .handler(async ({ context: { rt } }) => {
     const s = getSettings(rt.db);
-    return { ...s, tmdbApiKey: mask(s.tmdbApiKey), hasTmdbKey: Boolean(s.tmdbApiKey), demo: rt.env.demo };
+    return {
+      ...s,
+      tmdbApiKey: mask(s.tmdbApiKey),
+      hasTmdbKey: Boolean(s.tmdbApiKey),
+      tvdbApiKey: mask(s.tvdbApiKey),
+      hasTvdbKey: Boolean(s.tvdbApiKey),
+      tvdbPin: s.tvdbPin ? "••••" : undefined,
+      demo: rt.env.demo,
+    };
   });
 
 export const saveSettings = createServerFn({ method: "POST" })
@@ -190,6 +202,16 @@ export const saveSettings = createServerFn({ method: "POST" })
   .validator(
     z.object({
       tmdbApiKey: z.string().max(500).optional(),
+      tvdbApiKey: z.string().max(500).optional(),
+      tvdbPin: z.string().max(100).optional(),
+      anidbClient: z
+        .string()
+        .max(50)
+        .regex(/^[a-z0-9]*$/i, tr("AniDB-Client: nur Buchstaben und Ziffern", "AniDB client: letters and digits only"))
+        .optional(),
+      anidbClientVersion: z.string().max(10).optional(),
+      seriesProvider: z.enum(SERIES_PROVIDERS).optional(),
+      movieProvider: z.enum(MOVIE_PROVIDERS).optional(),
       language: z.string().max(20).optional(),
       roots: z.array(z.string().min(1)).optional(),
       defaultTargetRoot: z.string().optional(),
@@ -207,8 +229,17 @@ export const saveSettings = createServerFn({ method: "POST" })
         if (!st?.isDirectory()) throw new Error(tr(`Ordner existiert nicht: ${r}`, `Folder does not exist: ${r}`));
       }
     }
-    // An empty key field keeps the stored key; "-" removes it.
-    const patch = { ...data, tmdbApiKey: data.tmdbApiKey === "-" ? undefined : data.tmdbApiKey || getSettings(rt.db).tmdbApiKey };
+    // An empty secret field keeps what is stored; "-" removes it.
+    const stored = getSettings(rt.db);
+    const secret = (key: "tmdbApiKey" | "tvdbApiKey" | "tvdbPin") => (data[key] === "-" ? undefined : data[key] || stored[key]);
+    const patch: Partial<Settings> = {
+      ...data,
+      tmdbApiKey: secret("tmdbApiKey"),
+      tvdbApiKey: secret("tvdbApiKey"),
+      tvdbPin: secret("tvdbPin"),
+      anidbClient: data.anidbClient === undefined ? stored.anidbClient : data.anidbClient || undefined,
+      anidbClientVersion: data.anidbClientVersion === undefined ? stored.anidbClientVersion : data.anidbClientVersion || undefined,
+    };
     setSettings(rt.db, patch);
     return { ok: true };
   });

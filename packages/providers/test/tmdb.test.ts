@@ -29,6 +29,7 @@ const routes = {
   "/3/tv/95396/episode_groups": "tv_95396_episode_groups",
   "/3/tv/episode_group/grp-dvd": "episode_group_grp-dvd",
   "/3/tv/95396": "tv_95396",
+  "/3/find/371980?external_source=tvdb_id&language=de-DE": "find_tvdb_371980",
   "/3/search/movie?include_adult=false&language=de-DE&query=Dune": "search_movie_dune",
   "/3/search/movie?include_adult=false&language=de-DE&query=Das": "search_movie_das_boot",
 };
@@ -179,5 +180,13 @@ describe("TMDB-Provider", () => {
     const movie = results.get(inputs[1]!.key)!;
     expect(movie.best).toMatchObject({ id: "387", year: 1981 });
     expect(classify(movie.confidence)).toBe("auto");
+  });
+
+  it("findet Serien über TMDB-, TVDB- und IMDb-IDs aus dem Ordnernamen", async () => {
+    const { tmdb, calls } = provider();
+    expect(await tmdb.findById("series", { tmdb: "95396" })).toMatchObject({ id: "95396", title: "Severance" });
+    expect(await tmdb.findById("series", { tvdb: "371980" })).toMatchObject({ id: "95396" });
+    expect(await tmdb.findById("series", { tmdb: "1", imdb: "tt0" })).toBeUndefined();
+    expect(calls).toContain("/3/find/371980?external_source=tvdb_id&language=de-DE&api_key=k");
   });
 });

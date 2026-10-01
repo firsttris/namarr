@@ -13,6 +13,7 @@ export function automaticConfig(profile: Profile | undefined, opts: { targetRoot
     rules: profile?.rulesJson ?? [],
     action: profile?.action && profile.action !== "test" ? profile.action : "hardlink",
     conflictPolicy: profile?.conflictPolicy ?? "skip",
+    provider: profile?.provider ?? undefined,
     targetRoot: opts.targetRoot,
     autoThreshold: opts.autoThreshold ?? undefined,
     alwaysReview: opts.autoThreshold === null,

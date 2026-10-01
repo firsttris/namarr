@@ -160,6 +160,18 @@ describe("Ordnerkontext", () => {
     expect(parse("Inception (2010)/1080p.mkv")).toMatchObject({ title: "Inception", year: 2010, kind: { value: "movie" } });
   });
 
+  it("IDs von Sonarr, Radarr und Jellyfin im Ordnernamen", () => {
+    const ds9 = parse(
+      "/tv/Star Trek - Deep Space Nine (1993) [tvdbid-72073]/Season 01/Star Trek - Deep Space Nine S01E07 'Q'-unerwünscht - [1080p, AC3].mkv",
+    );
+    expect(ds9).toMatchObject({ title: "Star Trek - Deep Space Nine", year: 1993, season: 1, episodes: [7], ids: { tvdb: "72073" } });
+    // The file's own ID wins over the folder's; the tags never end up in the title
+    const dune = parse("/movies/Dune (2021) {tmdb-438631} [imdbid-tt0000001]/Dune (2021) {imdb-tt1160419}.mkv");
+    expect(dune).toMatchObject({ title: "Dune", year: 2021, ids: { tmdb: "438631", imdb: "tt1160419" } });
+    expect(parse("[SubsPlease] Frieren - 05 (1080p) [anidb-17617].mkv")).toMatchObject({ title: "Frieren", ids: { anidb: "17617" } });
+    expect(parse("Dark.S01E01.mkv").ids).toBeUndefined();
+  });
+
   it("Windows-Pfade", () => {
     expect(parse("D:\\TV\\Dark\\Staffel 1\\03.mkv")).toMatchObject({ title: "Dark", season: 1, episodes: [3] });
   });
