@@ -51,12 +51,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Prepare README for Docker Hub
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           BLOB=https://github.com/${{ github.repository }}/blob/main
           sed -E -e "s#\]\((\./|/)?docker/#](${BLOB}/docker/#g" README.md > dockerhub-readme.md
       - name: Update Docker Hub description
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: peter-evans/dockerhub-description@v5
         with:
           username: tristanteu
