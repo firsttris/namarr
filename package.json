@@ -20,11 +20,11 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^22",
-    "fast-check": "^4",
-    "typescript": "^5.9",
-    "vitest": "^5",
-    "@biomejs/biome": "^2",
-    "yaml": "^2"
+    "@types/node": "^26.6.3",
+    "fast-check": "^4.10.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3",
+    "@biomejs/biome": "^2.5.15",
+    "yaml": "^2.9.1"
   }
 }

@@ -1,4 +1,4 @@
-import { createMiddleware, createStart } from "@tanstack/react-start";
+import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 import { isAuthenticated, isPublicPath } from "./server/auth.server";
 import { runtime } from "./server/runtime.server";
 
@@ -14,4 +14,7 @@ const authGate = createMiddleware().server(async ({ next, request }) => {
   return new Response(null, { status: 302, headers: { location: `/login?next=${encodeURIComponent(url.pathname + url.search)}` } });
 });
 
-export const startInstance = createStart(() => ({ requestMiddleware: [authGate] }));
+/** Server functions are same-origin RPC: reject cross-site calls (Sec-Fetch-Site, then Origin/Referer). */
+const csrf = createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === "serverFn" });
+
+export const startInstance = createStart(() => ({ requestMiddleware: [csrf, authGate] }));

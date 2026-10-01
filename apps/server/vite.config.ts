@@ -8,9 +8,6 @@ export default defineConfig(({ command }) => ({
   server: { port: 8420 },
   // Bundle every dependency for the build: the Docker image ships dist/ without node_modules.
   // Dev keeps dependencies external, since the SSR module runner cannot evaluate CommonJS (react).
-  ssr:
-    command === "build"
-      ? { noExternal: true, external: ["bun:sqlite"] }
-      : { external: ["bun:sqlite"] },
+  ssr: command === "build" ? { noExternal: true, external: ["bun:sqlite"] } : { external: ["bun:sqlite"] },
   plugins: [tanstackStart(), viteReact(), tailwindcss()],
 }));
