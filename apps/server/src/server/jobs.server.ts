@@ -81,12 +81,22 @@ export class JobService {
     return getSettings(this.deps.db);
   }
 
+  /** Everything that touches files runs here, one after another. */
+  private serial<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(work);
+    this.queue = run.catch((e) => this.deps.log.error({ err: e }, "Job fehlgeschlagen"));
+    return run;
+  }
+
   private enqueue<T>(jobId: number, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const controller = new AbortController();
     this.aborts.set(jobId, controller);
-    const run = this.queue.then(() => work(controller.signal));
-    this.queue = run.catch((e) => this.deps.log.error({ err: e, jobId }, "Job fehlgeschlagen")).finally(() => this.aborts.delete(jobId));
-    return run;
+    return this.serial(() => work(controller.signal)).finally(() => this.aborts.delete(jobId));
+  }
+
+  /** Previews and items of a job that is scanning, matching or executing are not editable. */
+  private assertIdle(job: Job) {
+    if (["pending", "scanning", "matching", "executing"].includes(job.status)) throw new JobError("Job läuft noch");
   }
 
   /** Waits until everything queued so far has finished (tests, shutdown). */
@@ -185,7 +195,7 @@ export class JobService {
         for (const r of rows) updateItem(db, r.id, { matchJson: matches.get(String(r.id)) ?? null, state: "matched" });
       }
 
-      await this.recompute(jobId);
+      await this.computePreview(jobId);
       const counts = countItemsByState(db, jobId);
       this.progress(job, "ready", files.length, files.length);
       this.deps.log.info({ jobId, files: files.length, counts }, "Job analysiert");
@@ -270,6 +280,7 @@ export class JobService {
       match: (item.matchJson as StoredMatch | null) ?? undefined,
       targetOverride: item.overrideTarget ?? undefined,
       excluded: item.excluded,
+      approved: item.approved,
     };
   }
 
@@ -289,6 +300,16 @@ export class JobService {
     jobId: number,
     patch?: Partial<Pick<JobConfig, "mode" | "preset" | "template" | "rules">> & { targetRoot?: string | null },
   ) {
+    const job = getJob(this.deps.db, jobId);
+    if (!job) throw new JobError("Job nicht gefunden");
+    this.assertIdle(job);
+    return this.computePreview(jobId, patch);
+  }
+
+  private async computePreview(
+    jobId: number,
+    patch?: Partial<Pick<JobConfig, "mode" | "preset" | "template" | "rules">> & { targetRoot?: string | null },
+  ) {
     const { db } = this.deps;
     let job = getJob(db, jobId);
     if (!job) throw new JobError("Job nicht gefunden");
@@ -299,7 +320,8 @@ export class JobService {
       else if (targetRoot !== undefined) config.targetRoot = await resolveInRoots(targetRoot, this.settings().roots);
       job = updateJob(db, jobId, { config })!;
     }
-    const items = allItems(db, jobId).filter((i) => !["done", "undone"].includes(i.state));
+    // Undone files are back at their source and can be renamed again.
+    const items = allItems(db, jobId).filter((i) => i.state !== "done");
     const inputs = await Promise.all(items.map((i) => this.toInput(i)));
     const preview = buildPreview(inputs, this.previewConfig(job.config));
     await this.markExisting(preview);
@@ -356,6 +378,7 @@ export class JobService {
     if (!item) throw new JobError("Datei nicht gefunden");
     if (item.state === "done") throw new JobError("Bereits ausgeführt: erst rückgängig machen");
     const job = getJob(db, item.jobId)!;
+    this.assertIdle(job);
     const values: Parameters<typeof updateItem>[2] = {};
 
     if (change.match) {
@@ -390,22 +413,47 @@ export class JobService {
       } else values.overrideTarget = null;
     }
     if (change.excluded !== undefined) values.excluded = change.excluded;
-    if (Object.keys(values).length) updateItem(db, itemId, values);
-    if (change.match || change.targetPath !== undefined || change.excluded !== undefined) await this.recompute(item.jobId);
-    if (change.approve) {
-      const fresh = getItem(db, itemId)!;
-      if (fresh.targetPath && !fresh.conflict) updateItem(db, itemId, { state: "ready", reasons: [...fresh.reasons, "Freigegeben"] });
-    }
+    if (change.approve) values.approved = true;
+    updateItem(db, itemId, values);
+    await this.computePreview(item.jobId);
     return getItem(db, itemId)!;
+  }
+
+  /** Approves several files at once; each job's preview is recomputed once. */
+  async approve(itemIds: number[]): Promise<Map<number, number[]>> {
+    const { db } = this.deps;
+    const byJob = new Map<number, number[]>();
+    for (const id of itemIds) {
+      const item = getItem(db, id);
+      if (!item || item.state === "done") continue;
+      byJob.set(item.jobId, [...(byJob.get(item.jobId) ?? []), id]);
+    }
+    const ready = new Map<number, number[]>();
+    for (const [jobId, ids] of byJob) {
+      this.assertIdle(getJob(db, jobId)!);
+      db.transaction(() => {
+        for (const id of ids) updateItem(db, id, { approved: true });
+      });
+      await this.computePreview(jobId);
+      ready.set(
+        jobId,
+        ids.filter((id) => getItem(db, id)?.state === "ready"),
+      );
+    }
+    return ready;
   }
 
   // ---------- execute ----------
 
-  async executeNow(jobId: number, options: { action?: Action; conflictPolicy?: ConflictPolicy; itemIds?: number[] } = {}) {
+  /**
+   * Queues the execution. Validation errors throw synchronously, so a caller that does not
+   * wait for the result still learns that the job is busy or missing.
+   */
+  executeNow(jobId: number, options: { action?: Action; conflictPolicy?: ConflictPolicy; itemIds?: number[] } = {}) {
     const { db } = this.deps;
     const job = getJob(db, jobId);
     if (!job) throw new JobError("Job nicht gefunden");
-    if (["scanning", "matching", "executing"].includes(job.status)) throw new JobError("Job läuft noch");
+    this.assertIdle(job);
     if (options.action || options.conflictPolicy) {
       updateJob(db, jobId, {
         config: {
@@ -438,12 +486,15 @@ export class JobService {
         if (result.status === "done") {
           this.record(jobId, item.id, result.record);
           // Companions follow their main file with the same action.
+          const companionErrors: string[] = [];
           for (const c of item.companions) {
             if (!c.to) continue;
             const cr = await executeOperation({ from: c.from, to: await resolveInRoots(c.to, settings.roots), action }, { conflict });
             if (cr.status === "done") this.record(jobId, item.id, cr.record);
+            else if (cr.status === "failed") companionErrors.push(`${path.basename(c.from)}: ${cr.error}`);
+            else if (cr.status === "skipped") companionErrors.push(`${path.basename(c.from)}: ${cr.reason}`);
           }
-          updateItem(db, item.id, { state: "done", targetPath: result.record.to, error: null });
+          updateItem(db, item.id, { state: "done", targetPath: result.record.to, error: companionErrors.join("; ") || null });
           removeFromInbox(db, item.id);
           summary.done++;
           if (action === "move") await cleanupEmptyDirs(path.dirname(item.sourcePath), job.sourcePaths[0] ?? "/").catch(() => []);
@@ -490,8 +541,12 @@ export class JobService {
 
   // ---------- undo ----------
 
-  /** Undo a whole job, some of its files, or single operations. Newest first. */
-  async undo(target: { jobId?: number; itemIds?: number[]; operationIds?: number[]; since?: Date }) {
+  /** Undo a whole job, some of its files, or single operations. Newest first, in the file queue. */
+  undo(target: { jobId?: number; itemIds?: number[]; operationIds?: number[]; since?: Date }) {
+    return this.serial(() => this.undoNow(target));
+  }
+
+  private async undoNow(target: { jobId?: number; itemIds?: number[]; operationIds?: number[]; since?: Date }) {
     const { db, bus } = this.deps;
     let ops = listOperations(db, { jobId: target.jobId, limit: 100_000, until: target.since });
     if (target.itemIds) ops = ops.filter((o) => o.jobItemId !== null && target.itemIds!.includes(o.jobItemId));
@@ -512,14 +567,17 @@ export class JobService {
       else failed.push({ id: op.id, reason: result.reason });
     }
     markUndone(db, undone);
-    const itemIds = [...new Set(ops.filter((o) => undone.includes(o.id) && o.jobItemId).map((o) => o.jobItemId!))];
-    for (const id of itemIds) {
-      const item = getItem(db, id);
-      if (item?.state === "done") updateItem(db, id, { state: "undone" });
-    }
+    const done = new Set(undone);
     const jobIds = [...new Set(ops.map((o) => o.jobId).filter((j): j is number => j !== null))];
     for (const jobId of jobIds) {
-      const remaining = listOperations(db, { jobId, limit: 1 });
+      const remaining = listOperations(db, { jobId, limit: 100_000 });
+      const stillApplied = new Set(remaining.map((o) => o.jobItemId));
+      const itemIds = [...new Set(ops.filter((o) => o.jobId === jobId && done.has(o.id) && o.jobItemId).map((o) => o.jobItemId!))];
+      for (const id of itemIds) {
+        // Only when the main file and all its companions went back is the item undone.
+        if (stillApplied.has(id)) continue;
+        if (getItem(db, id)?.state === "done") updateItem(db, id, { state: "undone", approved: false });
+      }
       if (!remaining.length) updateJob(db, jobId, { status: "undone" });
       bus.emit({ type: "item.updated", jobId, itemIds });
     }

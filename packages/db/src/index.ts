@@ -11,10 +11,11 @@ export { schema };
 
 export type Db = BunSQLiteDatabase<typeof schema> & { $client: Database };
 
+/** Next to the sources (packages/db/drizzle) or next to the server bundle (dist/drizzle). */
 function defaultMigrations(): string {
   if (process.env.NAMARR_MIGRATIONS_DIR) return process.env.NAMARR_MIGRATIONS_DIR;
-  const local = fileURLToPath(new URL("../drizzle", import.meta.url));
-  return existsSync(local) ? local : "./drizzle";
+  const candidates = [new URL("../drizzle", import.meta.url), new URL("./drizzle", import.meta.url)].map((u) => fileURLToPath(u));
+  return candidates.find((dir) => existsSync(`${dir}/meta/_journal.json`)) ?? candidates[0]!;
 }
 
 /**

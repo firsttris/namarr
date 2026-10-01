@@ -93,12 +93,8 @@ export const approveInbox = createServerFn({ method: "POST" })
         (data.itemIds ? data.itemIds.includes(e.item.id) : true) &&
         (data.minConfidence === undefined || e.item.confidence >= data.minConfidence),
     );
-    const byJob = new Map<number, number[]>();
-    for (const e of chosen) {
-      const item = await rt.jobs.updateItem(e.item.id, { approve: true });
-      if (item.state === "ready") byJob.set(item.jobId, [...(byJob.get(item.jobId) ?? []), item.id]);
-    }
-    for (const [jobId, itemIds] of byJob) await rt.jobs.executeNow(jobId, { itemIds });
+    const byJob = await rt.jobs.approve(chosen.map((e) => e.item.id));
+    for (const [jobId, itemIds] of byJob) if (itemIds.length) await rt.jobs.executeNow(jobId, { itemIds });
     const approved = [...byJob.values()].flat();
     return { approved: approved.length, done: approved.filter((i) => getItem(rt.db, i)?.state === "done").length };
   });

@@ -30,6 +30,8 @@ export type PreviewInput = {
   /** Manual override from the UI. */
   targetOverride?: string;
   excluded?: boolean;
+  /** Approved by the user: ready regardless of confidence. */
+  approved?: boolean;
 };
 
 export type PreviewItem = {
@@ -64,7 +66,7 @@ function companionTarget(target: string, companion: Companion): string {
  * Pure: no disk access. Conflicts with existing files are checked by the caller.
  */
 export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): PreviewItem[] {
-  const items: PreviewItem[] = inputs.map(({ file, parsed, match, targetOverride, excluded }) => {
+  const items: PreviewItem[] = inputs.map(({ file, parsed, match, targetOverride, excluded, approved }) => {
     const base: PreviewItem = { source: file.path, state: "parsed", confidence: 1, reasons: [], companions: [] };
     if (excluded) return { ...base, state: "skipped", reasons: ["Manuell ausgeschlossen"] };
     if (parsed.sample) return { ...base, state: "skipped", reasons: ["Übersprungen: Sample-Datei"] };
@@ -91,9 +93,9 @@ export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): Pre
     return {
       ...base,
       target: resolveTarget(relative, file, config),
-      state: decision === "auto" ? "ready" : "needs_review",
+      state: decision === "auto" || approved ? "ready" : "needs_review",
       confidence: match.confidence,
-      reasons: match.reasons,
+      reasons: approved && decision !== "auto" ? [...match.reasons, "Freigegeben"] : match.reasons,
     };
   });
 

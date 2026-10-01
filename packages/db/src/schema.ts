@@ -96,6 +96,8 @@ export const jobItems = sqliteTable(
     /** Target set by hand in the UI; wins over the template. */
     overrideTarget: text("override_target"),
     excluded: integer("excluded", { mode: "boolean" }).notNull().default(false),
+    /** Approved by the user: stays ready when the preview is recomputed. */
+    approved: integer("approved", { mode: "boolean" }).notNull().default(false),
     state: text("state", { enum: ITEM_STATES }).notNull().default("parsed"),
     reasons: text("reasons_json", { mode: "json" }).$type<string[]>().notNull().default([]),
     companions: text("companions_json", { mode: "json" }).$type<{ from: string; to: string; suffix?: string }[]>().notNull().default([]),

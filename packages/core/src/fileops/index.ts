@@ -1,6 +1,7 @@
 import { constants, type Stats } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { splitExtension } from "../parser/index.ts";
 
 export const ACTIONS = ["move", "copy", "hardlink", "symlink", "rename", "test"] as const;
 export const CONFLICT_POLICIES = ["skip", "overwrite", "suffix", "keep-better"] as const;
@@ -78,9 +79,12 @@ export async function ensureDir(dir: string): Promise<string[]> {
 export async function freeName(target: string): Promise<string> {
   const dir = path.dirname(target);
   const base = path.basename(target);
-  const dot = base.indexOf(".", 1);
-  const stem = dot > 0 ? base.slice(0, dot) : base;
-  const ext = dot > 0 ? base.slice(dot) : "";
+  // "Mr. Robot - S01E01.de.srt" → "Mr. Robot - S01E01 (1).de.srt"
+  let { stem, suffix: ext } = splitExtension(base);
+  if (!ext) {
+    const dot = base.lastIndexOf(".");
+    if (dot > 0) [stem, ext] = [base.slice(0, dot), base.slice(dot)];
+  }
   for (let i = 1; i < 10_000; i++) {
     const candidate = path.join(dir, `${stem} (${i})${ext}`);
     if (!(await exists(candidate))) return candidate;
@@ -257,7 +261,8 @@ async function removeEmptyDirs(dirs: string[]): Promise<void> {
   }
 }
 
-export const DEFAULT_JUNK = [/^thumbs\.db$/i, /^\.ds_store$/i, /^desktop\.ini$/i, /\.(url|txt|exe|nzb|sfv)$/i, /^rarbg/i];
+/** Files left behind by downloaders. Deliberately narrow: a user's own notes are never junk. */
+export const DEFAULT_JUNK = [/^thumbs\.db$/i, /^\.ds_store$/i, /^desktop\.ini$/i, /\.(url|nzb|sfv|par2)$/i, /^rarbg.*\.(txt|exe)$/i];
 
 /**
  * Walks up from `start` to `root` (exclusive) and removes folders that are empty

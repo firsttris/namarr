@@ -107,7 +107,10 @@ describe("Konflikte", () => {
     await write("b (1).mkv", "older");
     const record = done(await executeOperation({ from, to: p("b.mkv"), action: "move" }, { conflict: "suffix" }));
     expect(record.to).toBe(p("b (2).mkv"));
-    expect(await freeName(p("x.de.srt"))).toBe(p("x.de.srt").replace("x.de.srt", "x (1).de.srt"));
+    expect(await freeName(p("x.de.srt"))).toBe(p("x (1).de.srt"));
+    // A dot inside the title is not the extension
+    expect(await freeName(p("Mr. Robot - S01E01.mkv"))).toBe(p("Mr. Robot - S01E01 (1).mkv"));
+    expect(await freeName(p("archive.tar.zst"))).toBe(p("archive.tar (1).zst"));
   });
 
   it("overwrite sichert das alte Ziel und Undo stellt es wieder her", async () => {
@@ -239,8 +242,11 @@ describe("Aufräumen", () => {
     expect(await exists("dl/keep/a.mkv")).toBe(true);
   });
 
-  it("stoppt bei echten Dateien", async () => {
+  it("stoppt bei echten Dateien, auch bei eigenen .txt", async () => {
     await write("dl/x/notes.md");
+    await write("dl/y/meine-notizen.txt");
     expect(await cleanupEmptyDirs(p("dl/x"), p("dl"))).toEqual([]);
+    expect(await cleanupEmptyDirs(p("dl/y"), p("dl"))).toEqual([]);
+    expect(await exists("dl/y/meine-notizen.txt")).toBe(true);
   });
 });

@@ -217,6 +217,76 @@ describe("JobService: Ausführen und Undo", () => {
   });
 });
 
+describe("JobService: Review-Fixes", () => {
+  it("eine Freigabe überlebt das Neuberechnen der Vorschau", async () => {
+    const { job, by } = await analyzed();
+    const double = by("severance.204-205.720p.mkv");
+    expect((await jobs.updateItem(double.id, { approve: true })).state).toBe("ready");
+    await jobs.recompute(job.id, { template: { episode: "{n}/{s00e00}" } });
+    const after = allItems(db, job.id).find((i) => i.id === double.id)!;
+    expect(after.state).toBe("ready");
+    expect(after.reasons).toContain("Freigegeben");
+  });
+
+  it("mehrere Freigaben auf einmal: eine Neuberechnung pro Job", async () => {
+    const { job, by } = await analyzed();
+    const spy = vi.spyOn(jobs as unknown as { computePreview: () => Promise<unknown> }, "computePreview");
+    const ready = await jobs.approve([by("severance.204-205.720p.mkv").id, by("Severance.S02E01.sample.mkv").id]);
+    expect(spy).toHaveBeenCalledTimes(1);
+    // The sample stays skipped: approval does not override a skip
+    expect(ready.get(job.id)).toEqual([by("severance.204-205.720p.mkv").id]);
+  });
+
+  it("während der Job läuft, sind Vorschau und Items gesperrt", async () => {
+    const job = await jobs.create({ paths: [tv()], config: config() });
+    await expect(jobs.recompute(job.id, { preset: "plex" })).rejects.toThrow(/läuft noch/);
+    // Thrown synchronously, so the server function can report it before queueing
+    expect(() => jobs.executeNow(job.id)).toThrow(/läuft noch/);
+    await jobs.idle();
+    await expect(jobs.recompute(job.id, { preset: "plex" })).resolves.toBeDefined();
+  });
+
+  it("Undo wartet in der Queue auf eine laufende Ausführung", async () => {
+    const { job } = await analyzed();
+    const order: string[] = [];
+    const exec = jobs.executeNow(job.id).then(() => order.push("execute"));
+    const undo = jobs.undo({ jobId: job.id }).then((r) => order.push(`undo ${r.undone}`));
+    await Promise.all([exec, undo]);
+    expect(order).toEqual(["execute", "undo 3"]);
+    expect(await fs.readdir(media())).toEqual([]);
+  });
+
+  it("rückgängig gemachte Dateien lassen sich erneut ausführen", async () => {
+    const { job } = await analyzed();
+    await jobs.executeNow(job.id);
+    await jobs.undo({ jobId: job.id });
+    await jobs.recompute(job.id);
+    const ready = allItems(db, job.id).filter((i) => i.state === "ready");
+    expect(ready).toHaveLength(2);
+    expect(await jobs.executeNow(job.id)).toMatchObject({ done: 2 });
+  });
+
+  it("ein Item bleibt erledigt, solange eine Begleitdatei nicht zurück konnte", async () => {
+    const { job, by } = await analyzed();
+    await jobs.executeNow(job.id);
+    const e1 = by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv");
+    await fs.writeFile(e1.targetPath!.replace(/\.mkv$/, ".de.srt"), "verändert, länger als vorher");
+    const result = await jobs.undo({ jobId: job.id });
+    expect(result.failed).toHaveLength(1);
+    expect(allItems(db, job.id).find((i) => i.id === e1.id)!.state).toBe("done");
+    expect(getJob(db, job.id)!.status).toBe("done");
+  });
+
+  it("fehlgeschlagene Begleitdateien werden am Item vermerkt", async () => {
+    await touch("media/tv/Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.de.srt", "alt");
+    const { job, by } = await analyzed();
+    await jobs.executeNow(job.id);
+    const e1 = allItems(db, job.id).find((i) => i.id === by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").id)!;
+    expect(e1.state).toBe("done");
+    expect(e1.error).toContain("Ziel existiert bereits");
+  });
+});
+
 describe("JobService: Watch-Jobs", () => {
   it("sichere Treffer laufen automatisch, unsichere landen in der Inbox", async () => {
     const wf = createWatchFolder(db, { name: "Serien", path: tv(), targetRoot: media() });

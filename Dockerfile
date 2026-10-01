@@ -19,7 +19,6 @@ FROM oven/bun:1.3-slim AS runtime
 WORKDIR /app
 COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 COPY --from=build /app/apps/server/dist ./dist
-COPY --from=build /app/packages/db/drizzle ./drizzle
 
 # Bound to all interfaces inside the container, so NAMARR_TOKEN is mandatory (checked at start).
 # PUID/PGID: the server starts as root, hands /config over and drops to that user.
@@ -28,7 +27,6 @@ ENV NODE_ENV=production \
     NAMARR_PORT=8420 \
     NAMARR_CONFIG_DIR=/config \
     NAMARR_ROOTS=/data \
-    NAMARR_MIGRATIONS_DIR=/app/drizzle \
     PUID=1000 \
     PGID=1000
 
