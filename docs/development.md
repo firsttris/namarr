@@ -70,12 +70,15 @@ The corpus is a start (the goal is 500+ real names) and was written together wit
 
 ## Releases
 
-A version is a tag. On `main`, with a clean working tree:
+A version is a tag. On an up-to-date `main`, with a clean working tree:
 
 ```bash
-npm version minor          # or patch / major: bumps package.json, commits, tags vX.Y.Z
-git push --follow-tags     # pushes the commit and the tag
+bun run release:minor      # or release:patch / release:major
 ```
+
+This runs `npm version`, which writes the new number into `package.json`, commits it and creates the
+tag `vX.Y.Z` from the same number; the `postversion` script then pushes commit and tag
+(`git push --follow-tags`).
 
 The tag push starts the *Release* workflow:
 
