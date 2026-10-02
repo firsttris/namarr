@@ -127,6 +127,8 @@ export type ProbeInfo = {
   hdr?: string;
   audio: { codec: string; profile?: string; channels?: number; language?: string }[];
   duration?: number;
+  /** Container and audio-stream tags with lower-case names (artist, title, creation_time, …). */
+  tags?: Record<string, string>;
 };
 
 type FfprobeStream = {
@@ -138,13 +140,16 @@ type FfprobeStream = {
   channels?: number;
   color_transfer?: string;
   side_data_list?: { side_data_type?: string }[];
-  tags?: { language?: string };
+  tags?: Record<string, string>;
 };
 
 const CODEC_NAMES: Record<string, string> = { h264: "H.264", hevc: "H.265", av1: "AV1", mpeg4: "XviD", vp9: "VP9" };
 
 /** Turns `ffprobe -print_format json -show_streams -show_format` output into release fields. */
-export function parseFfprobe(json: { streams?: FfprobeStream[]; format?: { duration?: string } }): ProbeInfo {
+export function parseFfprobe(json: {
+  streams?: FfprobeStream[];
+  format?: { duration?: string; tags?: Record<string, string> };
+}): ProbeInfo {
   const streams = json.streams ?? [];
   const video = streams.find((s) => s.codec_type === "video");
   let resolution: string | undefined;
@@ -167,7 +172,21 @@ export function parseFfprobe(json: { streams?: FfprobeStream[]; format?: { durat
       .filter((s) => s.codec_type === "audio")
       .map((s) => ({ codec: s.codec_name ?? "unknown", profile: s.profile, channels: s.channels, language: s.tags?.language })),
     duration: json.format?.duration ? Number(json.format.duration) : undefined,
+    tags: probeTags(json.format?.tags, streams),
   };
+}
+
+/** Ogg and Opus keep their tags on the audio stream, everything else on the container. */
+function probeTags(format: Record<string, string> | undefined, streams: FfprobeStream[]): Record<string, string> | undefined {
+  const all = [format, ...streams.filter((s) => s.codec_type === "audio").map((s) => s.tags)];
+  const out: Record<string, string> = {};
+  for (const tags of all) {
+    for (const [k, v] of Object.entries(tags ?? {})) {
+      const key = k.toLowerCase();
+      if (key !== "language" && v && out[key] === undefined) out[key] = String(v).trim();
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Reads container metadata with ffprobe. Returns undefined when ffprobe is not installed. */

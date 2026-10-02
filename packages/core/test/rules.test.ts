@@ -113,6 +113,74 @@ describe("Regel-Engine", () => {
     expect(steps).toEqual([["Fünf: Zwei.mkv"], ["Fünf: Zwei.mkv"], ["Fünf - Zwei.mkv"]]);
   });
 
+  it("Zahlen auffüllen: kürzere Zahlen auf die Stellenzahl, längere bleiben", () => {
+    expect(one("Folge 5 von 12.mkv", [{ type: "pad", digits: 2 }])).toBe("Folge 05 von 12.mkv");
+    expect(one("S1E5 (2024).mkv", [{ type: "pad", digits: 3 }])).toBe("S001E005 (2024).mkv");
+  });
+
+  it("Aufräumen: Klammern, Punkte, Leerzeichen", () => {
+    const cleanup: Rule = { type: "cleanup" };
+    expect(one("Song Title [Official Video] (HD)  .mp3", [cleanup])).toBe("Song Title.mp3");
+    expect(one("my.holiday_photo  {copy}.jpg", [{ type: "cleanup", separators: true }])).toBe("my holiday photo.jpg");
+    expect(one("Keep (this).txt", [{ type: "cleanup", brackets: false }])).toBe("Keep (this).txt");
+  });
+
+  it("Zeichen entfernen: Ziffern, Sonderzeichen, eigene Auswahl", () => {
+    expect(one("Track 01 - Intro!.mp3", [{ type: "strip", digits: true }])).toBe("Track  - Intro!.mp3");
+    expect(one("Größe & Gewicht #2!.txt", [{ type: "strip", symbols: true }])).toBe("Größe  Gewicht 2.txt");
+    expect(one("a-b_c]d.txt", [{ type: "strip", chars: "-]" }])).toBe("ab_cd.txt");
+  });
+
+  it("Umsortieren an einem Trennzeichen", () => {
+    const rule: Rule = { type: "rearrange", delimiter: " - ", pattern: "$2 - $1" };
+    expect(one("Bohemian Rhapsody - Queen.mp3", [rule])).toBe("Queen - Bohemian Rhapsody.mp3");
+    expect(one("Nur ein Teil.mp3", [rule])).toBe(" - Nur ein Teil.mp3");
+    expect(one("a_b_c.txt", [{ type: "rearrange", delimiter: "_", pattern: "$3$2$1 ($0)" }])).toBe("cba (a_b_c).txt");
+  });
+
+  it("Namensliste: Zeile für Zeile, in Listen- oder Namensreihenfolge; danach bleibt alles", () => {
+    const files = [{ path: "b.jpg" }, { path: "a.jpg" }, { path: "c.jpg" }];
+    expect(applyRules(files, [{ type: "list", names: ["Eins", " Zwei ", ""] }])).toEqual(["Eins.jpg", "Zwei.jpg", "c.jpg"]);
+    expect(applyRules(files, [{ type: "list", names: ["Eins", "Zwei", "Drei"], sort: "name" }])).toEqual([
+      "Zwei.jpg",
+      "Eins.jpg",
+      "Drei.jpg",
+    ]);
+  });
+
+  it("Aus der Datei: Aufnahmedatum und Musik-Tags; fehlt ein Wert, bleibt der Name", () => {
+    const photo = { path: "IMG_1234.JPG", meta: { taken: new Date(2024, 6, 14, 18, 3, 22), tags: {} } };
+    const date: Rule = { type: "metadata", template: "{date:YYYY-MM-DD HH-mm-ss}" };
+    expect(applyRules([photo], [date])).toEqual(["2024-07-14 18-03-22.JPG"]);
+    expect(applyRules([photo], [{ ...date, template: "{date}", position: "start", separator: "_" }])).toEqual(["2024-07-14_IMG_1234.JPG"]);
+
+    const song = {
+      path: "track03.mp3",
+      meta: {
+        tags: {
+          artist: "Queen",
+          album_artist: "Queen",
+          title: "Bohemian Rhapsody",
+          album: "A Night at the Opera",
+          track: "11/12",
+          date: "1975-11-21",
+        },
+      },
+    };
+    // Folders in the template land below the file's folder
+    const music: Rule = { type: "metadata", template: "{albumartist}/{year} - {album}/{track} {artist} - {title}" };
+    expect(applyRules([{ ...song, path: "/music/in/track03.mp3" }], [music])).toEqual([
+      "/music/in/Queen/1975 - A Night at the Opera/11 Queen - Bohemian Rhapsody.mp3",
+    ]);
+    expect(applyRules([song], [{ type: "metadata", template: "{track:3} {title}" }])).toEqual(["011 Bohemian Rhapsody.mp3"]);
+    // Tags cannot create folders or climb out: "AC/DC" stays one name, ".." becomes harmless
+    const tricky = { path: "/m/x.mp3", meta: { tags: { artist: "AC/DC", album: "..", title: "T.N.T." } } };
+    expect(applyRules([tricky], [{ type: "metadata", template: "{artist}/{album}/{title}" }])).toEqual(["/m/AC-DC/_/T.N.T..mp3"]);
+    // No EXIF, no tags: unchanged instead of a half-empty name
+    expect(applyRules([{ path: "scan.jpg", meta: { tags: {} } }], [date])).toEqual(["scan.jpg"]);
+    expect(applyRules([{ path: "x.mp3" }], [{ type: "metadata", template: "{artist} - {title}" }])).toEqual(["x.mp3"]);
+  });
+
   it("Beschriftungen für den Regel-Stack", () => {
     expect(localize(describeRule({ type: "transliterate" }), "de")).toBe("Umlaute ersetzen ä → ae");
     expect(localize(describeRule({ type: "transliterate" }), "en")).toBe("Transliterate ä → ae");
@@ -135,6 +203,15 @@ const ruleArb: fc.Arbitrary<Rule> = fc.oneof(
   fc.record({ type: fc.constant("separators" as const), separator: fc.constantFrom(" ", ".", "_", "-") }),
   fc.record({ type: fc.constant("numbering" as const), start: fc.nat(100), padding: fc.nat(4) }),
   fc.record({ type: fc.constant("transliterate" as const) }),
+  fc.record({ type: fc.constant("pad" as const), digits: fc.integer({ min: 1, max: 10 }) }),
+  fc.record({ type: fc.constant("cleanup" as const), brackets: fc.boolean(), separators: fc.boolean(), spaces: fc.boolean() }),
+  fc.record({ type: fc.constant("strip" as const), digits: fc.boolean(), symbols: fc.boolean(), chars: fc.string({ maxLength: 3 }) }),
+  fc.record({
+    type: fc.constant("rearrange" as const),
+    delimiter: fc.constantFrom(" - ", "_", ""),
+    pattern: fc.constantFrom("$2 - $1", "$1", "$0"),
+  }),
+  fc.record({ type: fc.constant("list" as const), names: fc.array(fc.string({ maxLength: 8 }), { maxLength: 3 }) }),
 );
 
 describe("Regel-Engine: Property-Tests", () => {

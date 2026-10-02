@@ -1,5 +1,7 @@
+import { sanitizeSegment } from "../formatter/sanitize.ts";
 import { FILTERS } from "../formatter/template.ts";
 import { tr } from "../i18n.ts";
+import type { FileMeta } from "../metadata/index.ts";
 
 /** Which part of the path a rule rewrites. */
 export type RuleTarget = "name" | "extension" | "full";
@@ -27,13 +29,33 @@ export type Rule = Base &
     | { type: "extension"; to?: string; case?: "lower" | "upper" }
     | { type: "transliterate"; stripDiacritics?: boolean }
     | { type: "cutAfter"; pattern: string; regex?: boolean; keepMatch?: boolean }
+    /** Numbers in the name to at least `digits` digits: "Folge 5" → "Folge 05". */
+    | { type: "pad"; digits: number }
+    /** Bracketed parts away, dots and underscores to spaces, spaces tidied. */
+    | { type: "cleanup"; brackets?: boolean; separators?: boolean; spaces?: boolean }
+    /** Removes kinds of characters: digits, symbols (neither letter, digit nor space), a custom set. */
+    | { type: "strip"; digits?: boolean; symbols?: boolean; chars?: string }
+    /** Splits at `delimiter` and joins the parts by `pattern`: "$2 - $1". */
+    | { type: "rearrange"; delimiter: string; pattern: string }
+    /** New names from a list, one per file in list or name order; files past the list stay. */
+    | { type: "list"; names: string[]; sort?: "list" | "name" }
+    /**
+     * Name from inside the file: `{date:YYYY-MM-DD}` (EXIF capture date, video creation time),
+     * `{artist}`, `{title}`, `{album}`, `{track}`, … Files lacking a used value stay unchanged.
+     */
+    | { type: "metadata"; template: string; position?: "replace" | "start" | "end"; separator?: string }
   );
 
 export type RuleEntry = {
   path: string;
   mtime?: Date;
   birthtime?: Date;
+  /** Read only for stacks with a metadata rule (see `needsMetadata`). */
+  meta?: FileMeta;
 };
+
+/** Whether the stack reads data from inside the files, which costs a file read per entry. */
+export const needsMetadata = (rules: Rule[]) => rules.some((r) => r.type === "metadata" && r.enabled !== false);
 
 export class RuleError extends Error {
   constructor(
@@ -83,6 +105,27 @@ function formatDate(date: Date, format: string): string {
     ss: String(date.getSeconds()).padStart(2, "0"),
   };
   return format.replace(/YYYY|MM|DD|HH|mm|ss/g, (t) => parts[t]!);
+}
+
+/** `{date:FORMAT}` and tag tokens filled from the file; undefined when a used value is missing. */
+function fillMetadata(template: string, meta: FileMeta | undefined): string | undefined {
+  let missing = false;
+  const out = template.replace(/\{([a-z_.]+)(?::([^}]*))?\}/gi, (_, name: string, arg: string | undefined) => {
+    const key = name.toLowerCase();
+    let value: string | undefined;
+    if (key === "date") value = meta?.taken ? formatDate(meta.taken, arg || "YYYY-MM-DD") : undefined;
+    else if (key === "year") value = (meta?.tags.date ?? meta?.tags.year)?.slice(0, 4);
+    else if (key === "track" || key === "disc") {
+      // "3/12" → 03; the argument sets the digits (default 2 for tracks)
+      const n = /\d+/.exec(meta?.tags[key] ?? "")?.[0];
+      value = n === undefined ? undefined : n.padStart(Number(arg ?? (key === "track" ? 2 : 1)), "0");
+    } else if (key === "albumartist") value = meta?.tags.album_artist ?? meta?.tags.albumartist;
+    else value = meta?.tags[key];
+    if (!value) missing = true;
+    // Only slashes of the template make folders; one in a tag ("AC/DC") does not.
+    return (value ?? "").replace(/[\\/]/g, "-");
+  });
+  return missing ? undefined : out;
 }
 
 function place(value: string, addition: string, position: "start" | "end", separator: string): string {
@@ -149,6 +192,37 @@ function applyText(rule: Rule, value: string, entry: RuleEntry, index: number, r
       if (!m) return value;
       return value.slice(0, rule.keepMatch ? m.index + m[0].length : m.index).trimEnd();
     }
+    case "pad":
+      return value.replace(/\d+/g, (n) => n.padStart(Math.min(Math.max(rule.digits, 1), 10), "0"));
+    case "cleanup": {
+      let v = value;
+      if (rule.brackets !== false) v = v.replace(/\s*(\[[^\]]*\]|\([^)]*\)|\{[^}]*\})/g, "");
+      if (rule.separators) v = v.replace(/[._]+/g, " ");
+      if (rule.spaces !== false) v = v.replace(/\s{2,}/g, " ").replace(/^[\s._-]+|[\s._-]+$/g, "");
+      return v;
+    }
+    case "strip": {
+      let v = value;
+      if (rule.digits) v = v.replace(/\p{N}/gu, "");
+      if (rule.symbols) v = v.replace(/[^\p{L}\p{N}\s]/gu, "");
+      if (rule.chars) v = v.replace(new RegExp(`[${escapeRegex(rule.chars).replace(/-/g, "\\-")}]`, "gu"), "");
+      return v;
+    }
+    case "rearrange": {
+      if (!rule.delimiter) return value;
+      const parts = value.split(rule.delimiter).map((p) => p.trim());
+      return rule.pattern.replace(/\$(\d+)/g, (_, n: string) => (n === "0" ? value : (parts[Number(n) - 1] ?? "")));
+    }
+    case "list": {
+      const name = rule.names[index]?.trim();
+      return name || value;
+    }
+    case "metadata": {
+      const filled = fillMetadata(rule.template, entry.meta);
+      if (filled === undefined) return value;
+      const position = rule.position ?? "replace";
+      return position === "replace" ? filled : place(value, filled, position, rule.separator ?? " ");
+    }
   }
 }
 
@@ -162,8 +236,16 @@ function applyRule(rule: Rule, path: string, entry: RuleEntry, index: number, ru
   }
   const target = rule.target ?? "name";
   if (target === "full") return applyText(rule, path, entry, index, ruleIndex);
-  // Name and extension rules never create folders.
-  const text = (v: string) => applyText(rule, v, entry, index, ruleIndex).replace(/[\\/]/g, "-");
+  // Name and extension rules never create folders, except a metadata template that asks for
+  // them ("{artist}/{album}/{track} {title}"): those land below the file's folder.
+  const folders = rule.type === "metadata" && target === "name";
+  const text = (v: string) => {
+    const out = applyText(rule, v, entry, index, ruleIndex);
+    if (!folders) return out.replace(/[\\/]/g, "-");
+    // Each folder is cleaned like a file name, so ".." or "Album: Live" cannot misbehave.
+    const segments = out.split("/").filter((seg) => seg.trim());
+    return segments.map((seg, k) => (k < segments.length - 1 ? sanitizeSegment(seg) : seg)).join("/");
+  };
   if (target === "extension") return join({ ...parts, ext: text(parts.ext) });
   // An empty name would turn the extension into a hidden file name (".mkv").
   return join({ ...parts, stem: text(parts.stem) || "_" });
@@ -177,7 +259,7 @@ export function previewRules(entries: RuleEntry[], rules: Rule[]): string[][] {
   const steps: string[][] = [entries.map((e) => e.path)];
   rules.forEach((rule, ruleIndex) => {
     const prev = steps.at(-1)!;
-    const order = rule.type === "numbering" && rule.sort === "name" ? nameOrder(prev) : undefined;
+    const order = (rule.type === "numbering" || rule.type === "list") && rule.sort === "name" ? nameOrder(prev) : undefined;
     steps.push(rule.enabled === false ? prev : prev.map((path, i) => applyRule(rule, path, entries[i]!, order ? order[i]! : i, ruleIndex)));
   });
   return steps;
@@ -222,5 +304,20 @@ export function describeRule(rule: Rule): string {
       return tr("Umlaute ersetzen ä → ae", "Transliterate ä → ae");
     case "cutAfter":
       return tr(`Abschneiden ab "${rule.pattern}"`, `Cut from "${rule.pattern}"`);
+    case "pad":
+      return tr(`Zahlen auf ${rule.digits} Stellen`, `Numbers to ${rule.digits} digits`);
+    case "cleanup":
+      return tr("Aufräumen: Klammern, Leerzeichen", "Clean up: brackets, spaces");
+    case "strip":
+      return tr(
+        `Entfernen: ${[rule.digits && "Ziffern", rule.symbols && "Sonderzeichen", rule.chars && `„${rule.chars}“`].filter(Boolean).join(", ") || "–"}`,
+        `Strip: ${[rule.digits && "digits", rule.symbols && "symbols", rule.chars && `"${rule.chars}"`].filter(Boolean).join(", ") || "–"}`,
+      );
+    case "rearrange":
+      return tr(`Umsortieren an "${rule.delimiter}" → ${rule.pattern}`, `Rearrange at "${rule.delimiter}" → ${rule.pattern}`);
+    case "list":
+      return tr(`Namensliste (${rule.names.length})`, `Name list (${rule.names.length})`);
+    case "metadata":
+      return tr(`Aus der Datei: ${rule.template}`, `From the file: ${rule.template}`);
   }
 }

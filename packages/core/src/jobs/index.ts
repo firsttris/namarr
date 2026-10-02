@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { formatPath, presetTemplate, type SanitizeOptions, sanitizeSegment } from "../formatter/index.ts";
 import { tr } from "../i18n.ts";
 import { classify, type MatchResult, NO_MATCH } from "../matcher/index.ts";
+import type { FileMeta } from "../metadata/index.ts";
 import { applyRules, type Rule } from "../rules/index.ts";
 import type { Companion, ScannedFile } from "../scanner/index.ts";
 import type { Parsed } from "../types.ts";
@@ -35,6 +36,8 @@ export type PreviewInput = {
   excluded?: boolean;
   /** Approved by the user: ready regardless of confidence. */
   approved?: boolean;
+  /** Data from inside the file, loaded only for rule stacks that read it. */
+  meta?: FileMeta;
 };
 
 export type PreviewItem = {
@@ -112,8 +115,8 @@ export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): Pre
     const withTarget = indices.map((i) => items[i]!);
     const renamed = applyRules(
       indices.map((i) => {
-        const { file } = inputs[i]!;
-        return { path: items[i]!.target!, mtime: file.mtime, birthtime: file.birthtime };
+        const { file, meta } = inputs[i]!;
+        return { path: items[i]!.target!, mtime: file.mtime, birthtime: file.birthtime, meta };
       }),
       config.rules,
     );

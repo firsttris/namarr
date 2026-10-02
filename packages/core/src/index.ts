@@ -4,6 +4,7 @@ export * from "./formatter/index.ts";
 export * from "./i18n.ts";
 export * from "./jobs/index.ts";
 export * from "./matcher/index.ts";
+export * from "./metadata/index.ts";
 export * from "./parser/index.ts";
 export * from "./paths.ts";
 export * from "./rules/index.ts";

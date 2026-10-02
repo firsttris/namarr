@@ -42,8 +42,10 @@ kinds of renaming for any folder you point it at:
 - **Workbench**: pick a folder on the server and get a virtualized preview with diff highlighting,
   series groups, subtitles and other companion files, confidence badges and skipped samples, all
   usable from the keyboard
-- **Media, rules or both**: match against a database, or rename with rules (replace, regex, insert,
-  case, numbering, dates, transliteration …), or match first and polish with rules
+- **Media, rules or both**: match against a database, or rename with 16 ReNamer-style rules (replace,
+  regex, numbering, padding, clean up, rearrange, name lists …), or match first and polish with rules
+- **Photos and music**: name photos by their EXIF capture date and sort MP3s into
+  `{artist}/{album}/{track} {title}` from their tags; rule sets export and import as YAML
 - **Template language** with auto-completion and a live example: `{n} ({y})/Season {s00}/{n} - {s00e00} - {t}`,
   with filters, conditions and presets for Plex, Jellyfin, Emby and Kodi
 - **Move, copy, hardlink, symlink or rename in place**. Hardlinks keep torrents seeding

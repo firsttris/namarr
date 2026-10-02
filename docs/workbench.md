@@ -95,7 +95,64 @@ reserved names, 255 bytes per segment, NFC.
 
 ## Rules
 
-Replace (text or regex with `$1`), insert, delete, case, normalise separators, numbering (start,
-step, digits, natural sort), date from the file, extension, transliterate umlauts and accents, cut
-the rest after a pattern. Each rule works on the name, the extension or the full path and can be
-switched off on its own.
+In *Rules* mode namarr renames without any database, like ReNamer; in *Both* mode the rules polish
+the names that came from the database. Rules run top to bottom, each one shows its result for the
+selected file, and each can be switched off on its own. Unless noted, a rule works on the name, the
+extension or the full path.
+
+| Rule | What it does | Example |
+|---|---|---|
+| Replace | text or regex with `$1` groups, all or the first match, optionally case-sensitive | `IMG_(\d{8})` → `$1` |
+| Insert | text at the start, the end or a position | `Holiday - ` + name |
+| Delete | characters from a position, also counted from the end | drop the first 4 characters |
+| Case | title, sentence, lower, UPPER | `the office` → `The Office` |
+| Normalise separators | spaces, dots, underscores and dashes to one separator | `a.b_c` → `a b c` |
+| Numbering | start, step, digits, separator, list or natural name order | `01 - IMG_0001.jpg` |
+| Date from file | modification or creation date, any format | `2024-07-14 IMG.jpg` |
+| Extension | new extension, lower or upper case | `.JPG` → `.jpg` |
+| Transliterate | umlauts and accents to ASCII | `Größe` → `Groesse` |
+| Cut the rest | everything from a pattern on | cut from ` - ` |
+| Pad numbers | every number to at least N digits | `Folge 5` → `Folge 05` |
+| Clean up | bracketed parts `[ ] ( ) { }`, dots and underscores to spaces, tidy spaces | `Song [Official Video].mp3` → `Song.mp3` |
+| Strip characters | digits, symbols or a set of your own | `Track #1!` → `Track 1` |
+| Rearrange | split at a delimiter and rebuild with `$1`, `$2` … (`$0` = everything) | `Title - Artist` → `Artist - Title` |
+| Name list | one new name per line, assigned in list or natural name order; files past the list stay | paste 20 episode titles |
+| From the file | values read from inside the file, see below | `2024-07-14 18-03-22.jpg` |
+
+### From the file: photos, videos, music
+
+The template can use:
+
+| Token | Source |
+|---|---|
+| `{date:YYYY-MM-DD HH-mm-ss}` | capture date: EXIF of photos (JPEG and TIFF-based raw files such as DNG, CR2, NEF, ARW), the creation time of videos (ffprobe) |
+| `{artist}` `{albumartist}` `{title}` `{album}` `{genre}` | audio tags (ffprobe: MP3, FLAC, M4A, Ogg, Opus, …) |
+| `{track}` `{disc}` | numbers, `{track}` with 2 digits (`{track:3}` for 3) |
+| `{year}` | the year of the release date tag |
+| `{any_tag}` | any other tag by its name |
+
+The result can replace the name or go before or after it. **Slashes in the template make folders**
+below the file's folder, so `{artist}/{album}/{track} {title}` sorts a pile of MP3s into artist and
+album folders. A slash inside a tag (`AC/DC`) does not, and every folder name is cleaned like a file
+name. A file that lacks a value the template uses keeps its name, so a scan without EXIF never
+becomes a half-empty name.
+
+The values are read only when such a rule is active, and once per file version, so editing the rules
+stays fast. HEIC photos are not read yet.
+
+### Sharing rule sets
+
+*Export* below the rule stack saves the rules as `namarr-rules.yaml`; *Import* loads such a file (or
+JSON) and replaces the current rules. Profiles keep rule stacks on the server, export and import move
+them between installations or to other people.
+
+```yaml
+namarr: rules/1
+rules:
+  - type: cleanup
+    brackets: true
+  - type: pad
+    digits: 2
+  - type: metadata
+    template: "{date:YYYY-MM-DD HH-mm-ss}"
+```
