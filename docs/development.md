@@ -80,7 +80,8 @@ This runs `npm version`, which writes the new number into `package.json`, commit
 tag `vX.Y.Z` from the same number; the `postversion` script then pushes commit and tag
 (`git push --follow-tags`).
 
-The tag push starts the *Release* workflow:
+The tag push starts the *Release* workflow (CI here, the rest from the shared
+[`docker-release.yml`](https://github.com/firsttris/workflows) in `firsttris/workflows`):
 
 1. the tag must match `version` in the root `package.json`,
 2. the full CI (lint, typecheck, tests, parser benchmark, build, E2E),
