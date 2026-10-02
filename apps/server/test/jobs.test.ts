@@ -126,6 +126,69 @@ describe("JobService: Analyse", () => {
   });
 });
 
+describe("JobService: Regeln mit Daten aus der Datei", () => {
+  /** A JPEG with EXIF DateTimeOriginal (little-endian TIFF block in APP1). */
+  function photo(date: string): Uint8Array {
+    const t = new Uint8Array(76 + 20);
+    const v = new DataView(t.buffer);
+    t.set(new TextEncoder().encode("II"), 0);
+    v.setUint16(2, 42, true);
+    v.setUint32(4, 8, true);
+    v.setUint16(8, 1, true);
+    v.setUint16(10, 0x8769, true);
+    v.setUint16(12, 4, true);
+    v.setUint32(14, 1, true);
+    v.setUint32(18, 38, true);
+    v.setUint16(38, 1, true);
+    v.setUint16(40, 0x9003, true);
+    v.setUint16(42, 2, true);
+    v.setUint32(44, 20, true);
+    v.setUint32(48, 76, true);
+    t.set(new TextEncoder().encode(`${date}\0`), 76);
+    const len = 8 + t.length;
+    return new Uint8Array([0xff, 0xd8, 0xff, 0xe1, len >> 8, len & 0xff, ...new TextEncoder().encode("Exif\0\0"), ...t, 0xff, 0xda, 0, 2]);
+  }
+
+  it("Fotos nach Aufnahmedatum, Musik nach Tags in Ordner; Daten werden nur einmal gelesen", async () => {
+    const dir = path.join(tmp, "mixed");
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, "IMG_0001.JPG"), photo("2024:07:14 18:03:22"));
+    await fs.writeFile(path.join(dir, "DSC_9.jpg"), photo("2023:12:24 20:15:00"));
+    await fs.writeFile(path.join(dir, "scan.jpg"), "no exif");
+    await fs.writeFile(path.join(dir, "track03.mp3"), "mp3");
+    const probe = vi.fn(async (file: string) =>
+      file.endsWith(".mp3")
+        ? { audio: [], tags: { artist: "Queen", album: "A Night at the Opera", track: "11/12", title: "Bohemian Rhapsody" } }
+        : undefined,
+    );
+    jobs = new JobService({ db, bus, provider: () => new DemoProvider(), log, notify, probe });
+    const rules = [
+      { type: "metadata" as const, template: "{date:YYYY-MM-DD HH-mm-ss}" },
+      { type: "metadata" as const, template: "{artist}/{album}/{track} {title}" },
+    ];
+    const job = await jobs.create({ paths: [dir], config: config({ mode: "rules", targetRoot: undefined, rules }) });
+    await jobs.idle();
+    const target = (name: string) => allItems(db, job.id).find((i) => i.sourcePath.endsWith(`/${name}`))!.targetPath;
+    expect(target("IMG_0001.JPG")).toBe(path.join(dir, "2024-07-14 18-03-22.JPG"));
+    expect(target("DSC_9.jpg")).toBe(path.join(dir, "2023-12-24 20-15-00.jpg"));
+    expect(target("scan.jpg")).toBe(path.join(dir, "scan.jpg"));
+    expect(target("track03.mp3")).toBe(path.join(dir, "Queen/A Night at the Opera/11 Bohemian Rhapsody.mp3"));
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    // Editing the rules recomputes the preview; the files are not read again
+    await jobs.recompute(job.id, { rules: [...rules, { type: "case", mode: "lower" }] });
+    expect(target("track03.mp3")).toBe(path.join(dir, "Queen/A Night at the Opera/11 bohemian rhapsody.mp3"));
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    // Renaming creates the folders; undo removes them again
+    await jobs.executeNow(job.id, { action: "move" });
+    expect(await exists(path.join(dir, "Queen/A Night at the Opera/11 bohemian rhapsody.mp3"))).toBe(true);
+    await jobs.undo({ jobId: job.id });
+    expect(await exists(path.join(dir, "track03.mp3"))).toBe(true);
+    expect(await exists(path.join(dir, "Queen"))).toBe(false);
+  });
+});
+
 describe("JobService: Vorschau neu berechnen ohne neues Matching", () => {
   it("Template, Regeln und Ziel ändern", async () => {
     const { job, by } = await analyzed();

@@ -50,6 +50,35 @@ export const ruleSchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("extension"), to: z.string().max(20).optional(), case: z.enum(["lower", "upper"]).optional() }),
   z.object({ ...base, type: z.literal("transliterate"), stripDiacritics: z.boolean().optional() }),
   z.object({ ...base, type: z.literal("cutAfter"), pattern: short, regex: z.boolean().optional(), keepMatch: z.boolean().optional() }),
+  z.object({ ...base, type: z.literal("pad"), digits: z.number().int().min(1).max(10) }),
+  z.object({
+    ...base,
+    type: z.literal("cleanup"),
+    brackets: z.boolean().optional(),
+    separators: z.boolean().optional(),
+    spaces: z.boolean().optional(),
+  }),
+  z.object({
+    ...base,
+    type: z.literal("strip"),
+    digits: z.boolean().optional(),
+    symbols: z.boolean().optional(),
+    chars: z.string().max(100).optional(),
+  }),
+  z.object({ ...base, type: z.literal("rearrange"), delimiter: z.string().max(20), pattern: short }),
+  z.object({
+    ...base,
+    type: z.literal("list"),
+    names: z.array(z.string().max(255)).max(10_000),
+    sort: z.enum(["list", "name"]).optional(),
+  }),
+  z.object({
+    ...base,
+    type: z.literal("metadata"),
+    template: short,
+    position: z.enum(["replace", "start", "end"]).optional(),
+    separator: z.string().max(20).optional(),
+  }),
 ]);
 
 export const rulesSchema = z.array(ruleSchema).max(100);

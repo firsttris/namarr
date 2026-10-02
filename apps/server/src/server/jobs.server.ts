@@ -7,9 +7,11 @@ import {
   cleanupEmptyDirs,
   entryParsed,
   executeOperation,
+  type FileMeta,
   type MatchResult,
   type MetadataProvider,
   matchAll,
+  needsMetadata,
   type OperationRecord,
   type Parsed,
   type PreviewConfig,
@@ -20,6 +22,7 @@ import {
   type Quality,
   qualityOf,
   type Rule,
+  readMetadata,
   resolveEpisodes,
   resolveInRoots,
   type ScannedFile,
@@ -91,6 +94,7 @@ type StoredMatch = MatchResult;
 export class JobService {
   private queue: Promise<unknown> = Promise.resolve();
   private readonly aborts = new Map<number, AbortController>();
+  private readonly metaCache = new Map<string, FileMeta>();
 
   constructor(private readonly deps: JobServiceDeps) {}
 
@@ -352,6 +356,7 @@ export class JobService {
     // Undone files are back at their source and can be renamed again.
     const items = allItems(db, jobId).filter((i) => i.state !== "done");
     const inputs = await Promise.all(items.map((i) => this.toInput(i)));
+    if (job.config.mode !== "media" && needsMetadata(job.config.rules ?? [])) await this.loadMetadata(inputs);
     const preview = buildPreview(inputs, this.previewConfig(job.config));
     await this.markExisting(preview);
     db.transaction(() => {
@@ -369,6 +374,25 @@ export class JobService {
     });
     this.deps.bus.emit({ type: "item.updated", jobId, itemIds: items.map((i) => i.id) });
     return countItemsByState(db, jobId);
+  }
+
+  /**
+   * EXIF dates and audio tags for metadata rules. The workbench recomputes the preview on every
+   * rule change, so results are cached per file version (path, size, mtime). Eight at a time.
+   */
+  private async loadMetadata(inputs: PreviewInput[]) {
+    const key = (f: ScannedFile) => `${f.path}|${f.size}|${f.mtime.getTime()}`;
+    const todo = inputs.filter((i) => !this.metaCache.has(key(i.file)));
+    for (let i = 0; i < todo.length; i += 8) {
+      const metas = await Promise.all(todo.slice(i, i + 8).map((t) => readMetadata(t.file.path, this.deps.probe)));
+      for (const [k, m] of metas.entries()) this.metaCache.set(key(todo[i + k]!.file), m);
+    }
+    for (const input of inputs) input.meta = this.metaCache.get(key(input.file));
+    // Keep the cache bounded: drop the oldest entries.
+    for (const k of this.metaCache.keys()) {
+      if (this.metaCache.size <= 20_000) break;
+      this.metaCache.delete(k);
+    }
   }
 
   /** An existing target is a conflict unless the policy resolves it. */

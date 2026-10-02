@@ -105,6 +105,36 @@ test("Regel-Modus: Fotos nummerieren", async ({ page }) => {
     .toEqual(["01 - IMG_0001.jpg", "02 - IMG_0002.jpg", "03 - IMG_0003.jpg"]);
 });
 
+test("Regel-Modus: Zahlen auffüllen, Regeln exportieren und wieder importieren", async ({ page }) => {
+  await page.goto("/rename?mode=rules");
+  await openFolder(page, "photos");
+  await page.getByRole("button", { name: "Vorschau erstellen" }).click();
+  await expect(page.getByText("ORIGINAL · 3 DATEIEN")).toBeVisible();
+
+  await page.getByRole("button", { name: "Regel hinzufügen" }).click();
+  await page.getByRole("button", { name: "Zahlen auffüllen" }).click();
+  await page.getByLabel("Stellen").fill("3");
+  const grid = page.getByRole("grid");
+  await expect(grid.getByText("001 - IMG_0001.jpg")).toBeVisible();
+
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Exportieren" }).click()]);
+  expect(download.suggestedFilename()).toBe("namarr-rules.yaml");
+  const yaml = fs.readFileSync(await download.path(), "utf8");
+  expect(yaml).toContain("namarr: rules/1");
+  expect(yaml).toContain("type: pad");
+  expect(yaml).toContain("digits: 3");
+
+  await page.getByRole("button", { name: "Regel 1 entfernen" }).click();
+  await expect(grid.getByText("001 - IMG_0001.jpg")).toHaveCount(0);
+  await page.getByLabel("Importieren").setInputFiles({ name: "rules.yaml", mimeType: "application/yaml", buffer: Buffer.from(yaml) });
+  await expect(grid.getByText("001 - IMG_0001.jpg")).toBeVisible();
+
+  await page
+    .getByLabel("Importieren")
+    .setInputFiles({ name: "bad.yaml", mimeType: "application/yaml", buffer: Buffer.from("rules: [{type: nope}]") });
+  await expect(page.getByRole("alert")).toContainText("Import fehlgeschlagen");
+});
+
 test("History: einzelne Operation rückgängig", async ({ page }) => {
   await page.goto("/history");
   await expect(page.getByText("01 - IMG_0001.jpg").first()).toBeVisible();

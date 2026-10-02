@@ -1,6 +1,8 @@
 import { describeRule, previewRules, type Rule, RuleError } from "@namarr/core/rules";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
+import { parse as parseYaml, stringify as toYaml } from "yaml";
 import { useLocalize, useT } from "~/lib/i18n";
+import { rulesSchema } from "~/lib/schemas";
 import { GripIcon, PlusIcon, XIcon } from "./icons";
 import { cx, inputClass, Select } from "./ui";
 
@@ -15,7 +17,42 @@ const NEW_RULES: Record<Rule["type"], Rule> = {
   extension: { type: "extension", case: "lower" },
   transliterate: { type: "transliterate" },
   cutAfter: { type: "cutAfter", pattern: "" },
+  pad: { type: "pad", digits: 2 },
+  cleanup: { type: "cleanup", brackets: true, spaces: true },
+  strip: { type: "strip", symbols: true },
+  rearrange: { type: "rearrange", delimiter: " - ", pattern: "$2 - $1" },
+  list: { type: "list", names: [] },
+  metadata: { type: "metadata", template: "{date:YYYY-MM-DD HH-mm-ss}", position: "replace" },
 };
+
+/** Example data for the per-rule preview of metadata rules (the real values come from the files). */
+const SAMPLE_META = {
+  taken: new Date(2024, 6, 14, 18, 3, 22),
+  tags: {
+    artist: "Artist",
+    album_artist: "Artist",
+    title: "Title",
+    album: "Album",
+    track: "3/12",
+    disc: "1",
+    date: "2024",
+    genre: "Genre",
+  },
+};
+
+/** File format for sharing rule stacks: YAML, without the UI's ids. */
+function exportRules(rules: Rule[]): string {
+  return toYaml({ namarr: "rules/1", rules: rules.map(({ id: _, ...rule }) => rule) });
+}
+
+/** Accepts the export format or a bare list; YAML is a superset of JSON, so JSON works too. */
+function importRules(text: string): Rule[] {
+  const data = parseYaml(text) as unknown;
+  const list = Array.isArray(data) ? data : (data as { rules?: unknown })?.rules;
+  const parsed = rulesSchema.safeParse(list);
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "invalid");
+  return (parsed.data as Rule[]).map((rule) => ({ ...rule, id: crypto.randomUUID() }));
+}
 
 type Props = {
   rules: Rule[];
@@ -33,11 +70,30 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
   const [open, setOpen] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([exportRules(rules)], { type: "application/yaml" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: "namarr-rules.yaml" });
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const upload = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      onChange(importRules(await f.text()));
+      setImportError(null);
+    } catch (e) {
+      setImportError(t.rules.importError((e as Error).message));
+    }
+  };
 
   const steps = useMemo(() => {
     if (!sample) return null;
     try {
-      return { names: previewRules([{ path: sample.split("/").at(-1)!, mtime: new Date() }], rules).map((s) => s[0]!), error: null };
+      const entry = { path: sample.split("/").at(-1)!, mtime: new Date(), meta: SAMPLE_META };
+      return { names: previewRules([entry], rules).map((s) => s[0]!), error: null };
     } catch (e) {
       return { names: null, error: e instanceof RuleError ? e : null };
     }
@@ -143,6 +199,39 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
         ))}
       </ol>
       <div className="text-xs text-muted">{note ?? t.workbench.rulesAfterNote}</div>
+      <div className="flex gap-3 text-xs">
+        <button
+          type="button"
+          onClick={download}
+          disabled={!rules.length}
+          className="cursor-pointer border-0 bg-transparent p-0 text-accent hover:text-accent-soft disabled:cursor-default disabled:text-faint"
+        >
+          {t.rules.exportRules}
+        </button>
+        <button
+          type="button"
+          onClick={() => file.current?.click()}
+          className="cursor-pointer border-0 bg-transparent p-0 text-accent hover:text-accent-soft"
+        >
+          {t.rules.importRules}
+        </button>
+        <input
+          ref={file}
+          type="file"
+          accept=".yaml,.yml,.json"
+          aria-label={t.rules.importRules}
+          className="hidden"
+          onChange={(e) => {
+            void upload(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      {importError && (
+        <div role="alert" className="text-[11px] text-danger">
+          {importError}
+        </div>
+      )}
     </section>
   );
 }
@@ -316,6 +405,75 @@ function RuleEditor({ rule, index, onChange }: { rule: Rule; index: number; onCh
             {check(r.regex, "regex", rule.regex)}
             {check(r.keepMatch, "keepMatch", rule.keepMatch)}
           </div>
+        </>
+      )}
+      {rule.type === "pad" && number(r.digits, "digits", rule.digits)}
+      {rule.type === "cleanup" && (
+        <>
+          {check(r.brackets, "brackets", rule.brackets !== false)}
+          {check(r.dotsToSpaces, "separators", rule.separators)}
+          {check(r.tidySpaces, "spaces", rule.spaces !== false)}
+        </>
+      )}
+      {rule.type === "strip" && (
+        <>
+          <div className="flex gap-4">
+            {check(r.stripDigits, "digits", rule.digits)}
+            {check(r.stripSymbols, "symbols", rule.symbols)}
+          </div>
+          {text(r.stripChars, "chars", rule.chars)}
+        </>
+      )}
+      {rule.type === "rearrange" && (
+        <>
+          {text(r.delimiter, "delimiter", rule.delimiter)}
+          {text(r.pattern, "pattern", rule.pattern)}
+          <div className="text-[11px] text-faint">{r.rearrangeHint}</div>
+        </>
+      )}
+      {rule.type === "list" && (
+        <>
+          <label htmlFor={id("names")} className="text-xs text-muted">
+            {r.names}
+          </label>
+          <textarea
+            id={id("names")}
+            rows={5}
+            className={cx(inputClass, "h-auto py-2 font-mono text-xs")}
+            value={rule.names.join("\n")}
+            onChange={(e) => onChange({ names: e.target.value.split("\n") } as Partial<Rule>)}
+          />
+          <div className="text-[11px] text-faint">{r.namesHint(rule.names.filter((n) => n.trim()).length)}</div>
+          <Row label={r.order} id={id("sort")}>
+            <Select
+              id={id("sort")}
+              className="h-8 text-xs"
+              value={rule.sort ?? "list"}
+              onChange={(e) => onChange({ sort: e.target.value as "name" } as Partial<Rule>)}
+            >
+              <option value="list">{r.orderList}</option>
+              <option value="name">{r.orderName}</option>
+            </Select>
+          </Row>
+        </>
+      )}
+      {rule.type === "metadata" && (
+        <>
+          {text(r.template, "template", rule.template)}
+          <div className="text-[11px] text-faint">{r.metadataHint}</div>
+          <Row label={r.position} id={id("pos")}>
+            <Select
+              id={id("pos")}
+              className="h-8 text-xs"
+              value={rule.position ?? "replace"}
+              onChange={(e) => onChange({ position: e.target.value as "replace" } as Partial<Rule>)}
+            >
+              <option value="replace">{r.replaceName}</option>
+              <option value="start">{r.start}</option>
+              <option value="end">{r.end}</option>
+            </Select>
+          </Row>
+          {rule.position && rule.position !== "replace" && text(r.separator, "separator", rule.separator ?? " ")}
         </>
       )}
       {rule.type !== "extension" && target}
