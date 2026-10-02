@@ -70,9 +70,25 @@ The corpus is a start (the goal is 500+ real names) and was written together wit
 
 ## Releases
 
-Images are built and pushed only by hand through the *Release* workflow (Actions → Run workflow): on
-`main` for `edge`, on a `v*` tag for `latest` and `x.y.z`. CI runs lint, typecheck, tests, the
-parser benchmark and the build on every push to `main` and on every pull request.
+A version is a tag. On `main`, with a clean working tree:
+
+```bash
+npm version minor          # or patch / major: bumps package.json, commits, tags vX.Y.Z
+git push --follow-tags     # pushes the commit and the tag
+```
+
+The tag push starts the *Release* workflow:
+
+1. the tag must match `version` in the root `package.json`,
+2. the full CI (lint, typecheck, tests, parser benchmark, build, E2E),
+3. the image as `x.y.z`, `x.y` and `latest` on Docker Hub and GHCR, plus the Docker Hub description,
+4. only then the GitHub release with generated notes.
+
+Started by hand on `main` (Actions → *Release* → Run workflow), the workflow runs the same checks and
+pushes the image as `edge`; nothing is released.
+
+CI runs lint, typecheck, tests, the parser benchmark, the build and the E2E tests on every push to
+`main` and on every pull request.
 
 ## Roadmap
 
