@@ -1,4 +1,4 @@
-import type { Parsed } from "../types.ts";
+import type { ExternalIds, Parsed } from "../types.ts";
 import { groupRule, type ParseContext, RULES, resolvePending } from "./rules.ts";
 
 export * from "./rules.ts";
@@ -25,6 +25,19 @@ export function splitExtension(fileName: string): SplitName {
   return { stem: parts.slice(0, cut).join("."), extension: ext, suffix: `.${parts.slice(cut).join(".")}` };
 }
 
+/** `[tvdbid-72073]`, `{tvdb-72073}`, `[tmdbid=1399]`, `{imdb-tt0106145}`, `[anidb-17617]` */
+const ID_TAG = /\s*[[{]\s*(tmdb|tvdb|imdb|anidb)(?:id)?\s*[-=:]\s*(tt\d+|\d+)\s*[\]}]/gi;
+
+/** Reads external IDs from a name and returns the name without them. */
+export function extractIds(name: string): { ids?: ExternalIds; rest: string } {
+  let ids: ExternalIds | undefined;
+  const rest = name.replace(ID_TAG, (_, source: string, id: string) => {
+    ids = { ...ids, [source.toLowerCase()]: id };
+    return "";
+  });
+  return { ids, rest };
+}
+
 function emptyParsed(): Parsed {
   return { kind: { value: "unknown", confidence: 0 }, episodes: [], release: { languages: [] } };
 }
@@ -46,7 +59,9 @@ export function parseName(fileName: string): Parsed {
   const out = emptyParsed();
   if (extension) out.extension = extension;
 
-  let name = stem.trim();
+  const { ids, rest } = extractIds(stem);
+  if (ids) out.ids = ids;
+  let name = rest.trim();
   let bracketGroup = false;
   const lead = /^\[([^\]]+)\]\s*/.exec(name);
   if (lead) {
@@ -136,6 +151,13 @@ export function parse(path: string): Parsed {
     out.release.resolution ??= parent.release.resolution;
     out.release.source ??= parent.release.source;
   }
+  // IDs from any folder above: "Serie (1993) [tvdbid-72073]/Season 01/…"; the nearest wins.
+  const own = out.ids;
+  for (const dir of segments) {
+    const { ids } = extractIds(dir);
+    if (ids) out.ids = { ...out.ids, ...ids };
+  }
+  if (own) out.ids = { ...out.ids, ...own };
   return out;
 }
 

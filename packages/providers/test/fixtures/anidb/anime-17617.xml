@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<anime id="17617" restricted="false">
+  <type>TV Series</type>
+  <episodecount>28</episodecount>
+  <startdate>2023-09-29</startdate>
+  <titles>
+    <title xml:lang="x-jat" type="main">Sousou no Frieren</title>
+    <title xml:lang="en" type="official">Frieren: Beyond Journey&apos;s End</title>
+    <title xml:lang="de" type="official">Frieren - Nach dem Ende der Reise</title>
+    <title xml:lang="en" type="synonym">Frieren</title>
+  </titles>
+  <picture>279327.jpg</picture>
+  <episodes>
+    <episode id="1" update="2023-10-01"><epno type="1">1</epno><length>25</length><airdate>2023-09-29</airdate>
+      <title xml:lang="ja">冒険の終わり</title><title xml:lang="en">The Journey&apos;s End</title><title xml:lang="x-jat">Bouken no Owari</title></episode>
+    <episode id="2" update="2023-10-01"><epno type="1">2</epno><length>25</length><airdate>2023-09-29</airdate>
+      <title xml:lang="en">It Didn&apos;t Have to Be Magic...</title><title xml:lang="de">Es musste keine Magie sein</title></episode>
+    <episode id="3" update="2023-10-01"><epno type="2">S1</epno><length>2</length>
+      <title xml:lang="en">Mini Anime 1</title></episode>
+    <episode id="4" update="2023-10-01"><epno type="3">C1</epno><length>2</length>
+      <title xml:lang="en">Opening</title></episode>
+    <episode id="5" update="2023-10-01"><epno type="1">5</epno><length>25</length>
+      <title xml:lang="x-jat"><![CDATA[Shisha no Gen'ei]]></title></episode>
+  </episodes>
+</anime>

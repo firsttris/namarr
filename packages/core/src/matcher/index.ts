@@ -6,6 +6,7 @@ export * from "./similarity.ts";
 
 export const NO_MATCH = tr("Kein Treffer gefunden", "No match found");
 export const DOUBLE_EPISODE = tr("Doppelfolge", "Double episode");
+export const ID_FROM_FOLDER = tr("ID aus dem Ordnernamen", "ID from the folder name");
 
 export const AUTO_THRESHOLD = 0.9;
 export const SUGGEST_THRESHOLD = 0.6;
@@ -48,13 +49,20 @@ export type MatchOptions = {
   onProgress?: (done: number, total: number) => void;
 };
 
+/** "2nd Season", "Season 2", "Staffel 2", "II", a trailing "2": which season a title names. */
+export function seasonOfTitle(title: string): number | undefined {
+  const t = title.toLowerCase().trim();
+  const m = /\b(\d+)(?:st|nd|rd|th) season\b/.exec(t) ?? /\b(?:season|staffel|part|cour)\s*(\d+)\b/.exec(t) ?? /[\s:]+(\d)$/.exec(t);
+  if (m) return Number(m[1]);
+  const roman = /\s(ii|iii|iv|v)$/.exec(t);
+  return roman ? { ii: 2, iii: 3, iv: 4, v: 5 }[roman[1] as "ii"] : undefined;
+}
+
 /** Score from title similarity and year. Year off by one is common (festival vs. release). */
 export function scoreCandidate(parsed: Parsed, candidate: MediaCandidate): number {
   if (!parsed.title) return 0;
-  const sim = Math.max(
-    titleSimilarity(parsed.title, candidate.title),
-    candidate.originalTitle ? titleSimilarity(parsed.title, candidate.originalTitle) : 0,
-  );
+  const titles = [candidate.title, candidate.originalTitle, ...(candidate.aliases ?? [])].filter((t): t is string => Boolean(t));
+  const sim = Math.max(...titles.map((t) => titleSimilarity(parsed.title!, t)));
   let score: number;
   if (parsed.year !== undefined && candidate.year !== undefined) {
     const diff = Math.abs(parsed.year - candidate.year);
@@ -67,6 +75,11 @@ export function scoreCandidate(parsed: Parsed, candidate: MediaCandidate): numbe
   const episode = parsed.absolute ?? parsed.episodes.at(-1);
   if (episode !== undefined && candidate.episodeCount !== undefined && episode > candidate.episodeCount) {
     score *= 0.8;
+  }
+  // One entry per season (AniDB): S02 files belong to the entry whose title names season 2.
+  if (candidate.seasonsAsEntries && parsed.season !== undefined && parsed.season > 0) {
+    const named = Math.max(1, ...titles.map((t) => seasonOfTitle(t) ?? 1));
+    if (named !== parsed.season) score *= 0.85;
   }
   return score;
 }
@@ -131,6 +144,12 @@ function findOverride(parsed: Parsed, overrides: MatchOverride[] | undefined, pr
   });
 }
 
+/** AniDB and co.: the entry is the season, so S02E05 is episode 5 of whatever entry was chosen. */
+export function entryParsed(candidate: MediaCandidate, parsed: Parsed): Parsed {
+  const season = parsed.season;
+  return candidate.seasonsAsEntries && season !== undefined && season > 1 ? { ...parsed, season: 1 } : parsed;
+}
+
 /** Maps the parsed numbering onto the provider's episode list. */
 export function resolveEpisodes(parsed: Parsed, all: EpisodeInfo[], seasonOffset = 0): EpisodeInfo[] {
   if (parsed.date) return all.filter((e) => e.airDate === parsed.date);
@@ -175,7 +194,10 @@ export async function matchAll(
   let done = 0;
   for (const group of groups) {
     const first = group.items[0]!.parsed;
-    const override = findOverride(first, options.overrides, provider.name);
+    const override = findOverride(first, options.overrides, provider.nameFor?.(group.kind) ?? provider.name);
+    const ids = group.items.find((i) => i.parsed.ids)?.parsed.ids;
+    const byId =
+      !override && ids && provider.findById ? await provider.findById(group.kind, ids, { language: options.language }) : undefined;
     let best: MediaCandidate | undefined;
     let alternatives: ScoredCandidate[] = [];
     let confidence = 0;
@@ -184,6 +206,10 @@ export async function matchAll(
       best = await provider.details(group.kind, override.externalId, { language: options.language });
       confidence = 1;
       reasons = [tr("Gespeicherte Entscheidung", "Saved decision")];
+    } else if (byId) {
+      best = byId;
+      confidence = 1;
+      reasons = [ID_FROM_FOLDER];
     } else {
       const search = group.kind === "series" ? provider.searchSeries : provider.searchMovie;
       const candidates = await search.call(provider, group.title, { year: group.year, language: options.language });
@@ -200,12 +226,22 @@ export async function matchAll(
         best,
         episodes: [],
         alternatives,
-        confidence: override ? confidence : withParserConfidence(confidence, item.parsed),
+        confidence: override || byId ? confidence : withParserConfidence(confidence, item.parsed),
         reasons: [...reasons],
         overridden: Boolean(override),
       };
       if (best && group.kind === "series") {
-        result.episodes = resolveEpisodes(item.parsed, episodes, override?.seasonOffset);
+        const parsed = entryParsed(best, item.parsed);
+        result.episodes = resolveEpisodes(parsed, episodes, override?.seasonOffset);
+        if (parsed !== item.parsed) {
+          result.reasons.push(
+            tr(
+              `Staffel ${item.parsed.season} ist beim Anbieter ein eigener Eintrag – prüfen, ob es der richtige ist`,
+              `Season ${item.parsed.season} is an entry of its own at the provider – check it is the right one`,
+            ),
+          );
+          if (!override && !byId) result.confidence = Math.min(result.confidence, 0.7);
+        }
         const wanted = item.parsed.date ? 1 : Math.max(1, item.parsed.episodes.length);
         if (result.episodes.length < wanted) {
           result.confidence *= item.parsed.episodes.length === 0 && !item.parsed.date ? 0.5 : 0.7;
@@ -215,7 +251,8 @@ export async function matchAll(
               : tr("Episode nicht beim Anbieter gefunden", "Episode not found at the provider"),
           );
         }
-        if (item.parsed.absolute !== undefined && item.parsed.season === undefined) {
+        // With one entry per season (AniDB) the absolute number is exact, nothing is estimated.
+        if (item.parsed.absolute !== undefined && item.parsed.season === undefined && !best.seasonsAsEntries) {
           result.reasons.push(tr("Absolute Nummer, Staffel geschätzt", "Absolute number, season estimated"));
           result.confidence = Math.min(result.confidence, 0.85);
         }

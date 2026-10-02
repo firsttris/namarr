@@ -112,7 +112,7 @@ describe("JobService: Analyse", () => {
     jobs = new JobService({ db, bus, provider: () => undefined, log, notify });
     const job = await jobs.create({ paths: [tv()], config: config() });
     await jobs.idle();
-    expect(getJob(db, job.id)).toMatchObject({ status: "failed", error: expect.stringContaining("TMDB-API-Key") });
+    expect(getJob(db, job.id)).toMatchObject({ status: "failed", error: expect.stringContaining("TMDB, TheTVDB oder AniDB") });
   });
 
   it("Regel-Modus benennt ohne Matching am Ort um", async () => {
@@ -309,6 +309,63 @@ describe("JobService: Watch-Jobs", () => {
     expect(listInbox(db)).toHaveLength(3);
     expect(listInbox(db).every((e) => localize(e.reason, "de").startsWith("Immer prüfen"))).toBe(true);
     expect(getJob(db, job.id)!.status).toBe("ready");
+  });
+});
+
+describe("JobService: Bessere Qualität behalten", () => {
+  const episode = () => path.join(media(), "Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel");
+  const severanceE01 = (items: { sourcePath: string }[]) =>
+    items.find((i) => i.sourcePath.endsWith("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv")) as ReturnType<typeof allItems>[number];
+
+  /** An earlier job put another release of S02E01 into the library under the template name. */
+  async function earlier(release: string, content: string) {
+    await touch(`downloads/old/${release}.mkv`, content);
+    await touch(`downloads/old/${release}.de.srt`, "alte Untertitel");
+    const job = await jobs.create({ paths: [path.join(tmp, "downloads/old")], config: config() });
+    await jobs.idle();
+    await jobs.executeNow(job.id);
+    expect(await fs.readFile(`${episode()}.mkv`, "utf8")).toBe(content);
+  }
+
+  it("ersetzt eine 720p-HDTV-Datei durch 1080p WEB, auch wenn die neue kleiner ist", async () => {
+    await earlier("Severance.S02E01.720p.HDTV.x264-OLD", "a much bigger but worse 720p HDTV file");
+    const { job } = await analyzed({ conflictPolicy: "keep-better" });
+    await jobs.executeNow(job.id);
+    const item = severanceE01(allItems(db, job.id));
+    expect(item.state).toBe("done");
+    expect(localize(item.reasons.at(-1)!, "en")).toBe("Replaced a worse file (Resolution: 1080p vs 720p)");
+    expect(await fs.readFile(`${episode()}.mkv`, "utf8")).toContain("1080p.WEB");
+    // The subtitle belongs to the new file, not compared by size
+    expect(await fs.readFile(`${episode()}.de.srt`, "utf8")).toContain("1080p.WEB");
+    // Undo restores the old release with its subtitle
+    await jobs.undo({ jobId: job.id });
+    expect(await fs.readFile(`${episode()}.mkv`, "utf8")).toContain("720p HDTV");
+    expect(await fs.readFile(`${episode()}.de.srt`, "utf8")).toBe("alte Untertitel");
+  });
+
+  it("lässt eine bessere vorhandene Datei liegen und sagt warum", async () => {
+    await earlier("Severance.S02E01.1080p.BluRay.x264-OLD", "BluRay");
+    const { job } = await analyzed({ conflictPolicy: "keep-better" });
+    await jobs.executeNow(job.id);
+    const item = severanceE01(allItems(db, job.id));
+    expect(item.state).toBe("skipped");
+    expect(localize(item.reasons.at(-1)!, "de")).toBe("Vorhandene Datei ist besser (Quelle: WEB vs BluRay)");
+    expect(await fs.readFile(`${episode()}.mkv`, "utf8")).toBe("BluRay");
+  });
+
+  it("ffprobe zählt für beide Dateien: 4K-Inhalt unter einem nackten Namen gewinnt", async () => {
+    await touch("media/tv/Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv", "x");
+    const probe = vi.fn(async (file: string) =>
+      file.startsWith(media())
+        ? { resolution: "2160p", videoCodec: "H.265", hdr: "DV", audio: [] }
+        : { resolution: "1080p", videoCodec: "H.264", audio: [] },
+    );
+    jobs = new JobService({ db, bus, provider: () => new DemoProvider(), log, notify, probe });
+    const { job } = await analyzed({ conflictPolicy: "keep-better" });
+    await jobs.executeNow(job.id);
+    const item = severanceE01(allItems(db, job.id));
+    expect(item.state).toBe("skipped");
+    expect(localize(item.reasons.at(-1)!, "en")).toBe("Existing file is better (Resolution: 1080p vs 2160p)");
   });
 });
 

@@ -1,12 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { type MetadataProvider, probe } from "@namarr/core";
-import { type Db, failInterruptedJobs, getSettings, openDatabase, type Settings, SqliteProviderCache, setSettings } from "@namarr/db";
-import { DemoProvider, TmdbProvider } from "@namarr/providers";
+import { type Db, failInterruptedJobs, getSettings, openDatabase, type SeriesProvider, SqliteProviderCache, setSettings } from "@namarr/db";
 import pino from "pino";
 import { type Env, readEnv } from "./env.server.ts";
 import { EventBus } from "./events.server.ts";
 import { JobService } from "./jobs.server.ts";
+import { providerFactory } from "./providers.server.ts";
 import { WatchService } from "./watch.server.ts";
 
 export type Runtime = {
@@ -15,8 +15,8 @@ export type Runtime = {
   bus: EventBus;
   jobs: JobService;
   watch: WatchService;
-  /** The metadata provider for the current settings (TMDB, or the demo catalog). */
-  provider: () => MetadataProvider | undefined;
+  /** The metadata provider for the current settings; `series` picks another series source. */
+  provider: (choice?: { series?: SeriesProvider }) => MetadataProvider | undefined;
   log: pino.Logger;
   startedAt: Date;
 };
@@ -46,18 +46,11 @@ export function runtime(): Runtime {
 
   const bus = new EventBus();
   const cache = new SqliteProviderCache(db);
-  // One client per key, so the rate limit holds across jobs and manual searches.
-  let tmdb: { key: string; client: TmdbProvider } | undefined;
-  const demo = new DemoProvider();
-  const provider = (s: Settings) => {
-    if (!s.tmdbApiKey) return env.demo ? demo : undefined;
-    const key = `${s.tmdbApiKey}|${s.language}`;
-    if (tmdb?.key !== key) tmdb = { key, client: new TmdbProvider({ apiKey: s.tmdbApiKey, language: s.language, cache }) };
-    return tmdb.client;
-  };
+  // One client per source and key, so rate limits hold across jobs and manual searches.
+  const provider = providerFactory(cache, env.demo);
   const jobs = new JobService({ db, bus, provider, log, probe: (file) => probe(file) });
   const watch = new WatchService({ db, bus, jobs, log });
-  const rt: Runtime = { env, db, bus, jobs, watch, provider: () => provider(getSettings(db)), log, startedAt: new Date() };
+  const rt: Runtime = { env, db, bus, jobs, watch, provider: (choice) => provider(getSettings(db), choice), log, startedAt: new Date() };
   holder[KEY] = rt;
 
   void watch.reload().catch((err) => log.error({ err }, "Watch-Folder konnten nicht starten"));

@@ -9,6 +9,12 @@ const now = sql`(unixepoch() * 1000)`;
 const createdAt = () => integer("created_at", { mode: "timestamp_ms" }).notNull().default(now);
 
 /** Reusable rename setups. */
+/** Where series come from; movies come from TMDB or TheTVDB (TVmaze and AniDB have none). */
+export const SERIES_PROVIDERS = ["tmdb", "tvdb", "tvmaze", "anidb"] as const;
+export const MOVIE_PROVIDERS = ["tmdb", "tvdb"] as const;
+export type SeriesProvider = (typeof SERIES_PROVIDERS)[number];
+export type MovieProvider = (typeof MOVIE_PROVIDERS)[number];
+
 export const profiles = sqliteTable("profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -22,6 +28,8 @@ export const profiles = sqliteTable("profiles", {
   action: text("action", { enum: ACTIONS }).notNull().default("test"),
   conflictPolicy: text("conflict_policy", { enum: CONFLICT_POLICIES }).notNull().default("skip"),
   targetRoot: text("target_root"),
+  /** Series source for this profile (an anime profile uses AniDB); null = the setting. */
+  provider: text("provider", { enum: SERIES_PROVIDERS }),
   createdAt: createdAt(),
 });
 
@@ -49,6 +57,8 @@ export type JobConfig = {
   targetRoot?: string;
   language?: string;
   order?: "aired" | "dvd" | "absolute";
+  /** Series source; unset = the setting. */
+  provider?: SeriesProvider;
   autoThreshold?: number;
   /** Watch folders set to "Immer prüfen": nothing runs without approval. */
   alwaysReview?: boolean;

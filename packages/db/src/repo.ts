@@ -9,10 +9,12 @@ import {
   type JobKind,
   jobItems,
   jobs,
+  type MovieProvider,
   matchOverrides,
   operations,
   profiles,
   providerCache,
+  type SeriesProvider,
   settings,
   watchFolders,
 } from "./schema.ts";
@@ -35,6 +37,14 @@ export type ItemStateName = (typeof ITEM_STATES)[number];
 
 export type Settings = {
   tmdbApiKey?: string;
+  tvdbApiKey?: string;
+  /** Subscriber PIN for a user-supported TheTVDB key. */
+  tvdbPin?: string;
+  /** Client registered at anidb.net, with its version. */
+  anidbClient?: string;
+  anidbClientVersion?: string;
+  seriesProvider?: SeriesProvider;
+  movieProvider?: MovieProvider;
   language: string;
   roots: string[];
   defaultTargetRoot?: string;
@@ -42,7 +52,14 @@ export type Settings = {
   libraryRefresh: { kind: "jellyfin" | "plex" | "emby"; url: string; token: string }[];
 };
 
-export const DEFAULT_SETTINGS: Settings = { language: "de-DE", roots: [], notifications: [], libraryRefresh: [] };
+export const DEFAULT_SETTINGS: Settings = {
+  language: "de-DE",
+  seriesProvider: "tmdb",
+  movieProvider: "tmdb",
+  roots: [],
+  notifications: [],
+  libraryRefresh: [],
+};
 
 export function getSettings(db: AnyDb): Settings {
   const rows = db.select().from(settings).all();
@@ -176,6 +193,16 @@ export function knownSourcePaths(db: AnyDb, dir: string): Set<string> {
   const prefix = `${dir.replace(/\/+$/, "").replace(/[%_\\]/g, "\\$&")}/%`;
   const rows = db.select({ path: jobItems.sourcePath }).from(jobItems).where(sql`${jobItems.sourcePath} LIKE ${prefix} ESCAPE '\\'`).all();
   return new Set(rows.map((r) => r.path));
+}
+
+/** The item whose file now lives at `targetPath`: its parsed name still knows source and quality. */
+export function findDoneItemByTarget(db: AnyDb, targetPath: string): JobItem | undefined {
+  return db
+    .select()
+    .from(jobItems)
+    .where(and(eq(jobItems.targetPath, targetPath), eq(jobItems.state, "done")))
+    .orderBy(desc(jobItems.id))
+    .get();
 }
 
 export function updateItem(db: AnyDb, id: number, values: Partial<NewJobItem>): JobItem | undefined {

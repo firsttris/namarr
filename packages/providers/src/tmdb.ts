@@ -1,7 +1,8 @@
-import type { EpisodeInfo, EpisodeOrder, MediaCandidate, MetadataProvider } from "@namarr/core";
+import type { EpisodeInfo, EpisodeOrder, ExternalIds, MediaCandidate, MetadataProvider } from "@namarr/core";
 import { tr } from "@namarr/core/i18n";
 import Bottleneck from "bottleneck";
 import { MemoryCache, type ProviderCache } from "./cache.ts";
+import { ProviderError } from "./http.ts";
 
 export type TmdbOptions = {
   /** v3 API key or v4 read access token. Every user brings their own. */
@@ -14,16 +15,6 @@ export type TmdbOptions = {
   rateLimit?: number;
   ttlSeconds?: { search: number; details: number };
 };
-
-export class ProviderError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-  ) {
-    super(message);
-    this.name = "ProviderError";
-  }
-}
 
 const IMAGE_BASE = "https://image.tmdb.org/t/p/w185";
 const yearOf = (date?: string | null) => (date && /^\d{4}/.test(date) ? Number(date.slice(0, 4)) : undefined);
@@ -159,6 +150,33 @@ export class TmdbProvider implements MetadataProvider {
     const language = this.language(opts);
     if (kind === "movie") return this.movie(await this.get<TmdbMovie>(`/movie/${id}`, { language }, this.ttl.details));
     return this.tv(await this.get<TmdbTv>(`/tv/${id}`, { language }, this.ttl.details));
+  }
+
+  /** TMDB's own ID, else TVDB or IMDb IDs through `/find`. */
+  async findById(kind: "movie" | "series", ids: ExternalIds, opts?: { language?: string }) {
+    const orNothing = (e: Error) => {
+      if ((e as ProviderError).status === 404) return undefined;
+      throw e;
+    };
+    if (ids.tmdb) {
+      const found = await this.details(kind, ids.tmdb, opts).catch(orNothing);
+      if (found) return found;
+    }
+    const language = this.language(opts);
+    for (const [source, id] of [
+      ["tvdb_id", ids.tvdb],
+      ["imdb_id", ids.imdb],
+    ] as const) {
+      if (!id) continue;
+      const res = await this.get<{ movie_results: TmdbMovie[]; tv_results: TmdbTv[] }>(
+        `/find/${id}`,
+        { external_source: source, language },
+        this.ttl.details,
+      ).catch(orNothing);
+      const hit = kind === "movie" ? res?.movie_results?.[0] : res?.tv_results?.[0];
+      if (hit) return kind === "movie" ? this.movie(hit as TmdbMovie) : this.tv(hit as TmdbTv);
+    }
+    return undefined;
   }
 
   async episodes(seriesId: string, opts?: { season?: number; language?: string; order?: EpisodeOrder }) {

@@ -1,9 +1,9 @@
 # namarr
 
-Freies, selbst gehostetes Werkzeug, das **FileBot** (Medien-Matching über TMDB) und **ReNamer** (freie Regel-Umbenennung) in einer Web-UI vereint. Ein Bun-Prozess, ein Docker-Image, kein Lizenzschlüssel, kein Account, keine Telemetrie.
+Freies, selbst gehostetes Werkzeug, das **FileBot** (Medien-Matching über TMDB, TheTVDB, TVmaze und AniDB) und **ReNamer** (freie Regel-Umbenennung) in einer Web-UI vereint. Ein Bun-Prozess, ein Docker-Image, kein Lizenzschlüssel, kein Account, keine Telemetrie.
 
 - **Nichts passiert ohne Vorschau, alles ist rückgängig machbar.** Neue Jobs starten im Test-Modus; jede Operation landet in der History und lässt sich pro Datei, pro Job oder bis zu einem Zeitpunkt zurücknehmen – aber nur, wenn die Zieldatei seitdem unverändert ist.
-- **Die Datenbank ist die Wahrheit.** Namen kommen von TMDB, nie geraten. Unsichere Treffer warten in der Inbox.
+- **Die Datenbank ist die Wahrheit.** Namen kommen von TMDB, TheTVDB, TVmaze oder AniDB, nie geraten. Unsichere Treffer warten in der Inbox.
 
 ## Schnellstart (Docker)
 
@@ -21,7 +21,7 @@ services:
       - /mnt/data:/data # Downloads und Library im selben Mount, sonst keine Hardlinks
 ```
 
-Danach `http://<host>:8420` öffnen, mit dem Token anmelden und unter **Einstellungen** den eigenen TMDB-API-Key eintragen (themoviedb.org → Einstellungen → API; v3-Key oder v4-Token).
+Danach `http://<host>:8420` öffnen, mit dem Token anmelden und unter **Einstellungen** den eigenen TMDB-API-Key eintragen (themoviedb.org → Einstellungen → API; v3-Key oder v4-Token) – oder eine der anderen Quellen einrichten, siehe [Metadaten-Quellen](#metadaten-quellen).
 
 Alles rund ums Image liegt unter [`docker/`](docker/): [`Dockerfile`](docker/Dockerfile), [`compose.example.yml`](docker/compose.example.yml), ein Unraid-Template ([`unraid/namarr.xml`](docker/unraid/namarr.xml)) und ein Podman-Quadlet ([`quadlet/namarr.container`](docker/quadlet/namarr.container)). Images: `ghcr.io/firsttris/namarr` und `tristanteu/namarr` – `latest` und `x.y.z` für Releases, `edge` für den aktuellen Stand von `main`. Gebaut und gepusht wird nur manuell über den Workflow „Release“ (Actions → Run workflow): auf `main` für `edge`, auf einem `v*`-Tag für `latest`/`x.y.z`.
 
@@ -54,6 +54,8 @@ Healthcheck: `GET /api/health`. Live-Events: `GET /api/events` (Server-Sent Even
 
 **Workbench** (`/rename`): Ordner auf dem Server wählen, Modus *Media / Regeln / Beides*, Profil wählen. Die virtualisierte Vorschau zeigt alt → neu mit Diff-Hervorhebung, Serien-Gruppen, Begleitdateien (`↳ .de.srt`), Confidence-Badges, übersprungene Samples. Tastatur: ↑ ↓ wählen, Leertaste ein-/ausschließen, Enter öffnet den **MatchPicker**. Rechts: **Template-Editor** mit Token-Autovervollständigung (`{` tippen) und Live-Beispiel an der gewählten Datei, **Regel-Stack** mit Drag-and-Drop und Vorschau pro Regel. Unten: Aktion (Test, Move, Copy, Hardlink, Symlink, Umbenennen), Konfliktverhalten, Ziel, Ausführen.
 
+**Konfliktverhalten „Bessere behalten“** vergleicht nacheinander Auflösung, Quelle (Remux > BluRay > WEB-DL > WEBRip > HDTV > DVD), HDR (DV/HDR10+ > HDR10/HLG > SDR), Video-Codec (AV1 > H.265 > H.264), Ton (Codec, dann Kanäle), PROPER/REPACK und erst zum Schluss die Dateigröße – das erste Kriterium, in dem sich beide Dateien unterscheiden, entscheidet. Ein 4K-HEVC schlägt also ein größeres 1080p-H.264. Die Angaben kommen aus dem Dateinamen und, falls installiert, aus ffprobe (Auflösung, Codec, HDR, beste Tonspur). Für die vorhandene Datei nimmt namarr den Namen, den sie vor dem Umbenennen hatte, sonst wüsste es nichts über die Quelle. Was eine Seite nicht kennt, zählt nicht. Der Grund steht am Eintrag („Vorhandene Datei ist besser (Quelle: WEB vs BluRay)“), eine ersetzte Datei wird gesichert und beim Undo zurückgeholt; ihre Untertitel werden mit ersetzt.
+
 **Dashboard, Inbox, History, Profile, Watch-Folder, Einstellungen** wie im Design. Watch-Folder warten, bis Größe und mtime stabil sind, ignorieren `.part`/`.!qB`/`.tmp`, bündeln einen Release-Ordner zu einem Job und führen nur Treffer über der Auto-Schwelle aus (Standard-Aktion Hardlink, damit Seeding weiterläuft). Beim Start holen sie nach, was ankam, während namarr aus war: Videodateien, die noch kein Job kennt und die nach dem Anlegen des Watch-Folders entstanden sind – ein alter Bestand bleibt unberührt, dafür ist die Workbench da. Nach der Ausführung: Library-Refresh (Jellyfin, Emby, Plex) und Benachrichtigungen (ntfy, Gotify, Telegram, Discord, Webhook).
 
 ### Download-Clients (Hook)
@@ -83,9 +85,24 @@ Felder gehen als JSON, Formular oder Query-Parameter. Antwort `202 {"jobId", "st
 - **SABnzbd / NZBGet**: ein Post-Processing-Skript mit derselben Zeile, `path` aus `$SAB_COMPLETE_DIR` bzw. `$NZBPP_DIRECTORY`.
 - Liegen Client und namarr in verschiedenen Containern mit unterschiedlichen Mounts, z. B. `/downloads` gegenüber `/data/downloads`, hilft `NAMARR_PATH_MAP=/downloads:/data/downloads`. Für Hardlinks müssen Downloads und Library trotzdem im selben Dateisystem liegen.
 
+### Metadaten-Quellen
+
+| Quelle | Wofür | Zugang | Besonderheiten |
+|---|---|---|---|
+| **TMDB** | Filme und Serien | eigener API-Key | gute deutsche Titel, DVD- und absolute Reihenfolge über Episodengruppen |
+| **TheTVDB** | Filme und Serien | API-Key, bei einem nutzerfinanzierten Key zusätzlich die Abo-PIN | zählt Folgen wie Sonarr und Jellyfin; TV-, DVD- und absolute Reihenfolge |
+| **TVmaze** | nur Serien | kein Key | kostenlos, Titel meist auf Englisch |
+| **AniDB** | Anime | registrierter Client (anidb.net → Client registrieren, HTTP-API) | absolute Nummern und Specials; jede Staffel ist ein eigener Eintrag |
+
+In den Einstellungen wählst du, woher Serien und woher Filme kommen. Ein Profil (etwa „Anime“ mit AniDB) oder die Workbench kann für Serien eine andere Quelle nehmen; Watch-Folder und Download-Client-Hook übernehmen die des Profils.
+
+**IDs im Ordnernamen** wie `Serie (1993) [tvdbid-72073]`, `{tvdb-72073}`, `[tmdbid-1399]`, `{imdb-tt0106145}` oder `[anidb-17617]` – so legen Sonarr, Radarr und Jellyfin Ordner an – ersetzen die Suche: namarr nimmt den Eintrag direkt, mit voller Sicherheit. TMDB und TheTVDB übersetzen dabei auch fremde IDs (TVDB → TMDB, IMDb → TheTVDB), TVmaze findet Serien über TVDB- und IMDb-IDs.
+
+AniDB hat keine Such-API: namarr lädt die tägliche Titelliste (höchstens alle drei Tage) und sucht lokal; Anfragen kommen höchstens alle 2,5 Sekunden und jede Antwort bleibt eine Woche im Cache, weil AniDB zu eifrige Clients sperrt. Bei `S02E05` sucht namarr den Eintrag, dessen Titel die zweite Staffel nennt, und markiert den Treffer zum Prüfen.
+
 ### Sprachen
 
-Die Oberfläche gibt es auf Deutsch und Englisch. Beim ersten Besuch entscheidet die Browsersprache (alles außer Deutsch → Englisch), danach der Umschalter unten in der Navigation oder in den Einstellungen; die Wahl liegt im Cookie `namarr_lang`, damit schon das Server-Rendering stimmt. Meldungen vom Server (Gründe in der Vorschau, Fehler) werden zweisprachig übertragen und in der gewählten Sprache angezeigt. Die Sprache der Titel (TMDB) ist davon unabhängig und wird in den Einstellungen gesetzt.
+Die Oberfläche gibt es auf Deutsch und Englisch. Beim ersten Besuch entscheidet die Browsersprache (alles außer Deutsch → Englisch), danach der Umschalter unten in der Navigation oder in den Einstellungen; die Wahl liegt im Cookie `namarr_lang`, damit schon das Server-Rendering stimmt. Meldungen vom Server (Gründe in der Vorschau, Fehler) werden zweisprachig übertragen und in der gewählten Sprache angezeigt. Die Sprache der Titel ist davon unabhängig und wird in den Einstellungen gesetzt.
 
 Neue Texte kommen nach `apps/server/src/lib/messages.ts`: `de` gibt die Struktur vor, `en` muss sie erfüllen (prüft tsc), Server-Texte entstehen mit `tr("…", "…")` aus `@namarr/core/i18n`.
 
@@ -123,7 +140,7 @@ Migrationen: Schema in `packages/db/src/schema.ts` ändern, dann `bun run --cwd 
 ```
 packages/
   core/       Domänenlogik ohne Framework: parser, matcher, formatter, rules, scanner, fileops, jobs
-  providers/  TMDB-Client (Cache, Rate-Limit, Episodenreihenfolgen) und Demo-Katalog
+  providers/  TMDB, TheTVDB, TVmaze, AniDB (Cache, Rate-Limit, Episodenreihenfolgen), Demo-Katalog
   db/         Drizzle-Schema, Migrationen, Repositories (bun:sqlite)
 apps/
   server/     TanStack Start: Routen, Server Functions (dünne Adapter mit Zod), Server Routes, Worker
@@ -139,8 +156,8 @@ Ein Bun-Prozess: `apps/server/server.ts` führt beim Start die Migrationen aus u
 | Parser | jede Regel einzeln, Ordnerkontext, Snapshots, YAML-Korpus |
 | Matcher | Jaro-Winkler, Jahr, Mehrdeutigkeit (The Office US/UK), Gruppierung (eine Suche pro Serie), Overrides, absolute Nummern |
 | Formatter / Regeln | Template-Sprache inkl. Fehlerpositionen, Presets, Snapshots; Property-Tests (fast-check): Sanitizing ist idempotent und erzeugt nie ungültige Pfade, Regeln ändern nie die Erweiterung |
-| FileOps | in temporären Ordnern: alle Aktionen, Konflikte, Sicherung beim Überschreiben, Undo mit Verweigerung bei veränderten Dateien, Abbruch mitten im Job |
-| Provider | TMDB gegen aufgezeichnete Antworten (keine Live-API), Cache-TTL, 429-Retry, v3/v4-Auth |
+| FileOps | in temporären Ordnern: alle Aktionen, Konflikte, Qualitätsvergleich für „Bessere behalten“, Sicherung beim Überschreiben, Undo mit Verweigerung bei veränderten Dateien, Abbruch mitten im Job |
+| Provider | TMDB, TheTVDB, TVmaze und AniDB gegen Antworten im dokumentierten Format (keine Live-API), Cache-TTL, 429-Retry, Anmeldung, Fehlermeldungen, IDs aus Ordnernamen |
 | DB / Server | Migrationen, Paging, Inbox, Dashboard-Zahlen; Job-Pipeline Ende zu Ende, Watch-Folder mit echten Dateien, Auth, SSE, Benachrichtigungen |
 | E2E | Playwright: Vorschau, MatchPicker, Freigabe, Hardlinks, Undo, Regel-Modus, History |
 
@@ -161,6 +178,6 @@ Der Korpus ist ein Anfang (Ziel laut Plan: 500+ echte Namen) und wurde zusammen 
 - **M0 Fundament, M1 Core, M2 Web-UI und Docker:** umgesetzt.
 - **M3 Automatisierung:** Watch-Folder, Inbox, gelernte Overrides, Library-Refresh und Benachrichtigungen umgesetzt.
 - **M4 Regel-Modus:** Regel-Engine, RuleStack-UI und Media + Regeln umgesetzt; YAML-Export/-Import von Presets fehlt noch.
-- **M5 Anime:** absolute Nummern und TMDB-Episodengruppen (DVD/absolut) sind da; TVDB und AniDB fehlen.
+- **M5 Anime:** absolute Nummern, TMDB-Episodengruppen, TheTVDB und AniDB sind da; offen ist die Zuordnung von AniDB-Einträgen auf TVDB-Staffeln (Anime-Listen).
 
 Offen laut Plan: Lizenz (GPL-3.0 oder MIT/Apache-2.0), Namensreservierung, Desktop-App.

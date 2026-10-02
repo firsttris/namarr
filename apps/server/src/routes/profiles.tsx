@@ -6,8 +6,9 @@ import { z } from "zod";
 import { RuleStack } from "~/components/RuleStack";
 import { TemplateEditor } from "~/components/TemplateEditor";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
-import { getProfiles, removeProfile, saveProfile } from "~/functions/library.functions";
+import { getProfiles, getSettingsFn, removeProfile, saveProfile } from "~/functions/library.functions";
 import { useT } from "~/lib/i18n";
+import { SERIES_SOURCES } from "~/lib/providers";
 
 export const Route = createFileRoute("/profiles")({
   validateSearch: z.object({ id: z.coerce.number().optional() }),
@@ -26,6 +27,7 @@ const EMPTY: Draft = {
   action: "hardlink",
   conflictPolicy: "skip",
   targetRoot: null,
+  provider: null,
 };
 
 function Profiles() {
@@ -35,6 +37,7 @@ function Profiles() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { data = initial } = useQuery({ queryKey: ["profiles"], queryFn: () => getProfiles(), initialData: initial });
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => getSettingsFn() });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [kind, setKind] = useState<"episode" | "movie">("episode");
 
@@ -142,6 +145,22 @@ function Profiles() {
                   ))}
                 </Select>
               </Field>
+              {draft.mode !== "rules" && (
+                <Field label={t.common.seriesSource} htmlFor="p-provider">
+                  <Select
+                    id="p-provider"
+                    value={draft.provider ?? ""}
+                    onChange={(e) => setDraft({ ...draft, provider: (e.target.value || null) as Draft["provider"] })}
+                  >
+                    <option value="">{t.common.fromSettings(t.providers[settings.data?.seriesProvider ?? "tmdb"])}</option>
+                    {SERIES_SOURCES.map((p) => (
+                      <option key={p} value={p}>
+                        {t.providers[p]}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
               <Field label={t.profiles.targetRoot} htmlFor="p-target" hint={t.profiles.targetHint}>
                 <input
                   id="p-target"

@@ -17,6 +17,9 @@ export type ReleaseInfo = {
 
 export type MediaKind = "movie" | "episode" | "unknown";
 
+/** IDs written into folder names by Sonarr, Radarr, Jellyfin & co.: `[tvdbid-72073]`, `{imdb-tt0106145}`. */
+export type ExternalIds = Partial<Record<"tmdb" | "tvdb" | "imdb" | "anidb", string>>;
+
 export type Parsed = {
   kind: Guess<MediaKind>;
   title?: string;
@@ -30,6 +33,7 @@ export type Parsed = {
   part?: number; // CD1, Part 2
   sample?: boolean;
   extension?: string; // without dot, lower case
+  ids?: ExternalIds;
 };
 
 export type MediaCandidate = {
@@ -38,10 +42,14 @@ export type MediaCandidate = {
   kind: "movie" | "series";
   title: string;
   originalTitle?: string;
+  /** Further known titles (synonyms, other languages); they count for matching, not for naming. */
+  aliases?: string[];
   year?: number;
   poster?: string;
   /** Total episodes, used as a matcher signal for anime and season packs. */
   episodeCount?: number;
+  /** Every season is an entry of its own (AniDB): S02E05 is episode 5 of the season-2 entry. */
+  seasonsAsEntries?: boolean;
 };
 
 export type EpisodeInfo = {
@@ -60,4 +68,8 @@ export interface MetadataProvider {
   searchSeries(query: string, opts?: { year?: number; language?: string }): Promise<MediaCandidate[]>;
   episodes(seriesId: string, opts?: { season?: number; language?: string; order?: EpisodeOrder }): Promise<EpisodeInfo[]>;
   details(kind: "movie" | "series", id: string, opts?: { language?: string }): Promise<MediaCandidate>;
+  /** Looks a title up by an ID from the folder name; undefined when none of the IDs fits. */
+  findById?(kind: "movie" | "series", ids: ExternalIds, opts?: { language?: string }): Promise<MediaCandidate | undefined>;
+  /** The source per kind, for providers that route movies and series to different ones. */
+  nameFor?(kind: "movie" | "series"): string;
 }

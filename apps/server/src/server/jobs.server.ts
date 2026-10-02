@@ -5,6 +5,7 @@ import {
   buildPreview,
   type ConflictPolicy,
   cleanupEmptyDirs,
+  entryParsed,
   executeOperation,
   type MatchResult,
   type MetadataProvider,
@@ -16,6 +17,8 @@ import {
   type PreviewItem,
   type ProbeInfo,
   parse,
+  type Quality,
+  qualityOf,
   type Rule,
   resolveEpisodes,
   resolveInRoots,
@@ -31,6 +34,7 @@ import {
   countItemsByState,
   createJob,
   type Db,
+  findDoneItemByTarget,
   getItem,
   getJob,
   getSettings,
@@ -44,6 +48,7 @@ import {
   listOverrides,
   markUndone,
   removeFromInbox,
+  type SeriesProvider,
   type Settings,
   saveOverride,
   updateItem,
@@ -55,7 +60,8 @@ import { afterExecution, type JobSummary } from "./notify.server.ts";
 export type JobServiceDeps = {
   db: Db;
   bus: EventBus;
-  provider: (settings: Settings) => MetadataProvider | undefined;
+  /** `series` is the job's series source; unset uses the setting. */
+  provider: (settings: Settings, choice?: { series?: SeriesProvider }) => MetadataProvider | undefined;
   log: { info: (o: object | string, msg?: string) => void; error: (o: object | string, msg?: string) => void };
   notify?: (settings: Settings, summary: JobSummary) => Promise<void>;
   /** Container metadata (ffprobe); undefined when unavailable. */
@@ -65,8 +71,8 @@ export type JobServiceDeps = {
 export const JOB_BUSY = tr("Job läuft noch", "Job is still running");
 export const JOB_NOT_FOUND = tr("Job nicht gefunden", "Job not found");
 export const NO_PROVIDER = tr(
-  "Kein Metadaten-Anbieter: TMDB-API-Key in den Einstellungen hinterlegen",
-  "No metadata provider: add a TMDB API key in the settings",
+  "Kein Metadaten-Anbieter: in den Einstellungen einen Zugang für TMDB, TheTVDB oder AniDB hinterlegen oder TVmaze wählen",
+  "No metadata provider: add access for TMDB, TheTVDB or AniDB in the settings, or choose TVmaze",
 );
 export const ALWAYS_REVIEW = tr("Immer prüfen", "Always review");
 
@@ -189,7 +195,7 @@ export class JobService {
       let matches = new Map<string, MatchResult>();
       if (mode !== "rules") {
         const settings = this.settings();
-        const provider = this.deps.provider(settings);
+        const provider = this.deps.provider(settings, { series: job.config.provider });
         if (!provider) throw new JobError(NO_PROVIDER);
         this.progress(job, "matching", 0, files.length);
         matches = await matchAll(
@@ -236,6 +242,17 @@ export class JobService {
         p.release.videoCodec ??= info.videoCodec;
       });
     }
+  }
+
+  /**
+   * What keep-better knows about a file: the parsed name (for the existing file the name it
+   * had before namarr renamed it, since the new name rarely says "BluRay") plus ffprobe.
+   */
+  private async quality(file: string, incoming?: JobItem): Promise<Quality> {
+    const release = incoming
+      ? (incoming.parsedJson?.release ?? parse(file).release)
+      : (findDoneItemByTarget(this.deps.db, file)?.parsedJson?.release ?? parse(file).release);
+    return qualityOf(release, await this.deps.probe?.(file));
   }
 
   private finishCancelled(job: Job) {
@@ -395,13 +412,16 @@ export class JobService {
 
     if (change.match) {
       const settings = this.settings();
-      const provider = this.deps.provider(settings);
+      const provider = this.deps.provider(settings, { series: job.config.provider });
       if (!provider) throw new JobError(NO_PROVIDER);
       const best = await provider.details(change.match.kind, change.match.id, { language: settings.language });
       const parsed = item.parsedJson as Parsed;
       const episodes =
         best.kind === "series"
-          ? resolveEpisodes(parsed, await provider.episodes(best.id, { language: settings.language, order: job.config.order }))
+          ? resolveEpisodes(
+              entryParsed(best, parsed),
+              await provider.episodes(best.id, { language: settings.language, order: job.config.order }),
+            )
           : [];
       const previous = item.matchJson as StoredMatch | null;
       const match: StoredMatch = {
@@ -414,7 +434,7 @@ export class JobService {
       };
       values.matchJson = match;
       if (change.remember && parsed.title) {
-        saveOverride(db, { pattern: parsed.title, provider: provider.name, externalId: best.id, seasonOffset: 0 });
+        saveOverride(db, { pattern: parsed.title, provider: best.provider, externalId: best.id, seasonOffset: 0 });
       }
     }
     if (change.targetPath !== undefined) {
@@ -494,19 +514,33 @@ export class JobService {
       if (signal.aborted) break;
       try {
         const target = await resolveInRoots(item.targetPath!, settings.roots);
-        const result = await executeOperation({ from: item.sourcePath, to: target, action }, { conflict });
+        const quality =
+          conflict === "keep-better"
+            ? (file: string, role: string) => this.quality(file, role === "incoming" ? item : undefined)
+            : undefined;
+        const result = await executeOperation({ from: item.sourcePath, to: target, action }, { conflict, quality });
         if (result.status === "done") {
           this.record(jobId, item.id, result.record);
-          // Companions follow their main file with the same action.
+          // Companions follow their main file with the same action. Subtitles of a replaced
+          // worse file belong to it, so they are replaced too instead of compared by size.
+          const companionConflict = conflict === "keep-better" ? "overwrite" : conflict;
           const companionErrors: string[] = [];
           for (const c of item.companions) {
             if (!c.to) continue;
-            const cr = await executeOperation({ from: c.from, to: await resolveInRoots(c.to, settings.roots), action }, { conflict });
+            const cr = await executeOperation(
+              { from: c.from, to: await resolveInRoots(c.to, settings.roots), action },
+              { conflict: companionConflict },
+            );
             if (cr.status === "done") this.record(jobId, item.id, cr.record);
             else if (cr.status === "failed") companionErrors.push(`${path.basename(c.from)}: ${cr.error}`);
             else if (cr.status === "skipped") companionErrors.push(`${path.basename(c.from)}: ${cr.reason}`);
           }
-          updateItem(db, item.id, { state: "done", targetPath: result.record.to, error: companionErrors.join("; ") || null });
+          updateItem(db, item.id, {
+            state: "done",
+            targetPath: result.record.to,
+            error: companionErrors.join("; ") || null,
+            ...(result.note ? { reasons: [...item.reasons, result.note] } : {}),
+          });
           removeFromInbox(db, item.id);
           summary.done++;
           if (action === "move") await cleanupEmptyDirs(path.dirname(item.sourcePath), job.sourcePaths[0] ?? "/").catch(() => []);

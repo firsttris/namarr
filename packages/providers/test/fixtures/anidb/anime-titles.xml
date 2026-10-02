@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shortened AniDB title dump (format of anime-titles.xml) -->
+<animetitles>
+  <anime aid="17617">
+    <title xml:lang="x-jat" type="main">Sousou no Frieren</title>
+    <title xml:lang="en" type="official">Frieren: Beyond Journey&apos;s End</title>
+    <title xml:lang="de" type="official">Frieren - Nach dem Ende der Reise</title>
+    <title xml:lang="ja" type="official">葬送のフリーレン</title>
+    <title xml:lang="en" type="synonym">Frieren</title>
+  </anime>
+  <anime aid="18290">
+    <title xml:lang="x-jat" type="main">Sousou no Frieren (2026)</title>
+    <title xml:lang="en" type="official">Frieren: Beyond Journey&apos;s End Season 2</title>
+    <title xml:lang="en" type="synonym">Frieren 2nd Season</title>
+  </anime>
+  <anime aid="23">
+    <title xml:lang="x-jat" type="main">Cowboy Bebop</title>
+    <title xml:lang="en" type="official">Cowboy Bebop</title>
+  </anime>
+</animetitles>

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bunx --bun vite dev --port 8420",
-    "build": "bunx --bun vite build && bun build server.ts --target=bun --outfile=dist/entry.js && cp -r ../../packages/db/drizzle dist/drizzle",
+    "build": "bunx --bun vite build && bun build server.ts --target=bun --outfile=dist/entry.js && rm -rf dist/drizzle && cp -r ../../packages/db/drizzle dist/drizzle",
     "start": "bun run dist/entry.js",
     "e2e": "playwright test"
   },
