@@ -1,9 +1,10 @@
 name: Tag release
 
-# Actions → Tag release → Run workflow (from main): runs the full CI, picks the next version after
-# the newest v* tag (or the exact one given), creates the tag vX.Y.Z with a GitHub release and
-# generated notes, then starts the "Release" workflow on that tag, which pushes the image as
-# :x.y.z, :x.y and :latest.
+# Actions → Tag release → Run workflow (from main), all in one run:
+#   1. the full CI
+#   2. the next version after the newest v* tag (none yet: from 0.0.0), or the exact one given
+#   3. the "Release" workflow: image as :x.y.z, :x.y and :latest, then tag vX.Y.Z and the
+#      GitHub release with generated notes
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +20,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
   packages: write
 
 concurrency:
@@ -27,12 +27,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  checks:
-    uses: ./.github/workflows/ci.yml
-
-  tag:
-    needs: checks
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     steps:
       - name: Only from main
         if: github.ref != 'refs/heads/main'
@@ -71,19 +69,14 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "### v$version (previous: ${latest:-none})" >> "$GITHUB_STEP_SUMMARY"
-      - name: Create tag and GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.v.outputs.version }}
-        run: |
-          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "v$VERSION" --generate-notes \
-            --notes "Docker: \`tristanteu/namarr:$VERSION\` · \`ghcr.io/$GITHUB_REPOSITORY:$VERSION\` (also \`:latest\`)"
-      - name: Build the image for the new tag
-        # A tag created with GITHUB_TOKEN starts no "push" workflows; a dispatch does.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.v.outputs.version }}
-        run: |
-          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"
-          echo "Image build started: Actions → Release (v$VERSION)" >> "$GITHUB_STEP_SUMMARY"
+
+  checks:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: [version, checks]
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit
