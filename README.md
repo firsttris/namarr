@@ -1,183 +1,170 @@
-# namarr
+<div align="center">
 
-Freies, selbst gehostetes Werkzeug, das **FileBot** (Medien-Matching über TMDB, TheTVDB, TVmaze und AniDB) und **ReNamer** (freie Regel-Umbenennung) in einer Web-UI vereint. Ein Bun-Prozess, ein Docker-Image, kein Lizenzschlüssel, kein Account, keine Telemetrie.
+<img src="docs/banner.png" alt="namarr: Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv becomes Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv" width="900">
 
-- **Nichts passiert ohne Vorschau, alles ist rückgängig machbar.** Neue Jobs starten im Test-Modus; jede Operation landet in der History und lässt sich pro Datei, pro Job oder bis zu einem Zeitpunkt zurücknehmen – aber nur, wenn die Zieldatei seitdem unverändert ist.
-- **Die Datenbank ist die Wahrheit.** Namen kommen von TMDB, TheTVDB, TVmaze oder AniDB, nie geraten. Unsichere Treffer warten in der Inbox.
+**The self-hosted renamer for movies, series and anime.**<br>
+FileBot-style media matching and ReNamer-style rules in one web UI.
+Every change starts as a preview, and every change can be undone.
 
-## Schnellstart (Docker)
+[![CI](https://github.com/firsttris/namarr/actions/workflows/ci.yml/badge.svg)](https://github.com/firsttris/namarr/actions/workflows/ci.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tristanteu/namarr?logo=docker&logoColor=white)](https://hub.docker.com/r/tristanteu/namarr)
+[![Image Size](https://img.shields.io/docker/image-size/tristanteu/namarr/latest?logo=docker&logoColor=white&label=image)](https://hub.docker.com/r/tristanteu/namarr)
+[![Platforms](https://img.shields.io/badge/platform-amd64%20%7C%20arm64-lightgrey)](https://hub.docker.com/r/tristanteu/namarr/tags)
+[![Bun](https://img.shields.io/badge/built%20with-Bun-fbf0df?logo=bun&logoColor=black)](https://bun.sh/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-```yaml
-services:
-  namarr:
-    image: ghcr.io/firsttris/namarr:latest
-    ports: ["8420:8420"]
-    environment:
-      PUID: 1000
-      PGID: 1000
-      NAMARR_TOKEN: change-me
-    volumes:
-      - ./config:/config
-      - /mnt/data:/data # Downloads und Library im selben Mount, sonst keine Hardlinks
+[Features](#-features) •
+[Metadata](#-metadata-sources) •
+[Quick start](#-quick-start) •
+[Documentation](docs/README.md) •
+[Contributing](#-contributing)
+
+<img src="docs/screenshot-workbench.png" alt="namarr workbench: eight Severance files with their new names, the template editor and the selected episode" width="900">
+
+</div>
+
+## 💡 Why namarr?
+
+FileBot matches media better than anything else, but it is a paid Java desktop app. ReNamer has the
+best rules for everything else, but it only runs on Windows. Sonarr and Radarr rename well, but only
+what they downloaded themselves. namarr is one small container for a home server that does both
+kinds of renaming for any folder you point it at:
+
+- **Preview first**: new jobs start in test mode. You see old → new for every file before anything
+  moves.
+- **Undo for everything**: per file, per job or back to a point in time. namarr refuses when a file
+  has changed since, so an undo never destroys anything.
+- **Names come from a database, never from guesses**: TMDB, TheTVDB, TVmaze or AniDB. Uncertain
+  matches wait in the inbox instead of being renamed wrong.
+
+## ✨ Features
+
+- **Workbench**: pick a folder on the server and get a virtualized preview with diff highlighting,
+  series groups, subtitles and other companion files, confidence badges and skipped samples, all
+  usable from the keyboard
+- **Media, rules or both**: match against a database, or rename with rules (replace, regex, insert,
+  case, numbering, dates, transliteration …), or match first and polish with rules
+- **Template language** with auto-completion and a live example: `{n} ({y})/Season {s00}/{n} - {s00e00} - {t}`,
+  with filters, conditions and presets for Plex, Jellyfin, Emby and Kodi
+- **Move, copy, hardlink, symlink or rename in place**. Hardlinks keep torrents seeding
+- **Conflict handling**, including *keep better*, which compares resolution, source, HDR, codecs and
+  audio before it looks at file size
+- **Watch folders** that wait until downloads are finished, rename sure matches on their own and
+  send the rest to the inbox
+- **Download client hook**: qBittorrent, SABnzbd or NZBGet call `POST /api/jobs` after every download
+- **IDs in folder names**: `[tvdbid-72073]`, `{tmdb-1399}`, `{imdb-tt…}` or `[anidb-…]`, as Sonarr,
+  Radarr and Jellyfin write them, replace the search
+- **Library refresh** for Jellyfin, Emby and Plex, **notifications** via ntfy, Gotify, Telegram,
+  Discord or webhook
+- **ffprobe built in** for files whose names say nothing about resolution or codec
+- **English and German UI**, including every message from the server
+
+## 🗂️ Metadata sources
+
+| Source | Movies | Series | Anime | Access |
+|---|:---:|:---:|:---:|---|
+| **TMDB** | ✅ | ✅ | ✅ | your own API key |
+| **TheTVDB** | ✅ | ✅ | ✅ | API key, plus PIN for a user-supported key |
+| **TVmaze** | | ✅ | | none, free |
+| **AniDB** | | | ✅ | registered client |
+
+Series and movies can come from different sources, and every profile can pick its own series source,
+for example AniDB for an anime profile. Details: [docs/metadata.md](docs/metadata.md).
+
+## 🐳 Quick start
+
+```bash
+mkdir namarr && cd namarr
+curl -o compose.yml https://raw.githubusercontent.com/firsttris/namarr/main/docker/compose.example.yml
+# set NAMARR_TOKEN and your media mount, then
+docker compose up -d
 ```
 
-Danach `http://<host>:8420` öffnen, mit dem Token anmelden und unter **Einstellungen** den eigenen TMDB-API-Key eintragen (themoviedb.org → Einstellungen → API; v3-Key oder v4-Token) – oder eine der anderen Quellen einrichten, siehe [Metadaten-Quellen](#metadaten-quellen).
+Open **http://localhost:8420**, sign in with your token and add a TMDB API key under *Settings*, or
+set up one of the [other sources](docs/metadata.md).
 
-Alles rund ums Image liegt unter [`docker/`](docker/): [`Dockerfile`](docker/Dockerfile), [`compose.example.yml`](docker/compose.example.yml), ein Unraid-Template ([`unraid/namarr.xml`](docker/unraid/namarr.xml)) und ein Podman-Quadlet ([`quadlet/namarr.container`](docker/quadlet/namarr.container)). Images: `ghcr.io/firsttris/namarr` und `tristanteu/namarr` – `latest` und `x.y.z` für Releases, `edge` für den aktuellen Stand von `main`. Gebaut und gepusht wird nur manuell über den Workflow „Release“ (Actions → Run workflow): auf `main` für `edge`, auf einem `v*`-Tag für `latest`/`x.y.z`.
+<details>
+<summary><b>docker run</b></summary>
 
-### Podman (Quadlet)
+```bash
+docker run -d --name namarr --restart unless-stopped \
+  -p 8420:8420 \
+  -e PUID=1000 -e PGID=1000 \
+  -e NAMARR_TOKEN="$(openssl rand -hex 24)" \
+  -v ./config:/config \
+  -v /mnt/data:/data \
+  tristanteu/namarr:latest
+```
 
-```sh
+</details>
+
+<details>
+<summary><b>Podman Quadlet</b></summary>
+
+```bash
 mkdir -p ~/.config/containers/systemd ~/namarr/config
-cp docker/quadlet/namarr.container ~/.config/containers/systemd/   # /mnt/data darin anpassen
-printf 'mein-langes-token' | podman secret create namarr-token -
+curl -o ~/.config/containers/systemd/namarr.container https://raw.githubusercontent.com/firsttris/namarr/main/docker/quadlet/namarr.container
+# adjust /mnt/data in namarr.container, then
+printf 'a-long-token' | podman secret create namarr-token -
 systemctl --user daemon-reload && systemctl --user start namarr
-loginctl enable-linger $USER   # auch ohne Login nach dem Booten starten
 ```
 
-Rootless bleibt `PUID` leer: Container-root ist bereits der eigene Nutzer, ein `PUID` würde auf eine fremde subuid gemappt. Rootful (`/etc/containers/systemd/`) wie bei Docker `PUID`/`PGID` setzen. Updates: `podman auto-update`.
+</details>
 
-| Variable | Standard | Bedeutung |
-|---|---|---|
-| `NAMARR_TOKEN` | – | Zugangs-Token für UI (Login) und API (`Authorization: Bearer …` oder Basic Auth). **Pflicht**, sobald nicht nur auf `127.0.0.1` gelauscht wird – im Docker-Image also immer. |
-| `NAMARR_AUTH_HEADER` | – | Alternativ: Header eines vertrauenswürdigen Reverse-Proxys (z. B. `Remote-User`). |
-| `NAMARR_ROOTS` | `/data` (Docker) | Erlaubte Wurzelpfade, kommagetrennt. Nur hier wird gelesen und geschrieben; später in den Einstellungen änderbar. |
-| `NAMARR_CONFIG_DIR` | `/config` (Docker), `./config` | SQLite-Datenbank (WAL). |
-| `NAMARR_HOST` / `NAMARR_PORT` | `127.0.0.1` / `8420` | Außerhalb von Docker standardmäßig nur lokal erreichbar. |
-| `PUID` / `PGID` | `1000` | Der Server startet als root, übergibt `/config` und arbeitet dann als dieser Nutzer. |
-| `NAMARR_PATH_MAP` | – | Pfade anderer Container auf namarrs Sicht abbilden, z. B. `/downloads:/data/downloads` (mehrere durch Komma getrennt). Gilt für den Download-Client-Hook. |
-| `NAMARR_DEMO` | – | `1`: Offline-Demo-Katalog statt TMDB (UI ausprobieren, E2E-Tests). |
+<details>
+<summary><b>Unraid</b></summary>
 
-Healthcheck: `GET /api/health`. Live-Events: `GET /api/events` (Server-Sent Events: `job.progress`, `item.updated`, `inbox.added`, `watch.detected`).
+Use the template in [`docker/unraid/namarr.xml`](docker/unraid/namarr.xml).
 
-## Was drin ist
+</details>
 
-**Workbench** (`/rename`): Ordner auf dem Server wählen, Modus *Media / Regeln / Beides*, Profil wählen. Die virtualisierte Vorschau zeigt alt → neu mit Diff-Hervorhebung, Serien-Gruppen, Begleitdateien (`↳ .de.srt`), Confidence-Badges, übersprungene Samples. Tastatur: ↑ ↓ wählen, Leertaste ein-/ausschließen, Enter öffnet den **MatchPicker**. Rechts: **Template-Editor** mit Token-Autovervollständigung (`{` tippen) und Live-Beispiel an der gewählten Datei, **Regel-Stack** mit Drag-and-Drop und Vorschau pro Regel. Unten: Aktion (Test, Move, Copy, Hardlink, Symlink, Umbenennen), Konfliktverhalten, Ziel, Ausführen.
-
-**Konfliktverhalten „Bessere behalten“** vergleicht nacheinander Auflösung, Quelle (Remux > BluRay > WEB-DL > WEBRip > HDTV > DVD), HDR (DV/HDR10+ > HDR10/HLG > SDR), Video-Codec (AV1 > H.265 > H.264), Ton (Codec, dann Kanäle), PROPER/REPACK und erst zum Schluss die Dateigröße – das erste Kriterium, in dem sich beide Dateien unterscheiden, entscheidet. Ein 4K-HEVC schlägt also ein größeres 1080p-H.264. Die Angaben kommen aus dem Dateinamen und, falls installiert, aus ffprobe (Auflösung, Codec, HDR, beste Tonspur). Für die vorhandene Datei nimmt namarr den Namen, den sie vor dem Umbenennen hatte, sonst wüsste es nichts über die Quelle. Was eine Seite nicht kennt, zählt nicht. Der Grund steht am Eintrag („Vorhandene Datei ist besser (Quelle: WEB vs BluRay)“), eine ersetzte Datei wird gesichert und beim Undo zurückgeholt; ihre Untertitel werden mit ersetzt.
-
-**Dashboard, Inbox, History, Profile, Watch-Folder, Einstellungen** wie im Design. Watch-Folder warten, bis Größe und mtime stabil sind, ignorieren `.part`/`.!qB`/`.tmp`, bündeln einen Release-Ordner zu einem Job und führen nur Treffer über der Auto-Schwelle aus (Standard-Aktion Hardlink, damit Seeding weiterläuft). Beim Start holen sie nach, was ankam, während namarr aus war: Videodateien, die noch kein Job kennt und die nach dem Anlegen des Watch-Folders entstanden sind – ein alter Bestand bleibt unberührt, dafür ist die Workbench da. Nach der Ausführung: Library-Refresh (Jellyfin, Emby, Plex) und Benachrichtigungen (ntfy, Gotify, Telegram, Discord, Webhook).
-
-### Download-Clients (Hook)
-
-Statt (oder neben) einem Watch-Folder kann der Download-Client namarr nach jedem fertigen Download direkt aufrufen. Der Job läuft wie ein Watch-Job: sichere Treffer werden sofort umbenannt, unsichere warten in der Inbox.
-
-```bash
-curl -X POST http://namarr:8420/api/jobs \
-  -H "Authorization: Bearer $NAMARR_TOKEN" \
-  -d path="/data/downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP" -d profile=Serien
-```
-
-| Feld | Bedeutung |
+| Volume | Content |
 |---|---|
-| `path` | Datei oder Ordner, wie der Client ihn sieht (`NAMARR_PATH_MAP` übersetzt ihn) |
-| `profile` | Profil-ID oder -Name (Format, Regeln, Aktion; `test` wird zu Hardlink) |
-| `watchFolder` | ID oder Name eines Watch-Folders: dessen Profil, Ziel und Auto-Schwelle |
-| `target` | Zielordner; sonst aus Profil, Watch-Folder oder Standard-Zielordner |
-| `review` | `true`: nichts läuft ohne Freigabe, alles landet in der Inbox |
-| `threshold` | Auto-Schwelle 0–1, Standard 0,9 |
+| `/config` | SQLite database |
+| `/data` | your downloads and your library. Keep both in the same mount, otherwise hardlinks are impossible |
 
-Felder gehen als JSON, Formular oder Query-Parameter. Antwort `202 {"jobId", "status", "url"}`; den Fortschritt liefert `GET /api/jobs/<id>`. Fehler kommen als `{"error"}` mit 400 (ungültig), 401 (Token), 403 (außerhalb der Wurzelpfade) oder 404 (Pfad, Profil oder Watch-Folder unbekannt).
+Environment variables, image tags, updates and the API are in the
+[installation guide](docs/installation.md).
 
-- **qBittorrent** → Optionen → Downloads → „Externes Programm beim Beenden eines Torrents ausführen“:
-  `curl -s -X POST http://namarr:8420/api/jobs -H "Authorization: Bearer TOKEN" --data-urlencode "path=%F" -d profile=Serien`
-  (`%F` ist der Inhaltspfad: Ordner bei mehreren Dateien, sonst die Datei.)
-- **SABnzbd / NZBGet**: ein Post-Processing-Skript mit derselben Zeile, `path` aus `$SAB_COMPLETE_DIR` bzw. `$NZBPP_DIRECTORY`.
-- Liegen Client und namarr in verschiedenen Containern mit unterschiedlichen Mounts, z. B. `/downloads` gegenüber `/data/downloads`, hilft `NAMARR_PATH_MAP=/downloads:/data/downloads`. Für Hardlinks müssen Downloads und Library trotzdem im selben Dateisystem liegen.
+## 📸 Screenshots
 
-### Metadaten-Quellen
+<div align="center">
+<img src="docs/screenshot-dashboard.png" alt="namarr dashboard with the inbox, watch folders and recent jobs" width="900">
+</div>
 
-| Quelle | Wofür | Zugang | Besonderheiten |
-|---|---|---|---|
-| **TMDB** | Filme und Serien | eigener API-Key | gute deutsche Titel, DVD- und absolute Reihenfolge über Episodengruppen |
-| **TheTVDB** | Filme und Serien | API-Key, bei einem nutzerfinanzierten Key zusätzlich die Abo-PIN | zählt Folgen wie Sonarr und Jellyfin; TV-, DVD- und absolute Reihenfolge |
-| **TVmaze** | nur Serien | kein Key | kostenlos, Titel meist auf Englisch |
-| **AniDB** | Anime | registrierter Client (anidb.net → Client registrieren, HTTP-API) | absolute Nummern und Specials; jede Staffel ist ein eigener Eintrag |
+## 📚 Documentation
 
-In den Einstellungen wählst du, woher Serien und woher Filme kommen. Ein Profil (etwa „Anime“ mit AniDB) oder die Workbench kann für Serien eine andere Quelle nehmen; Watch-Folder und Download-Client-Hook übernehmen die des Profils.
+| | |
+|---|---|
+| [Installation](docs/installation.md) | Compose, docker run, Quadlet, Unraid, environment variables, image tags, health and events |
+| [Workbench](docs/workbench.md) | preview, actions, conflicts and *keep better*, template language, rules |
+| [Automation](docs/automation.md) | watch folders, inbox, download client hook, library refresh, notifications |
+| [Metadata sources](docs/metadata.md) | TMDB, TheTVDB, TVmaze, AniDB, IDs in folder names, languages |
+| [Development](docs/development.md) | setup, checks, architecture, tests, parser corpus, roadmap |
 
-**IDs im Ordnernamen** wie `Serie (1993) [tvdbid-72073]`, `{tvdb-72073}`, `[tmdbid-1399]`, `{imdb-tt0106145}` oder `[anidb-17617]` – so legen Sonarr, Radarr und Jellyfin Ordner an – ersetzen die Suche: namarr nimmt den Eintrag direkt, mit voller Sicherheit. TMDB und TheTVDB übersetzen dabei auch fremde IDs (TVDB → TMDB, IMDb → TheTVDB), TVmaze findet Serien über TVDB- und IMDb-IDs.
+## 🛠️ Development
 
-AniDB hat keine Such-API: namarr lädt die tägliche Titelliste (höchstens alle drei Tage) und sucht lokal; Anfragen kommen höchstens alle 2,5 Sekunden und jede Antwort bleibt eine Woche im Cache, weil AniDB zu eifrige Clients sperrt. Bei `S02E05` sucht namarr den Eintrag, dessen Titel die zweite Staffel nennt, und markiert den Treffer zum Prüfen.
-
-### Sprachen
-
-Die Oberfläche gibt es auf Deutsch und Englisch. Beim ersten Besuch entscheidet die Browsersprache (alles außer Deutsch → Englisch), danach der Umschalter unten in der Navigation oder in den Einstellungen; die Wahl liegt im Cookie `namarr_lang`, damit schon das Server-Rendering stimmt. Meldungen vom Server (Gründe in der Vorschau, Fehler) werden zweisprachig übertragen und in der gewählten Sprache angezeigt. Die Sprache der Titel ist davon unabhängig und wird in den Einstellungen gesetzt.
-
-Neue Texte kommen nach `apps/server/src/lib/messages.ts`: `de` gibt die Struktur vor, `en` muss sie erfüllen (prüft tsc), Server-Texte entstehen mit `tr("…", "…")` aus `@namarr/core/i18n`.
-
-### Template-Sprache
-
-```
-{n} ({y})/Season {s00}/{n} ({y}) - {s00e00}{?t} - {t}{/}
-{t|lower}   {n|replace:':':' -'}   {vf|default:'SD'}   {n|ascii}   {e|pad:3}
-{?edition} [{edition}]{/}   {!t}Episode {e}{/}   \{edition-{edition}\}  (Plex)
-```
-
-Tokens: `n` Name, `y` Jahr, `s`/`e`, `s00`, `e00`, `s00e00` (Doppelfolgen: `S02E04-E05`), `sxe`, `t` Episodentitel, `absolute`, `d` Datum, `vf` Auflösung, `vc` Video-Codec, `ac`/`af` Audio, `hdr`, `source`, `group`, `lang`, `edition`, `part`, `id`, `provider`, `orig`, `ext`. Filter: `lower upper title trim replace default pad truncate ascii space first`. Presets: Plex, Jellyfin, Emby, Kodi. Jeder Pfadteil wird pro Zielsystem bereinigt (Windows-verbotene Zeichen, `:` → ` - `, reservierte Namen, 255 Bytes pro Segment, NFC).
-
-### Regeln
-
-Ersetzen (Text oder Regex mit `$1`), Einfügen, Löschen, Schreibweise, Trenner normalisieren, Nummerierung (Start, Schritt, Stellen, natürliche Sortierung), Datum aus der Datei, Erweiterung, Umlaute/Akzente transliterieren, Rest nach Muster abschneiden – jeweils auf Name, Erweiterung oder vollen Pfad, einzeln abschaltbar.
-
-## Entwicklung
+Requires [Bun](https://bun.sh/) 1.4.
 
 ```bash
+git clone https://github.com/firsttris/namarr
+cd namarr
 bun install
-bun run dev          # TanStack Start auf http://localhost:8420 (NAMARR_DEMO=1 für den Demo-Katalog)
-bun run test         # Vitest: core, providers, db, server (unter der Bun-Runtime wegen bun:sqlite)
-bun run e2e          # Build + Playwright: Workbench-Flows gegen Demo-Backend mit Fake-Dateien
-bun run lint         # Biome
-bun run typecheck
-bun run corpus       # Parser gegen den Release-Namen-Korpus, Trefferquote pro Kategorie
-bun run build && bun run start
+NAMARR_DEMO=1 bun run dev   # http://localhost:8420 with an offline demo catalog
 ```
 
-Migrationen: Schema in `packages/db/src/schema.ts` ändern, dann `bun run --cwd packages/db generate`. Sie laufen beim Start automatisch.
+**Stack**: Bun, TanStack Start (React, server functions), TanStack Query and Virtual, Tailwind,
+SQLite with Drizzle, Vitest and Playwright. More in [docs/development.md](docs/development.md).
 
-### Aufbau
+## 🤝 Contributing
 
-```
-packages/
-  core/       Domänenlogik ohne Framework: parser, matcher, formatter, rules, scanner, fileops, jobs
-  providers/  TMDB, TheTVDB, TVmaze, AniDB (Cache, Rate-Limit, Episodenreihenfolgen), Demo-Katalog
-  db/         Drizzle-Schema, Migrationen, Repositories (bun:sqlite)
-apps/
-  server/     TanStack Start: Routen, Server Functions (dünne Adapter mit Zod), Server Routes, Worker
-scripts/      corpus.ts – Parser-Benchmark
-```
+A release name that namarr parses wrong is the most useful issue there is: add it to
+`packages/core/test/corpus/releases.yaml` or paste it into an issue. Pull requests are welcome; please
+run `bun run lint`, `bun run typecheck` and `bun run test` before opening one.
 
-Ein Bun-Prozess: `apps/server/server.ts` führt beim Start die Migrationen aus und startet Job-Queue und Watch-Folder genau einmal (Singleton über `globalThis`, auch im Vite-Dev-Modus). Server Functions legen Jobs nur an; Scan, Match und Ausführung laufen in der Queue, Fortschritt kommt per SSE. Die Workbench rendert clientseitig (`ssr: false`).
+---
 
-### Tests
-
-| Bereich | Was geprüft wird |
-|---|---|
-| Parser | jede Regel einzeln, Ordnerkontext, Snapshots, YAML-Korpus |
-| Matcher | Jaro-Winkler, Jahr, Mehrdeutigkeit (The Office US/UK), Gruppierung (eine Suche pro Serie), Overrides, absolute Nummern |
-| Formatter / Regeln | Template-Sprache inkl. Fehlerpositionen, Presets, Snapshots; Property-Tests (fast-check): Sanitizing ist idempotent und erzeugt nie ungültige Pfade, Regeln ändern nie die Erweiterung |
-| FileOps | in temporären Ordnern: alle Aktionen, Konflikte, Qualitätsvergleich für „Bessere behalten“, Sicherung beim Überschreiben, Undo mit Verweigerung bei veränderten Dateien, Abbruch mitten im Job |
-| Provider | TMDB, TheTVDB, TVmaze und AniDB gegen Antworten im dokumentierten Format (keine Live-API), Cache-TTL, 429-Retry, Anmeldung, Fehlermeldungen, IDs aus Ordnernamen |
-| DB / Server | Migrationen, Paging, Inbox, Dashboard-Zahlen; Job-Pipeline Ende zu Ende, Watch-Folder mit echten Dateien, Auth, SSE, Benachrichtigungen |
-| E2E | Playwright: Vorschau, MatchPicker, Freigabe, Hardlinks, Undo, Regel-Modus, History |
-
-Parser-Korpus (`bun run corpus`), aktuell:
-
-| Kategorie | Namen | Korrekt | Trefferquote |
-|---|---:|---:|---:|
-| Anime | 7 | 7 | 100.0 % |
-| Deutsch | 16 | 16 | 100.0 % |
-| Filme | 29 | 29 | 100.0 % |
-| Serien | 25 | 25 | 100.0 % |
-| **Gesamt** | **77** | **77** | **100.0 %** |
-
-Der Korpus ist ein Anfang (Ziel laut Plan: 500+ echte Namen) und wurde zusammen mit dem Parser geschrieben – die 100 % sagen deshalb wenig. Jeder gemeldete Fehlschlag wird ein neuer Eintrag in `packages/core/test/corpus/releases.yaml`.
-
-## Stand gegenüber der Roadmap
-
-- **M0 Fundament, M1 Core, M2 Web-UI und Docker:** umgesetzt.
-- **M3 Automatisierung:** Watch-Folder, Inbox, gelernte Overrides, Library-Refresh und Benachrichtigungen umgesetzt.
-- **M4 Regel-Modus:** Regel-Engine, RuleStack-UI und Media + Regeln umgesetzt; YAML-Export/-Import von Presets fehlt noch.
-- **M5 Anime:** absolute Nummern, TMDB-Episodengruppen, TheTVDB und AniDB sind da; offen ist die Zuordnung von AniDB-Einträgen auf TVDB-Staffeln (Anime-Listen).
-
-Offen laut Plan: Lizenz (GPL-3.0 oder MIT/Apache-2.0), Namensreservierung, Desktop-App.
+<div align="center">
+<sub>namarr is not affiliated with FileBot, ReNamer, Sonarr, Radarr, TMDB, TheTVDB, TVmaze or AniDB.
+This product uses the TMDB API but is not endorsed or certified by TMDB.</sub>
+</div>

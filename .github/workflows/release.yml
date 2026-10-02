@@ -53,7 +53,10 @@ jobs:
       - name: Prepare README for Docker Hub
         run: |
           BLOB=https://github.com/${{ github.repository }}/blob/main
-          sed -E -e "s#\]\((\./|/)?docker/#](${BLOB}/docker/#g" README.md > dockerhub-readme.md
+          RAW=https://raw.githubusercontent.com/${{ github.repository }}/main
+          # Relative links and images only work on GitHub; Docker Hub needs absolute URLs.
+          sed -E -e "s#\]\((\./|/)?(docker|docs)/#](${BLOB}/\2/#g" \
+            -e "s#src=\"(\./)?docs/#src=\"${RAW}/docs/#g" README.md > dockerhub-readme.md
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v5
         with:
