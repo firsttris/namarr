@@ -17,7 +17,11 @@
     "corpus": "bun scripts/corpus.ts --verbose",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "e2e": "bun run --cwd apps/server build && bun run --cwd apps/server e2e"
+    "e2e": "bun run --cwd apps/server build && bun run --cwd apps/server e2e",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
+    "postversion": "git push --follow-tags"
   },
   "devDependencies": {
     "@types/bun": "latest",
