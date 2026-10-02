@@ -165,6 +165,6 @@ run `bun run lint`, `bun run typecheck` and `bun run test` before opening one.
 ---
 
 <div align="center">
-<sub>namarr is not affiliated with FileBot, ReNamer, Sonarr, Radarr, TMDB, TheTVDB, TVmaze or AniDB.
+<sub>namarr is not affiliated with TMDB, TheTVDB, TVmaze or AniDB.
 This product uses the TMDB API but is not endorsed or certified by TMDB.</sub>
 </div>
