@@ -1,8 +1,12 @@
 name: Release
 
-# Manual only: run from "main" for an edge image, or pick a "v*" tag for latest/x.y.z.
+# Builds and pushes the image. On "main" it becomes :edge; on a "v*" tag :latest, :x.y.z and :x.y.
+# Started by hand (Actions → Release → Run workflow), by the "Tag release" workflow once it has
+# created a new tag, or by pushing a v* tag yourself.
 on:
   workflow_dispatch:
+  push:
+    tags: ["v*"]
 
 permissions:
   contents: read

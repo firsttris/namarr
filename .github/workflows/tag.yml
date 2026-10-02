@@ -1,0 +1,89 @@
+name: Tag release
+
+# Actions → Tag release → Run workflow (from main): runs the full CI, picks the next version after
+# the newest v* tag (or the exact one given), creates the tag vX.Y.Z with a GitHub release and
+# generated notes, then starts the "Release" workflow on that tag, which pushes the image as
+# :x.y.z, :x.y and :latest.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version goes up (no tag yet → from 0.0.0)
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: "Exact version instead, e.g. 0.1.0 (optional)"
+        type: string
+        required: false
+
+permissions:
+  contents: write
+  actions: write
+  packages: write
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  tag:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Start this workflow from main."
+          exit 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: v
+        name: Next version
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXACT: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          latest=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [[ -n "$EXACT" ]]; then
+            version="${EXACT#v}"
+          else
+            IFS=. read -r major minor patch <<< "${latest#v}"
+            major=${major:-0}; minor=${minor:-0}; patch=${patch:-0}
+            case "$BUMP" in
+              major) version="$((major + 1)).0.0" ;;
+              minor) version="${major}.$((minor + 1)).0" ;;
+              patch) version="${major}.${minor}.$((patch + 1))" ;;
+            esac
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Not a version: $version (expected x.y.z)"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::Tag v$version exists already."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "### v$version (previous: ${latest:-none})" >> "$GITHUB_STEP_SUMMARY"
+      - name: Create tag and GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "v$VERSION" --generate-notes \
+            --notes "Docker: \`tristanteu/namarr:$VERSION\` · \`ghcr.io/$GITHUB_REPOSITORY:$VERSION\` (also \`:latest\`)"
+      - name: Build the image for the new tag
+        # A tag created with GITHUB_TOKEN starts no "push" workflows; a dispatch does.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"
+          echo "Image build started: Actions → Release (v$VERSION)" >> "$GITHUB_STEP_SUMMARY"
