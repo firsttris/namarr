@@ -58,7 +58,7 @@ Images are published to `ghcr.io/firsttris/namarr` and `tristanteu/namarr` for `
 | `latest`, `x.y.z` | releases |
 | `edge` | the current state of `main` |
 
-A new version is published with the *Tag release* workflow (see [Releases](development.md#releases));
+A new version is published by pushing a tag `vX.Y.Z` (see [Releases](development.md#releases));
 `edge` is built by hand with the *Release* workflow on `main`. The image contains a static `ffprobe`, so
 resolution and codecs are read even from files whose names say nothing about them.
 

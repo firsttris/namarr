@@ -1,21 +1,16 @@
 name: Release
 
-# Builds and pushes the image, then creates the tag and the GitHub release for a version.
-#   Run by hand on "main"            → :edge, nothing is tagged
-#   Called by "Tag release"          → :x.y.z, :x.y, :latest, then tag vX.Y.Z + GitHub release
-#   A v* tag pushed (or run on a tag) → the same for that tag's version
-# Tag and release are created only after the image is pushed, so there is never a release
-# without an image.
+# Pushing a tag vX.Y.Z publishes that version:
+#   1. the tag must match "version" in package.json
+#   2. the full CI
+#   3. image as :x.y.z, :x.y and :latest on Docker Hub and GHCR
+#   4. GitHub release with generated notes, only after the image is out
+# New version: npm version patch|minor|major && git push --follow-tags
+# Run by hand on main: the same checks, then the image as :edge; nothing is released.
 on:
-  workflow_dispatch:
   push:
     tags: ["v*"]
-  workflow_call:
-    inputs:
-      version:
-        description: Version to publish, x.y.z
-        type: string
-        required: true
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -25,23 +20,22 @@ env:
   IMAGE: tristanteu/namarr
 
 jobs:
-  image:
+  verify:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.v.outputs.version }}
     steps:
-      - id: v
-        name: Version
-        env:
-          CALLED: ${{ inputs.version }}
-        run: |
-          if [[ -n "$CALLED" ]]; then
-            echo "version=${CALLED#v}" >> "$GITHUB_OUTPUT"
-          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=" >> "$GITHUB_OUTPUT"   # edge
-          fi
+      - uses: actions/checkout@v4
+      - name: Tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "v$(jq -r .version package.json)" = "$GITHUB_REF_NAME"
+
+  checks:
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -62,10 +56,10 @@ jobs:
             ghcr.io/${{ github.repository }}
             ${{ env.IMAGE }}
           tags: |
-            type=semver,pattern={{version}},value=${{ steps.v.outputs.version }},enable=${{ steps.v.outputs.version != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.v.outputs.version }},enable=${{ steps.v.outputs.version != '' }}
-            type=raw,value=latest,enable=${{ steps.v.outputs.version != '' }}
-            type=raw,value=edge,enable=${{ steps.v.outputs.version == '' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=edge,branch=main
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -95,23 +89,13 @@ jobs:
 
   github-release:
     needs: image
-    if: needs.image.outputs.version != ''
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Tag and release v${{ needs.image.outputs.version }}
+      - name: GitHub release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.image.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release v$VERSION exists already."
-            exit 0
-          fi
-          # Creates the tag on the built commit when it does not exist yet (call from
-          # "Tag release"); a pushed tag is used as it is. A tag made with GITHUB_TOKEN starts
-          # no further workflows, so this does not run twice.
-          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "v$VERSION" --generate-notes \
-            --notes "Docker: \`tristanteu/namarr:$VERSION\` · \`ghcr.io/$GITHUB_REPOSITORY:$VERSION\` (also \`:latest\`)"
-          echo "### Released v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && exit 0
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
+            --notes "Docker: \`tristanteu/namarr:${GITHUB_REF_NAME#v}\` · \`ghcr.io/$GITHUB_REPOSITORY:${GITHUB_REF_NAME#v}\` (also \`:latest\`)"

@@ -70,19 +70,22 @@ The corpus is a start (the goal is 500+ real names) and was written together wit
 
 ## Releases
 
-**A new version**: Actions → *Tag release* → Run workflow on `main`, pick `patch`, `minor` or `major`
-(or enter an exact version such as `0.1.0`). In one run it
+A version is a tag. On `main`, with a clean working tree:
 
-1. takes the newest `v*` tag (none yet: `0.0.0`) and computes the next version,
-2. runs the full CI (lint, typecheck, tests, parser benchmark, build, E2E),
-3. calls the *Release* workflow, which pushes `x.y.z`, `x.y` and `latest` to Docker Hub and GHCR,
-   updates the Docker Hub description and **only then** creates the tag `vX.Y.Z` with a GitHub
-   release and generated notes. A failed build leaves no tag and no release behind.
+```bash
+npm version minor          # or patch / major: bumps package.json, commits, tags vX.Y.Z
+git push --follow-tags     # pushes the commit and the tag
+```
 
-**A tag pushed by hand** (`git push origin v0.2.0`) runs *Release* the same way: image first, then
-the GitHub release for that tag.
+The tag push starts the *Release* workflow:
 
-**An edge image**: Actions → *Release* → Run workflow on `main` pushes `edge` and tags nothing.
+1. the tag must match `version` in the root `package.json`,
+2. the full CI (lint, typecheck, tests, parser benchmark, build, E2E),
+3. the image as `x.y.z`, `x.y` and `latest` on Docker Hub and GHCR, plus the Docker Hub description,
+4. only then the GitHub release with generated notes.
+
+Started by hand on `main` (Actions → *Release* → Run workflow), the workflow runs the same checks and
+pushes the image as `edge`; nothing is released.
 
 CI runs lint, typecheck, tests, the parser benchmark, the build and the E2E tests on every push to
 `main` and on every pull request.
