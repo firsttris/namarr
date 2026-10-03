@@ -12,3 +12,6 @@ coverage
 test-results
 playwright-report
 **/e2e/.tmp
+
+# Paraglide (generated from apps/server/messages/*.json)
+apps/server/src/paraglide

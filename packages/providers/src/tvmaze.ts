@@ -1,5 +1,5 @@
 import type { EpisodeInfo, ExternalIds, MediaCandidate, MetadataProvider } from "@namarr/core";
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import type { ProviderCache } from "./cache.ts";
 import { ProviderError, ProviderHttp, yearOf } from "./http.ts";
 
@@ -66,9 +66,9 @@ export class TvmazeProvider implements MetadataProvider {
   }
 
   async details(kind: "movie" | "series", id: string) {
-    if (kind === "movie") throw new ProviderError(tr("TVmaze kennt keine Filme", "TVmaze has no movies"));
+    if (kind === "movie") throw new ProviderError(msg("providers_tvmaze_noMovies"));
     const show = await this.get<TvmazeShow>(`/shows/${id}`, this.ttl.details);
-    if (!show) throw new ProviderError(tr(`TVmaze: ID ${id} nicht gefunden`, `TVmaze: ID ${id} not found`), 404);
+    if (!show) throw new ProviderError(msg("providers_tvmaze_idNotFound", { id }), 404);
     return this.show(show);
   }
 

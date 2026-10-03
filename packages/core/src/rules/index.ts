@@ -1,6 +1,6 @@
 import { sanitizeSegment } from "../formatter/sanitize.ts";
 import { FILTERS } from "../formatter/template.ts";
-import { tr } from "../i18n.ts";
+import { msg } from "../i18n.ts";
 import type { FileMeta } from "../metadata/index.ts";
 
 /** Which part of the path a rule rewrites. */
@@ -88,10 +88,7 @@ function pattern(find: string, regex: boolean | undefined, flags: string, index:
   try {
     return new RegExp(regex ? find : escapeRegex(find), flags);
   } catch (e) {
-    throw new RuleError(
-      tr(`Ungültiger regulärer Ausdruck: ${(e as Error).message}`, `Invalid regular expression: ${(e as Error).message}`),
-      index,
-    );
+    throw new RuleError(msg("rules_error_invalidRegex", { error: (e as Error).message }), index);
   }
 }
 
@@ -285,39 +282,41 @@ export function applyRules(entries: RuleEntry[], rules: Rule[]): string[] {
 export function describeRule(rule: Rule): string {
   switch (rule.type) {
     case "replace":
-      return tr(`Ersetzen ${rule.find} → "${rule.replace}"`, `Replace ${rule.find} → "${rule.replace}"`);
+      return msg("rules_describe_replace", { find: rule.find, replace: rule.replace });
     case "insert":
-      return tr(`Einfügen "${rule.text}"`, `Insert "${rule.text}"`);
+      return msg("rules_describe_insert", { text: rule.text });
     case "remove":
-      return tr(`Löschen ab ${rule.from}`, `Delete from ${rule.from}`);
+      return msg("rules_describe_delete", { from: rule.from });
     case "case":
-      return tr(`Schreibweise: ${rule.mode}`, `Case: ${rule.mode}`);
+      return msg("rules_describe_case", { mode: rule.mode });
     case "separators":
-      return tr(`Trenner: "${rule.separator}"`, `Separator: "${rule.separator}"`);
+      return msg("rules_describe_separator", { separator: rule.separator });
     case "numbering":
-      return tr(`Nummerierung ab ${rule.start ?? 1}`, `Numbering from ${rule.start ?? 1}`);
+      return msg("rules_describe_numbering", { start: rule.start ?? 1 });
     case "date":
-      return tr(`Datum ${rule.format ?? "YYYY-MM-DD"}`, `Date ${rule.format ?? "YYYY-MM-DD"}`);
+      return msg("rules_describe_date", { format: rule.format ?? "YYYY-MM-DD" });
     case "extension":
-      return tr(`Erweiterung ${rule.to ?? rule.case ?? ""}`, `Extension ${rule.to ?? rule.case ?? ""}`);
+      return msg("rules_describe_extension", { extension: rule.to ?? rule.case ?? "" });
     case "transliterate":
-      return tr("Umlaute ersetzen ä → ae", "Transliterate ä → ae");
+      return msg("rules_describe_transliterate");
     case "cutAfter":
-      return tr(`Abschneiden ab "${rule.pattern}"`, `Cut from "${rule.pattern}"`);
+      return msg("rules_describe_cut", { pattern: rule.pattern });
     case "pad":
-      return tr(`Zahlen auf ${rule.digits} Stellen`, `Numbers to ${rule.digits} digits`);
+      return msg("rules_describe_pad", { digits: rule.digits });
     case "cleanup":
-      return tr("Aufräumen: Klammern, Leerzeichen", "Clean up: brackets, spaces");
+      return msg("rules_describe_cleanup");
     case "strip":
-      return tr(
-        `Entfernen: ${[rule.digits && "Ziffern", rule.symbols && "Sonderzeichen", rule.chars && `„${rule.chars}“`].filter(Boolean).join(", ") || "–"}`,
-        `Strip: ${[rule.digits && "digits", rule.symbols && "symbols", rule.chars && `"${rule.chars}"`].filter(Boolean).join(", ") || "–"}`,
-      );
+      return msg("rules_describe_strip", {
+        parts:
+          [rule.digits && msg("rules_describe_digits"), rule.symbols && msg("rules_describe_symbols"), rule.chars && `"${rule.chars}"`]
+            .filter(Boolean)
+            .join(", ") || "–",
+      });
     case "rearrange":
-      return tr(`Umsortieren an "${rule.delimiter}" → ${rule.pattern}`, `Rearrange at "${rule.delimiter}" → ${rule.pattern}`);
+      return msg("rules_describe_rearrange", { delimiter: rule.delimiter, pattern: rule.pattern });
     case "list":
-      return tr(`Namensliste (${rule.names.length})`, `Name list (${rule.names.length})`);
+      return msg("rules_describe_list", { count: rule.names.length });
     case "metadata":
-      return tr(`Aus der Datei: ${rule.template}`, `From the file: ${rule.template}`);
+      return msg("rules_describe_metadata", { template: rule.template });
   }
 }

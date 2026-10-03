@@ -1,5 +1,6 @@
 import { type Lang, langOf } from "@namarr/core/i18n";
 import type { Settings } from "@namarr/db";
+import * as m from "~/paraglide/messages";
 
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -7,11 +8,11 @@ export type JobSummary = { jobId: number; done: number; failed: number; skipped:
 
 /** The notification text, in the language set for titles (`de-DE` → German, else English). */
 export function summaryText(s: JobSummary, lang: Lang = "de"): string {
-  const de = lang === "de";
-  const parts = [de ? `${s.done} umbenannt` : `${s.done} renamed`];
-  if (s.skipped) parts.push(de ? `${s.skipped} übersprungen` : `${s.skipped} skipped`);
-  if (s.failed) parts.push(de ? `${s.failed} fehlgeschlagen` : `${s.failed} failed`);
-  return `namarr Job #${s.jobId}: ${parts.join(", ")} (${s.source})`;
+  const locale = { locale: lang };
+  const parts = [m.notify_renamed({ n: s.done }, locale)];
+  if (s.skipped) parts.push(m.notify_skipped({ n: s.skipped }, locale));
+  if (s.failed) parts.push(m.notify_failed({ n: s.failed }, locale));
+  return m.notify_summary({ id: s.jobId, parts: parts.join(", "), source: s.source }, locale);
 }
 
 /** Builds the HTTP request for one notification target. Exported for tests. */

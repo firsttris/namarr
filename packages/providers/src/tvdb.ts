@@ -1,5 +1,5 @@
 import type { EpisodeInfo, EpisodeOrder, ExternalIds, MediaCandidate, MetadataProvider } from "@namarr/core";
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import type { ProviderCache } from "./cache.ts";
 import { lang3, ProviderError, ProviderHttp, yearOf } from "./http.ts";
 import { isPlaceholderTitle } from "./tmdb.ts";
@@ -65,10 +65,10 @@ export class TvdbProvider implements MetadataProvider {
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify(this.options.pin ? { apikey: this.options.apiKey, pin: this.options.pin } : { apikey: this.options.apiKey }),
       });
-      if (res.status === 401) throw new ProviderError(tr("TheTVDB: API-Key oder PIN ungültig", "TheTVDB: invalid API key or PIN"), 401);
+      if (res.status === 401) throw new ProviderError(msg("providers_tvdb_invalidKey"), 401);
       if (!res.ok) throw new ProviderError(`TheTVDB: HTTP ${res.status}`, res.status);
       const body = (await res.json()) as { data?: { token?: string } };
-      if (!body.data?.token) throw new ProviderError(tr("TheTVDB: Anmeldung ohne Token", "TheTVDB: login returned no token"));
+      if (!body.data?.token) throw new ProviderError(msg("providers_tvdb_noToken"));
       return body.data.token;
     })();
     this.token.catch(() => (this.token = undefined));
@@ -93,7 +93,7 @@ export class TvdbProvider implements MetadataProvider {
           continue;
         }
         if (res.status === 404) return undefined as T;
-        if (res.status === 401) throw new ProviderError(tr("TheTVDB: API-Key oder PIN ungültig", "TheTVDB: invalid API key or PIN"), 401);
+        if (res.status === 401) throw new ProviderError(msg("providers_tvdb_invalidKey"), 401);
         if (!res.ok) throw new ProviderError(`TheTVDB: HTTP ${res.status}`, res.status);
         return (await res.json()) as T;
       }
@@ -138,7 +138,7 @@ export class TvdbProvider implements MetadataProvider {
 
   async details(kind: "movie" | "series", id: string, opts?: { language?: string }): Promise<MediaCandidate> {
     const found = await this.record(kind, id, this.language(opts));
-    if (!found) throw new ProviderError(tr(`TheTVDB: ID ${id} nicht gefunden`, `TheTVDB: ID ${id} not found`), 404);
+    if (!found) throw new ProviderError(msg("providers_tvdb_idNotFound", { id }), 404);
     return found;
   }
 

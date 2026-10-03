@@ -8,7 +8,9 @@ import { cancelJob, undoJob } from "~/functions/jobs.functions";
 import { approveInbox, getDashboard } from "~/functions/library.functions";
 import { useLive } from "~/lib/events";
 import { ago, greeting, num, pct } from "~/lib/format";
-import { useT } from "~/lib/i18n";
+import { localeOf, pickMsg } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
+import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/")({
   loader: () => getDashboard(),
@@ -16,9 +18,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const t = useT();
-  const d = t.dashboard;
-  const n = (x: number) => num(x, t.locale);
+  const n = (x: number) => num(x, localeOf());
   const initial = Route.useLoaderData();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -42,7 +42,7 @@ function Dashboard() {
 
   return (
     <>
-      <PageHeader title={greeting(t)} subtitle={d.subtitle(activeFolders, stats.inboxOpen)}>
+      <PageHeader title={greeting()} subtitle={m.dashboard_subtitle({ folders: activeFolders, inbox: stats.inboxOpen })}>
         <form
           role="search"
           className="flex h-11 w-80 items-center gap-2 rounded-[10px] border border-line-2 bg-[#161920] px-3.5"
@@ -55,42 +55,42 @@ function Dashboard() {
             <SearchIcon />
           </span>
           <label htmlFor="q" className="sr-only">
-            {d.search}
+            {m.dashboard_search()}
           </label>
           <input
             id="q"
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={d.searchPlaceholder}
+            placeholder={m.dashboard_searchPlaceholder()}
             className="flex-grow border-0 bg-transparent text-sm text-ink outline-none"
           />
         </form>
         <Link to="/rename" className="no-underline">
           <Button variant="accent" size="lg">
-            <PlusIcon /> {d.newJob}
+            <PlusIcon /> {m.dashboard_newJob()}
           </Button>
         </Link>
       </PageHeader>
 
-      <section aria-label={d.stats} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Stat label={d.renamedToday} value={n(stats.renamedToday)} unit={d.files} />
-        <Stat label={d.inboxOpen} value={n(stats.inboxOpen)} unit={d.needYou} highlight={stats.inboxOpen > 0} />
-        <Stat label={d.autoRate} value={stats.autoRate === null ? "–" : pct(stats.autoRate)} unit={d.last7Days} />
-        <Stat label={d.undoable} value={n(stats.undoable)} unit={t.common.operations} />
+      <section aria-label={m.dashboard_stats()} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <Stat label={m.dashboard_renamedToday()} value={n(stats.renamedToday)} unit={m.dashboard_files()} />
+        <Stat label={m.dashboard_inboxOpen()} value={n(stats.inboxOpen)} unit={m.dashboard_needYou()} highlight={stats.inboxOpen > 0} />
+        <Stat label={m.dashboard_autoRate()} value={stats.autoRate === null ? "–" : pct(stats.autoRate)} unit={m.dashboard_last7Days()} />
+        <Stat label={m.dashboard_undoable()} value={n(stats.undoable)} unit={m.common_operations()} />
       </section>
 
       <ErrorNote error={approve.error ?? undo.error ?? cancel.error} />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Panel aria-labelledby="inbox-h" className="flex flex-col">
-          <PanelHeader title={d.waiting} id="inbox-h">
+          <PanelHeader title={m.dashboard_waiting()} id="inbox-h">
             <Button onClick={() => approve.mutate({ minConfidence: 0.8 })} disabled={approve.isPending || !data.inboxTotal}>
-              {d.approveAbove80}
+              {m.dashboard_approveAbove80()}
             </Button>
           </PanelHeader>
           {data.inbox.length === 0 ? (
-            <p className="m-0 px-5 py-8 text-sm text-muted">{d.inboxEmpty}</p>
+            <p className="m-0 px-5 py-8 text-sm text-muted">{m.dashboard_inboxEmpty()}</p>
           ) : (
             data.inbox.map((entry, i) => (
               <InboxRow
@@ -103,16 +103,16 @@ function Dashboard() {
             ))
           )}
           <Link to="/inbox" className="mt-auto border-t border-line px-5 py-3.5 text-[13px] font-medium no-underline">
-            {d.inboxAll(data.inboxTotal)}
+            {m.dashboard_inboxAll({ n: data.inboxTotal })}
           </Link>
         </Panel>
 
         <Panel aria-labelledby="watch-h" className="flex flex-col">
-          <PanelHeader title={t.nav.watch} id="watch-h" />
+          <PanelHeader title={m.nav_watch()} id="watch-h" />
           <div className="flex flex-col gap-3 p-4">
             {data.watchFolders.length === 0 && (
               <p className="m-0 text-sm text-muted">
-                {d.noWatchFolders} <Link to="/watch">{d.createNow}</Link>
+                {m.dashboard_noWatchFolders()} <Link to="/watch">{m.dashboard_createNow()}</Link>
               </p>
             )}
             {data.watchFolders.map((f) => (
@@ -121,15 +121,15 @@ function Dashboard() {
                   <span className={cx("h-2 w-2 rounded-full", !f.enabled ? "bg-faint" : f.inboxCount ? "bg-accent" : "bg-info")} />
                   <div className="flex-grow text-sm font-semibold">{f.name}</div>
                   <div className={cx("text-xs", f.inboxCount ? "text-accent" : "text-muted")}>
-                    {f.inboxCount ? d.inInbox(f.inboxCount) : f.enabled ? ago(t, f.lastEventAt) : d.paused}
+                    {f.inboxCount ? m.dashboard_inInbox({ n: f.inboxCount }) : f.enabled ? ago(f.lastEventAt) : m.dashboard_paused()}
                   </div>
                 </div>
                 <div className="font-mono text-xs text-soft">
                   {f.path} → {f.targetRoot}
                 </div>
                 <div className="flex gap-1.5">
-                  <Chip>{f.autoThreshold === null ? d.alwaysReview : d.autoFrom(pct(f.autoThreshold))}</Chip>
-                  <Chip>{d.stableSeconds(f.stableSeconds)}</Chip>
+                  <Chip>{f.autoThreshold === null ? m.dashboard_alwaysReview() : m.dashboard_autoFrom({ pct: pct(f.autoThreshold) })}</Chip>
+                  <Chip>{m.dashboard_stableSeconds({ n: f.stableSeconds })}</Chip>
                 </div>
               </div>
             ))}
@@ -140,20 +140,20 @@ function Dashboard() {
       <Panel aria-labelledby="jobs-h">
         <div className="flex items-center border-b border-line px-5 py-[18px]">
           <h2 id="jobs-h" className="m-0 flex-grow text-base font-semibold">
-            {d.recentJobs}
+            {m.dashboard_recentJobs()}
           </h2>
           <Link to="/history" className="text-[13px] font-medium no-underline">
-            {d.toHistory}
+            {m.dashboard_toHistory()}
           </Link>
         </div>
         <div className="grid grid-cols-[90px_minmax(0,1fr)_160px_220px_120px] gap-4 border-b border-row px-5 py-2.5 text-xs text-muted">
-          <div>{d.job}</div>
-          <div>{t.common.source}</div>
-          <div>{d.trigger}</div>
-          <div>{d.progress}</div>
-          <div className="text-right">{t.common.action}</div>
+          <div>{m.dashboard_job()}</div>
+          <div>{m.common_source()}</div>
+          <div>{m.dashboard_trigger()}</div>
+          <div>{m.dashboard_progress()}</div>
+          <div className="text-right">{m.common_action()}</div>
         </div>
-        {data.jobs.length === 0 && <p className="m-0 px-5 py-6 text-sm text-muted">{d.noJobs}</p>}
+        {data.jobs.length === 0 && <p className="m-0 px-5 py-6 text-sm text-muted">{m.dashboard_noJobs()}</p>}
         {data.jobs.map((job, i) => {
           const live = progress[job.id];
           const status = live?.status ?? job.status;
@@ -176,30 +176,32 @@ function Dashboard() {
               </div>
               <div className="text-soft">
                 {job.kind === "watch"
-                  ? d.triggerWatch
+                  ? m.dashboard_triggerWatch()
                   : job.kind === "hook"
-                    ? d.triggerHook
+                    ? m.dashboard_triggerHook()
                     : job.config.mode === "rules"
-                      ? d.triggerRules
-                      : d.triggerWorkbench}
-                <span className="block text-xs text-faint">{t.actions[job.config.action] ?? job.config.action}</span>
+                      ? m.dashboard_triggerRules()
+                      : m.dashboard_triggerWorkbench()}
+                <span className="block text-xs text-faint">{pickMsg(msgGroup.actions, job.config.action) ?? job.config.action}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Progress value={total ? done / total : status === "done" ? 1 : 0} tone={running ? "accent" : "info"} />
-                <span className="text-xs whitespace-nowrap text-soft">{total ? `${n(done)} / ${n(total)}` : t.jobStatus[status]}</span>
+                <span className="text-xs whitespace-nowrap text-soft">
+                  {total ? `${n(done)} / ${n(total)}` : pickMsg(msgGroup.jobStatus, status)}
+                </span>
               </div>
               <div className="text-right">
                 {running ? (
                   <Button size="sm" onClick={() => cancel.mutate(job.id)}>
-                    {t.common.cancel}
+                    {m.common_cancel()}
                   </Button>
                 ) : status === "done" && job.config.action !== "test" ? (
                   <Button size="sm" onClick={() => undo.mutate(job.id)} disabled={undo.isPending}>
-                    {t.common.undo}
+                    {m.common_undo()}
                   </Button>
                 ) : (
                   <Link to="/rename" search={{ job: job.id }} className="no-underline">
-                    <Button size="sm">{t.common.open}</Button>
+                    <Button size="sm">{m.common_open()}</Button>
                   </Link>
                 )}
               </div>

@@ -1,6 +1,6 @@
-import { localize } from "@namarr/core/i18n";
 import { countItemsByState, getJob } from "@namarr/db";
 import { createFileRoute } from "@tanstack/react-router";
+import { localizeIn } from "~/lib/i18n";
 import { isAuthenticated } from "~/server/auth.server";
 import { runtime } from "~/server/runtime.server";
 
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/api/jobs/$jobId")({
           status: job.status,
           progress: { done: job.progressDone, total: job.progressTotal },
           items: countItemsByState(rt.db, job.id),
-          error: localize(job.error, "en"),
+          error: localizeIn(job.error, "en"),
         });
       },
     },

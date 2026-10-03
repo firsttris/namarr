@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { matchAll, parse } from "@namarr/core";
-import { localize } from "@namarr/core/i18n";
 import { describe, expect, it } from "vitest";
+import { text } from "../../core/test/text.ts";
 import { AnidbProvider, MemoryCache, type ProviderError, parseTitleDump } from "../src/index.ts";
 import { parseXml } from "../src/xml.ts";
 import { fakeFetch, gzip } from "./fake-fetch.ts";
@@ -98,9 +98,9 @@ describe("AniDB-Provider", () => {
     expect(await anidb().provider.findById("series", { anidb: "99" })).toBeUndefined();
     const banned = anidb({ [`${API}&aid=1`]: '<error code="555">Banned</error>' }).provider;
     const err = await banned.details("series", "1").catch((e: ProviderError) => e);
-    expect(localize((err as Error).message, "de")).toBe("AniDB: zu viele Anfragen, vorübergehend gesperrt");
+    expect(text((err as Error).message, "de")).toBe("AniDB: zu viele Anfragen, vorübergehend gesperrt");
     const client = anidb({ [`${API}&aid=2`]: '<error code="302">client version missing or invalid</error>' }).provider;
-    expect(localize(((await client.details("series", "2").catch((e) => e)) as Error).message, "en")).toBe(
+    expect(text(((await client.details("series", "2").catch((e) => e)) as Error).message, "en")).toBe(
       "AniDB: client not registered or wrong version",
     );
   });

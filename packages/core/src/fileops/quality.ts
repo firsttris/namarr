@@ -1,4 +1,4 @@
-import { tr } from "../i18n.ts";
+import { msg } from "../i18n.ts";
 import type { ProbeInfo } from "../scanner/index.ts";
 import type { ReleaseInfo } from "../types.ts";
 
@@ -27,7 +27,7 @@ const CODEC: Record<string, number> = { AV1: 3, "H.265": 2, VP9: 2, "H.264": 1, 
 const AUDIO: Record<string, number> = { TrueHD: 5, "DTS-HD": 5, FLAC: 4, "DD+": 3, DTS: 3, AC3: 2, AAC: 1, Opus: 1, MP3: 0 };
 
 type Criterion = {
-  /** May carry tr() markers; they are localized inside the reason text. */
+  /** May be a message (msg()); it is localized inside the reason text. */
   label: string;
   rank: (q: Quality) => number | undefined;
   show: (q: Quality) => string;
@@ -35,10 +35,10 @@ type Criterion = {
 
 /** Most important first; the first criterion where both files differ decides. */
 const CRITERIA: Criterion[] = [
-  { label: tr("Auflösung", "Resolution"), rank: (q) => lookup(RESOLUTION, q.resolution), show: (q) => q.resolution! },
-  { label: tr("Quelle", "Source"), rank: (q) => lookup(SOURCE, q.source), show: (q) => q.source! },
+  { label: msg("quality_resolution"), rank: (q) => lookup(RESOLUTION, q.resolution), show: (q) => q.resolution! },
+  { label: msg("quality_source"), rank: (q) => lookup(SOURCE, q.source), show: (q) => q.source! },
   { label: "HDR", rank: (q) => lookup(HDR, q.hdr), show: (q) => q.hdr! },
-  { label: tr("Video-Codec", "Video codec"), rank: (q) => lookup(CODEC, q.videoCodec), show: (q) => q.videoCodec! },
+  { label: msg("quality_videoCodec"), rank: (q) => lookup(CODEC, q.videoCodec), show: (q) => q.videoCodec! },
   {
     label: "Audio",
     // Codec first, channels within the same codec: 7.1 beats 5.1 beats 2.0.
@@ -49,7 +49,7 @@ const CRITERIA: Criterion[] = [
     show: (q) => [q.audioCodec, q.audioChannels].filter(Boolean).join(" "),
   },
   { label: "Proper/Repack", rank: (q) => q.revision, show: (q) => (q.revision ? "Proper" : "–") },
-  { label: tr("Dateigröße", "File size"), rank: (q) => q.size, show: (q) => formatSize(q.size!) },
+  { label: msg("quality_fileSize"), rank: (q) => q.size, show: (q) => formatSize(q.size!) },
 ];
 
 function lookup(table: Record<string, number>, value: string | undefined): number | undefined {

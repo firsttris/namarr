@@ -1,4 +1,4 @@
-import { tr } from "../i18n.ts";
+import { msg } from "../i18n.ts";
 
 /**
  * Template language, close to FileBot:
@@ -97,7 +97,7 @@ export function parseTemplate(template: string): Node[] {
       i += 2;
       continue;
     }
-    if (ch === "}") throw new TemplateError(tr("Unerwartete '}'", "Unexpected '}'"), i);
+    if (ch === "}") throw new TemplateError(msg("template_error_unexpectedClose"), i);
     if (ch !== "{") {
       pushText(ch);
       i++;
@@ -105,16 +105,16 @@ export function parseTemplate(template: string): Node[] {
     }
     const start = i;
     const end = findClose(template, i + 1);
-    if (end < 0) throw new TemplateError(tr("Fehlende '}'", "Missing '}'"), start);
+    if (end < 0) throw new TemplateError(msg("template_error_missingClose"), start);
     const body = template.slice(i + 1, end).trim();
     i = end + 1;
     if (body === "/") {
-      if (!stack.pop()) throw new TemplateError(tr("'{/}' ohne öffnenden Block", "'{/}' without an opening block"), start);
+      if (!stack.pop()) throw new TemplateError(msg("template_error_endWithoutBlock"), start);
       continue;
     }
     if (body.startsWith("?") || body.startsWith("!")) {
       const name = body.slice(1).trim();
-      if (!/^[a-z0-9]+$/i.test(name)) throw new TemplateError(tr(`Ungültige Bedingung '${body}'`, `Invalid condition '${body}'`), start);
+      if (!/^[a-z0-9]+$/i.test(name)) throw new TemplateError(msg("template_error_invalidCondition", { body }), start);
       const node: Extract<Node, { type: "if" }> = { type: "if", name, negate: body[0] === "!", children: [] };
       current().push(node);
       stack.push({ node, start });
@@ -123,11 +123,7 @@ export function parseTemplate(template: string): Node[] {
     current().push(parseToken(body, start));
   }
   const open = stack.pop();
-  if (open)
-    throw new TemplateError(
-      tr(`Block '{?${open.node.name}}' wird nicht mit '{/}' geschlossen`, `Block '{?${open.node.name}}' is not closed with '{/}'`),
-      open.start,
-    );
+  if (open) throw new TemplateError(msg("template_error_unclosedBlock", { name: open.node.name }), open.start);
   return root;
 }
 
@@ -149,10 +145,10 @@ function findClose(s: string, from: number): number {
 function parseToken(body: string, position: number): Node {
   const parts = splitOutside(body, "|");
   const name = parts.shift()!.trim();
-  if (!/^[a-z0-9]+$/i.test(name)) throw new TemplateError(tr(`Ungültiges Token '{${body}}'`, `Invalid token '{${body}}'`), position);
+  if (!/^[a-z0-9]+$/i.test(name)) throw new TemplateError(msg("template_error_invalidToken", { body }), position);
   const filters = parts.map((raw) => {
     const [filterName = "", ...args] = splitOutside(raw.trim(), ":");
-    if (!FILTERS[filterName]) throw new TemplateError(tr(`Unbekannter Filter '${filterName}'`, `Unknown filter '${filterName}'`), position);
+    if (!FILTERS[filterName]) throw new TemplateError(msg("template_error_unknownFilter", { filterName }), position);
     return { name: filterName, args: args.map(unquote) };
   });
   return { type: "token", name, filters };

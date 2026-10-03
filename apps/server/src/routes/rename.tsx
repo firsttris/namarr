@@ -18,8 +18,10 @@ import { cancelJob, createJob, executeJob, getJob, getJobItems, recomputePreview
 import { getProfiles, getSettingsFn } from "~/functions/library.functions";
 import { useLive } from "~/lib/events";
 import { num, pct } from "~/lib/format";
-import { type Messages, useLocalize, useT } from "~/lib/i18n";
+import { localeOf, pickMsg, useLocalize } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
 import { SERIES_SOURCES } from "~/lib/providers";
+import * as m from "~/paraglide/messages";
 
 type Mode = "media" | "rules" | "both";
 
@@ -42,22 +44,20 @@ function Workbench() {
 }
 
 function ModeToggle({ value, onChange }: { value: Mode; onChange: (m: Mode) => void }) {
-  const t = useT();
-  const labels = t.modes;
   return (
-    <div role="group" aria-label={t.common.mode} className="flex rounded-[10px] border border-line-2 bg-[#161920] p-1">
-      {(Object.keys(labels) as Mode[]).map((m) => (
+    <div role="group" aria-label={m.common_mode()} className="flex rounded-[10px] border border-line-2 bg-[#161920] p-1">
+      {(Object.keys(msgGroup.modes) as Mode[]).map((mode) => (
         <button
-          key={m}
+          key={mode}
           type="button"
-          aria-pressed={value === m}
-          onClick={() => onChange(m)}
+          aria-pressed={value === mode}
+          onClick={() => onChange(mode)}
           className={cx(
             "h-9 cursor-pointer rounded-[7px] border-0 px-4 text-[13px]",
-            value === m ? "bg-toggle font-semibold text-white" : "bg-transparent text-soft",
+            value === mode ? "bg-toggle font-semibold text-white" : "bg-transparent text-soft",
           )}
         >
-          {labels[m]}
+          {msgGroup.modes[mode]()}
         </button>
       ))}
     </div>
@@ -82,7 +82,6 @@ function Breadcrumb({ path }: { path?: string }) {
 // ---------- start: choose folder, mode, profile ----------
 
 function NewJob() {
-  const t = useT();
   const search = Route.useSearch();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>(search.mode ?? "media");
@@ -97,15 +96,15 @@ function NewJob() {
     <>
       <header className="flex items-center gap-4">
         <div className="flex flex-grow flex-col gap-1">
-          <h1 className="m-0 font-display text-[28px] font-bold tracking-[-0.02em]">{t.workbench.title}</h1>
-          <div className="text-[13px] text-muted">{t.workbench.intro}</div>
+          <h1 className="m-0 font-display text-[28px] font-bold tracking-[-0.02em]">{m.workbench_title()}</h1>
+          <div className="text-[13px] text-muted">{m.workbench_intro()}</div>
         </div>
         <Select
-          aria-label={t.common.profile}
+          aria-label={m.common_profile()}
           value={profileId ?? ""}
           onChange={(e) => setProfileId(e.target.value ? Number(e.target.value) : undefined)}
         >
-          <option value="">{t.workbench.noProfile}</option>
+          <option value="">{m.workbench_noProfile()}</option>
           {profiles.data?.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -119,7 +118,7 @@ function NewJob() {
         <FolderBrowser
           initial={search.path}
           onChoose={(p) => create.mutate(p)}
-          chooseLabel={create.isPending ? t.workbench.creating : t.workbench.createPreview}
+          chooseLabel={create.isPending ? m.workbench_creating() : m.workbench_createPreview()}
         />
       </Panel>
     </>
@@ -151,10 +150,8 @@ function useDebounced<T>(value: T, ms: number): T {
 type Config = { mode: Mode; preset: string; template: { movie?: string; episode?: string }; rules: Rule[] };
 
 function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: number }) {
-  const t = useT();
-  const wb = t.workbench;
   const localize = useLocalize();
-  const n = (x: number) => num(x, t.locale);
+  const n = (x: number) => num(x, localeOf());
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { progress } = useLive();
@@ -295,14 +292,14 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
     <>
       <header className="flex items-center gap-4">
         <div className="flex min-w-0 flex-grow flex-col gap-1">
-          <h1 className="m-0 font-display text-[28px] font-bold tracking-[-0.02em]">{wb.title}</h1>
+          <h1 className="m-0 font-display text-[28px] font-bold tracking-[-0.02em]">{m.workbench_title()}</h1>
           <div className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] text-muted">
             <span className="truncate">
               <Breadcrumb path={j?.sourcePaths[0]} />
             </span>
             {j && j.sourcePaths.length > 1 && <span>+{j.sourcePaths.length - 1}</span>}
             <Link to="/rename" search={{}} className="ml-2 font-sans text-[13px] no-underline">
-              {wb.changeFolder}
+              {m.workbench_changeFolder()}
             </Link>
           </div>
         </div>
@@ -313,7 +310,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
         {config?.mode !== "rules" && (
           <>
             <label htmlFor="prov" className="text-[13px] text-muted">
-              {t.common.seriesSource}
+              {m.common_seriesSource()}
             </label>
             <Select
               id="prov"
@@ -322,41 +319,41 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
             >
               {SERIES_SOURCES.map((p) => (
                 <option key={p} value={p}>
-                  {t.providers[p]}
+                  {pickMsg(msgGroup.providers, p)}
                 </option>
               ))}
             </Select>
             <label htmlFor="order" className="ml-2 text-[13px] text-muted">
-              {wb.order}
+              {m.workbench_order()}
             </label>
             <Select id="order" value={j?.config.order ?? "aired"} onChange={(e) => rematch.mutate({ order: e.target.value as "aired" })}>
-              <option value="aired">{wb.orderAired}</option>
-              <option value="dvd">{wb.orderDvd}</option>
-              <option value="absolute">{wb.orderAbsolute}</option>
+              <option value="aired">{m.workbench_orderAired()}</option>
+              <option value="dvd">{m.workbench_orderDvd()}</option>
+              <option value="absolute">{m.workbench_orderAbsolute()}</option>
             </Select>
             <label htmlFor="lang" className="ml-2 text-[13px] text-muted">
-              {t.common.language}
+              {m.common_language()}
             </label>
             <Select
               id="lang"
               value={j?.config.language ?? settings.data?.language ?? "de-DE"}
               onChange={(e) => rematch.mutate({ language: e.target.value })}
             >
-              {Object.entries(t.titleLanguages).map(([id, label]) => (
+              {Object.entries(msgGroup.titleLanguages).map(([id, label]) => (
                 <option key={id} value={id}>
-                  {label}
+                  {label()}
                 </option>
               ))}
             </Select>
           </>
         )}
         <div className="flex-grow" />
-        {busy && status !== "executing" && <Button onClick={() => cancel.mutate()}>{t.common.cancel}</Button>}
+        {busy && status !== "executing" && <Button onClick={() => cancel.mutate()}>{m.common_cancel()}</Button>}
         <Button onClick={() => setAddingFolder((a) => !a)} aria-expanded={addingFolder}>
-          {wb.addFiles}
+          {m.workbench_addFiles()}
         </Button>
         <Button variant="light" onClick={() => rematch.mutate({})} disabled={!j || rematch.isPending}>
-          <SearchIcon size={15} /> {wb.rematch}
+          <SearchIcon size={15} /> {m.workbench_rematch()}
         </Button>
       </div>
 
@@ -364,7 +361,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
         <Panel className="p-4">
           <FolderBrowser
             initial={j.sourcePaths[0]}
-            chooseLabel={t.folders.add}
+            chooseLabel={m.folders_add()}
             onChoose={(p) => {
               setAddingFolder(false);
               rematch.mutate({ paths: [...new Set([...j.sourcePaths, p])] });
@@ -383,16 +380,19 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
         className="grid min-h-0 flex-grow grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_312px]"
         style={{ height: "calc(100vh - 230px)", minHeight: 520 }}
       >
-        <section aria-label={wb.preview} className="flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-line bg-panel">
+        <section
+          aria-label={m.workbench_preview()}
+          className="flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-line bg-panel"
+        >
           <div className="grid grid-cols-[28px_minmax(0,1fr)_44px_minmax(0,1fr)] items-center gap-3 border-b border-line px-4 py-3 text-xs font-semibold tracking-[0.02em] text-muted">
             <div />
-            <div>{wb.original(n(list.length))}</div>
+            <div>{m.workbench_original({ n: n(list.length) })}</div>
             <div />
-            <div>{wb.newName}</div>
+            <div>{m.workbench_newName()}</div>
           </div>
           {busy && status !== "executing" ? (
             <div className="flex flex-col gap-3 p-6">
-              <div className="text-sm">{t.jobStatus[status]}…</div>
+              <div className="text-sm">{pickMsg(msgGroup.jobStatus, status)}…</div>
               <Progress value={live?.total ? live.done / live.total : 0.05} />
             </div>
           ) : (
@@ -409,43 +409,44 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
           <div className="mt-auto flex flex-col gap-3 border-t border-line bg-panel-3 px-4 py-3.5">
             <div className="flex flex-wrap items-center gap-4 text-[13px]" aria-live="polite">
               <span>
-                <strong className="font-semibold">{n(counts.ready)}</strong> <span className="text-muted">{wb.matched}</span>
+                <strong className="font-semibold">{n(counts.ready)}</strong> <span className="text-muted">{m.workbench_matched()}</span>
               </span>
               <span>
-                <strong className="font-semibold text-accent">{n(counts.review)}</strong> <span className="text-muted">{wb.review}</span>
+                <strong className="font-semibold text-accent">{n(counts.review)}</strong>{" "}
+                <span className="text-muted">{m.workbench_review()}</span>
               </span>
               <span>
-                <strong className="font-semibold">{n(counts.skipped)}</strong> <span className="text-muted">{wb.skipped}</span>
+                <strong className="font-semibold">{n(counts.skipped)}</strong> <span className="text-muted">{m.workbench_skipped()}</span>
               </span>
               <span className="text-muted">
-                {n(counts.conflicts)} {wb.conflicts(counts.conflicts)}
+                {n(counts.conflicts)} {m.workbench_conflicts({ n: counts.conflicts })}
               </span>
-              {counts.done > 0 && <span className="text-[#4fd1a5]">{wb.done(n(counts.done))}</span>}
-              {counts.failed > 0 && <span className="text-danger">{wb.failed(n(counts.failed))}</span>}
+              {counts.done > 0 && <span className="text-[#4fd1a5]">{m.workbench_done({ n: n(counts.done) })}</span>}
+              {counts.failed > 0 && <span className="text-danger">{m.workbench_failed({ n: n(counts.failed) })}</span>}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               <label htmlFor="action" className="text-[13px] text-muted">
-                {t.common.action}
+                {m.common_action()}
               </label>
               <Select id="action" className="h-10" value={action} onChange={(e) => setAction(e.target.value as Action)}>
-                {Object.entries(t.actions).map(([k, v]) => (
+                {Object.entries(msgGroup.actions).map(([k, v]) => (
                   <option key={k} value={k}>
-                    {v}
+                    {v()}
                   </option>
                 ))}
               </Select>
               <label htmlFor="conflict" className="text-[13px] text-muted">
-                {t.common.conflicts}
+                {m.common_conflicts()}
               </label>
               <Select id="conflict" className="h-10" value={conflict} onChange={(e) => setConflict(e.target.value as ConflictPolicy)}>
-                {Object.entries(t.conflictPolicies).map(([k, v]) => (
+                {Object.entries(msgGroup.conflictPolicies).map(([k, v]) => (
                   <option key={k} value={k}>
-                    {v}
+                    {v()}
                   </option>
                 ))}
               </Select>
               <label htmlFor="target" className="text-[13px] text-muted">
-                {t.common.target}
+                {m.common_target()}
               </label>
               <Select
                 id="target"
@@ -453,7 +454,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
                 value={targetRoot ?? ""}
                 onChange={(e) => retarget.mutate(e.target.value || null)}
               >
-                <option value="">{wb.inPlace}</option>
+                <option value="">{m.workbench_inPlace()}</option>
                 {targets.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -461,13 +462,13 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
                 ))}
               </Select>
               <Button variant="accent" size="lg" onClick={() => execute.mutate()} disabled={!counts.ready || busy || execute.isPending}>
-                {wb.run(n(counts.ready), counts.ready, action === "test")}
+                {m.workbench_run({ n: n(counts.ready), count: counts.ready, test: String(action === "test") })}
               </Button>
             </div>
           </div>
         </section>
 
-        <aside aria-label={wb.sidebar} className="flex min-h-0 flex-col gap-4 overflow-auto">
+        <aside aria-label={m.workbench_sidebar()} className="flex min-h-0 flex-col gap-4 overflow-auto">
           {config && config.mode !== "rules" && (
             <TemplateEditor
               preset={config.preset}
@@ -483,8 +484,8 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
               rules={config.rules}
               onChange={(rules) => setConfig({ ...config, rules })}
               sample={selected?.targetPath ?? selected?.sourcePath}
-              title={config.mode === "rules" ? wb.rules : wb.rulesAfter}
-              note={config.mode === "rules" ? wb.rulesNote : wb.rulesAfterNote}
+              title={config.mode === "rules" ? m.workbench_rules() : m.workbench_rulesAfter()}
+              note={config.mode === "rules" ? m.workbench_rulesNote() : m.workbench_rulesAfterNote()}
             />
           )}
           {selected && (
@@ -502,18 +503,20 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
                     </div>
                   )}
                   <div className="text-xs text-muted">
-                    {[parsed?.release.resolution, parsed?.release.videoCodec, languageNames(t, parsed?.release.languages)]
+                    {[parsed?.release.resolution, parsed?.release.videoCodec, languageNames(parsed?.release.languages)]
                       .filter(Boolean)
-                      .join(" · ") || wb.noRelease}
+                      .join(" · ") || m.workbench_noRelease()}
                   </div>
-                  {selected.confidence > 0 && <div className="text-xs text-muted">{wb.confidence(pct(selected.confidence))}</div>}
+                  {selected.confidence > 0 && (
+                    <div className="text-xs text-muted">{m.workbench_confidence({ pct: pct(selected.confidence) })}</div>
+                  )}
                   {config?.mode !== "rules" && (
                     <button
                       type="button"
                       onClick={() => setPicking(selected)}
                       className="mt-1 cursor-pointer border-0 bg-transparent p-0 text-left text-xs text-accent hover:text-accent-soft"
                     >
-                      {wb.otherMatch}
+                      {m.workbench_otherMatch()}
                     </button>
                   )}
                 </div>
@@ -528,22 +531,22 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
                 }}
               >
                 <label htmlFor="target-override" className="sr-only">
-                  {wb.targetOverride}
+                  {m.workbench_targetOverride()}
                 </label>
                 <input
                   id="target-override"
                   className={cx(inputClass, "h-8 min-w-0 flex-grow font-mono text-xs")}
-                  placeholder={selected.overrideTarget ? wb.targetClear : wb.targetPlaceholder}
+                  placeholder={selected.overrideTarget ? m.workbench_targetClear() : m.workbench_targetPlaceholder()}
                   value={targetDraft}
                   onChange={(e) => setTargetDraft(e.target.value)}
                 />
                 <Button size="sm" type="submit" disabled={update.isPending || (!targetDraft && !selected.overrideTarget)}>
-                  {wb.set}
+                  {m.workbench_set()}
                 </Button>
               </form>
               {selected.state === "needs_review" && selected.targetPath && (
                 <Button variant="light" onClick={() => update.mutate({ itemId: selected.id, approve: true })} disabled={update.isPending}>
-                  {t.common.approve}
+                  {m.common_approve()}
                 </Button>
               )}
             </section>
@@ -570,6 +573,6 @@ function selectedTitle(item: JobItem, parsed?: Parsed, match?: MatchResult | nul
   return parsed?.title ?? item.sourcePath.split("/").at(-1)!;
 }
 
-function languageNames(t: Messages, langs?: string[]) {
-  return langs?.length ? langs.map((l) => t.releaseLanguages[l] ?? l).join(", ") : undefined;
+function languageNames(langs?: string[]) {
+  return langs?.length ? langs.map((l) => pickMsg(msgGroup.releaseLanguages, l)).join(", ") : undefined;
 }

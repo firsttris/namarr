@@ -1,6 +1,10 @@
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 import { isAuthenticated, isPublicPath } from "./server/auth.server";
+import { withRequestLang } from "./server/lang.server";
 import { runtime } from "./server/runtime.server";
+
+/** Every request renders in its viewer's language (cookie, else Accept-Language). */
+const lang = createMiddleware().server(({ next, request }) => withRequestLang(request.headers, () => next()));
 
 /** Pages and server routes need a session; server functions check it in their own middleware. */
 const authGate = createMiddleware().server(async ({ next, request }) => {
@@ -17,4 +21,4 @@ const authGate = createMiddleware().server(async ({ next, request }) => {
 /** Server functions are same-origin RPC: reject cross-site calls (Sec-Fetch-Site, then Origin/Referer). */
 const csrf = createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === "serverFn" });
 
-export const startInstance = createStart(() => ({ requestMiddleware: [csrf, authGate] }));
+export const startInstance = createStart(() => ({ requestMiddleware: [lang, csrf, authGate] }));

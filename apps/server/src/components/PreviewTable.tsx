@@ -3,7 +3,8 @@ import type { JobItem } from "@namarr/db/types";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type KeyboardEvent, useMemo, useRef } from "react";
 import { diffWords, pct, splitTarget } from "~/lib/format";
-import { useLocalize, useT } from "~/lib/i18n";
+import { useLocalize } from "~/lib/i18n";
+import * as m from "~/paraglide/messages";
 import { Arrow } from "./icons";
 import { Button, cx, Poster } from "./ui";
 
@@ -51,7 +52,6 @@ type Props = {
 };
 
 export function PreviewTable({ items, targetRoot, sourceRoot, selectedId, onSelect, onToggle, onSearch }: Props) {
-  const t = useT();
   const rows = useMemo(() => buildRows(items), [items]);
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -92,7 +92,7 @@ export function PreviewTable({ items, targetRoot, sourceRoot, selectedId, onSele
       onKeyDown={onKeyDown}
       role="grid"
       aria-activedescendant={selectedId ? `row-${selectedId}` : undefined}
-      aria-label={t.preview.grid}
+      aria-label={m.preview_grid()}
       aria-rowcount={rows.length}
       className="min-h-0 flex-grow overflow-auto outline-none"
     >
@@ -155,14 +155,13 @@ function companionLabel(to: string, main: string | null) {
 }
 
 function GroupRow({ match, count }: { match: MatchResult; count: number }) {
-  const t = useT();
   const best = match.best!;
   const season = match.episodes[0]?.season;
   return (
     // biome-ignore lint/a11y/useFocusableInteractive: rows are reached through the grid's aria-activedescendant
     <div role="row" className={cx(GRID, "border-b border-line bg-panel-2 py-1.5")}>
       <div />
-      <div className="text-xs text-muted">{t.preview.seriesFound(count)}</div>
+      <div className="text-xs text-muted">{m.preview_seriesFound({ n: count })}</div>
       <div />
       <div className="flex items-center gap-2.5">
         <Poster title={best.title} src={best.poster} size="sm" />
@@ -172,7 +171,7 @@ function GroupRow({ match, count }: { match: MatchResult; count: number }) {
         </div>
         <div className="text-xs text-muted">
           {best.provider.toUpperCase()} {best.id}
-          {season !== undefined ? t.preview.season(season) : ""}
+          {season !== undefined ? m.preview_season({ n: season }) : ""}
         </div>
       </div>
     </div>
@@ -196,7 +195,6 @@ function ItemRow({
   onToggle: () => void;
   onSearch: () => void;
 }) {
-  const t = useT();
   const localize = useLocalize();
   const review = item.state === "needs_review";
   const skipped = item.state === "skipped" || item.excluded;
@@ -225,7 +223,7 @@ function ItemRow({
         onChange={onToggle}
         onClick={(e) => e.stopPropagation()}
         disabled={done}
-        aria-label={t.preview.include(fileName)}
+        aria-label={m.preview_include({ file: fileName })}
         className="h-4 w-4"
       />
       <div className={cx("truncate font-mono text-xs", skipped ? "text-faint line-through" : "text-muted")} title={item.sourcePath}>
@@ -247,11 +245,11 @@ function ItemRow({
       <div className="flex min-w-0 items-center gap-2">
         {skipped ? (
           <div className="text-xs text-muted">
-            {item.excluded ? t.preview.excluded : item.reasons.length ? localize(item.reasons.at(-1)) : t.preview.skipped}
+            {item.excluded ? m.preview_excluded() : item.reasons.length ? localize(item.reasons.at(-1)) : m.preview_skipped()}
           </div>
         ) : !target ? (
           <>
-            <div className="flex-grow text-xs text-muted">{item.reasons.length ? localize(item.reasons[0]) : t.preview.noMatch}</div>
+            <div className="flex-grow text-xs text-muted">{item.reasons.length ? localize(item.reasons[0]) : m.preview_noMatch()}</div>
             <Button
               size="sm"
               onClick={(e) => {
@@ -259,7 +257,7 @@ function ItemRow({
                 onSearch();
               }}
             >
-              {t.preview.searchManually}
+              {m.preview_searchManually()}
             </Button>
           </>
         ) : (
@@ -281,14 +279,14 @@ function ItemRow({
                 title={localize(item.error ?? item.reasons.join(" · "))}
               >
                 {done
-                  ? t.states.done
+                  ? m.states_done()
                   : failed
-                    ? t.states.failed
+                    ? m.states_failed()
                     : item.conflict
                       ? item.conflict === "duplicate"
-                        ? t.preview.duplicate
-                        : t.preview.conflict
-                      : t.preview.review(pct(item.confidence))}
+                        ? m.preview_duplicate()
+                        : m.preview_conflict()
+                      : m.preview_review({ pct: pct(item.confidence) })}
               </span>
             )}
           </>

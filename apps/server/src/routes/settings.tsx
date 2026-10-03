@@ -5,8 +5,10 @@ import { useState } from "react";
 import { XIcon } from "~/components/icons";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getSettingsFn, saveSettings } from "~/functions/library.functions";
-import { LANGS, type Lang, useLang, useT } from "~/lib/i18n";
+import { LANGS, type Lang, pickMsg, useLang } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
 import { MOVIE_SOURCES, SERIES_SOURCES } from "~/lib/providers";
+import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/settings")({
   loader: () => getSettingsFn(),
@@ -14,8 +16,6 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
-  const t = useT();
-  const s = t.settings;
   const { lang, setLang } = useLang();
   const initial = Route.useLoaderData();
   const router = useRouter();
@@ -74,7 +74,7 @@ function SettingsPage() {
 
   return (
     <>
-      <PageHeader title={s.title} subtitle={s.subtitle} />
+      <PageHeader title={m.settings_title()} subtitle={m.settings_subtitle()} />
       <form
         className="flex max-w-3xl flex-col gap-5"
         onSubmit={(e) => {
@@ -83,11 +83,17 @@ function SettingsPage() {
         }}
       >
         <Panel className="flex flex-col gap-4 p-5">
-          <h2 className="m-0 text-base font-semibold">{s.metadata}</h2>
+          <h2 className="m-0 text-base font-semibold">{m.settings_metadata()}</h2>
           <Field
-            label={s.tmdbKey}
+            label={m.settings_tmdbKey()}
             htmlFor="s-key"
-            hint={initial.hasTmdbKey ? s.keyStored(initial.tmdbApiKey ?? "") : initial.demo ? s.keyDemo : s.keyHelp}
+            hint={
+              initial.hasTmdbKey
+                ? m.settings_keyStored({ masked: initial.tmdbApiKey ?? "" })
+                : initial.demo
+                  ? m.settings_keyDemo()
+                  : m.settings_keyHelp()
+            }
           >
             <input
               id="s-key"
@@ -99,20 +105,20 @@ function SettingsPage() {
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={s.seriesProvider} htmlFor="s-series" hint={s.providerHint[seriesProvider]}>
+            <Field label={m.settings_seriesProvider()} htmlFor="s-series" hint={pickMsg(msgGroup.settings_providerHint, seriesProvider)}>
               <Select id="s-series" value={seriesProvider} onChange={(e) => setSeriesProvider(e.target.value as SeriesProvider)}>
                 {SERIES_SOURCES.map((p) => (
                   <option key={p} value={p}>
-                    {t.providers[p]}
+                    {pickMsg(msgGroup.providers, p)}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label={s.movieProvider} htmlFor="s-movies">
+            <Field label={m.settings_movieProvider()} htmlFor="s-movies">
               <Select id="s-movies" value={movieProvider} onChange={(e) => setMovieProvider(e.target.value as MovieProvider)}>
                 {MOVIE_SOURCES.map((p) => (
                   <option key={p} value={p}>
-                    {t.providers[p]}
+                    {pickMsg(msgGroup.providers, p)}
                   </option>
                 ))}
               </Select>
@@ -120,11 +126,15 @@ function SettingsPage() {
           </div>
           {missing.length > 0 && (
             <p role="status" className="m-0 text-[13px] text-accent">
-              {missing.map((p) => s.missingAccess(t.providers[p])).join(" ")}
+              {missing.map((p) => m.settings_missingAccess({ name: pickMsg(msgGroup.providers, p) })).join(" ")}
             </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={s.tvdbKey} htmlFor="s-tvdb" hint={initial.hasTvdbKey ? s.keyStored(initial.tvdbApiKey ?? "") : s.tvdbHelp}>
+            <Field
+              label={m.settings_tvdbKey()}
+              htmlFor="s-tvdb"
+              hint={initial.hasTvdbKey ? m.settings_keyStored({ masked: initial.tvdbApiKey ?? "" }) : m.settings_tvdbHelp()}
+            >
               <input
                 id="s-tvdb"
                 type="password"
@@ -134,7 +144,11 @@ function SettingsPage() {
                 onChange={(e) => setTvdbKey(e.target.value)}
               />
             </Field>
-            <Field label={s.tvdbPin} htmlFor="s-tvdb-pin" hint={initial.tvdbPin ? s.keyStored(initial.tvdbPin) : undefined}>
+            <Field
+              label={m.settings_tvdbPin()}
+              htmlFor="s-tvdb-pin"
+              hint={initial.tvdbPin ? m.settings_keyStored({ masked: initial.tvdbPin }) : undefined}
+            >
               <input
                 id="s-tvdb-pin"
                 type="password"
@@ -144,7 +158,7 @@ function SettingsPage() {
                 onChange={(e) => setTvdbPin(e.target.value)}
               />
             </Field>
-            <Field label={s.anidbClient} htmlFor="s-anidb" hint={s.anidbHelp}>
+            <Field label={m.settings_anidbClient()} htmlFor="s-anidb" hint={m.settings_anidbHelp()}>
               <input
                 id="s-anidb"
                 autoComplete="off"
@@ -153,7 +167,7 @@ function SettingsPage() {
                 onChange={(e) => setAnidbClient(e.target.value)}
               />
             </Field>
-            <Field label={s.anidbClientVersion} htmlFor="s-anidb-ver">
+            <Field label={m.settings_anidbClientVersion()} htmlFor="s-anidb-ver">
               <input
                 id="s-anidb-ver"
                 inputMode="numeric"
@@ -163,16 +177,16 @@ function SettingsPage() {
               />
             </Field>
           </div>
-          <Field label={s.titleLanguage} htmlFor="s-lang">
+          <Field label={m.settings_titleLanguage()} htmlFor="s-lang">
             <Select id="s-lang" value={language} onChange={(e) => setLanguage(e.target.value)}>
-              {Object.entries(t.titleLanguages).map(([id, label]) => (
+              {Object.entries(msgGroup.titleLanguages).map(([id, label]) => (
                 <option key={id} value={id}>
-                  {label}
+                  {label()}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label={s.uiLanguage} htmlFor="s-ui-lang">
+          <Field label={m.settings_uiLanguage()} htmlFor="s-ui-lang">
             <Select id="s-ui-lang" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
               {LANGS.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -184,8 +198,8 @@ function SettingsPage() {
         </Panel>
 
         <Panel className="flex flex-col gap-4 p-5">
-          <h2 className="m-0 text-base font-semibold">{s.filesystem}</h2>
-          <Field label={s.roots} htmlFor="s-roots" hint={s.rootsHint}>
+          <h2 className="m-0 text-base font-semibold">{m.settings_filesystem()}</h2>
+          <Field label={m.settings_roots()} htmlFor="s-roots" hint={m.settings_rootsHint()}>
             <textarea
               id="s-roots"
               rows={3}
@@ -194,7 +208,7 @@ function SettingsPage() {
               onChange={(e) => setRoots(e.target.value)}
             />
           </Field>
-          <Field label={s.defaultTarget} htmlFor="s-target">
+          <Field label={m.settings_defaultTarget()} htmlFor="s-target">
             <input
               id="s-target"
               className={cx(inputClass, "font-mono")}
@@ -206,11 +220,11 @@ function SettingsPage() {
         </Panel>
 
         <Panel className="flex flex-col gap-3 p-5">
-          <h2 className="m-0 text-base font-semibold">{s.refresh}</h2>
+          <h2 className="m-0 text-base font-semibold">{m.settings_refresh()}</h2>
           {refresh.map((r, i) => (
             <div key={i} className="flex gap-2">
               <Select
-                aria-label={s.server}
+                aria-label={m.settings_server()}
                 value={r.kind}
                 onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, kind: e.target.value as "plex" } : x)))}
               >
@@ -219,38 +233,38 @@ function SettingsPage() {
                 <option value="plex">Plex</option>
               </Select>
               <input
-                aria-label={s.url}
+                aria-label={m.settings_url()}
                 className={cx(inputClass, "flex-grow")}
                 placeholder="http://jellyfin:8096"
                 value={r.url}
                 onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, url: e.target.value } : x)))}
               />
               <input
-                aria-label={t.common.token}
+                aria-label={m.common_token()}
                 type="password"
                 className={inputClass}
-                placeholder={s.apiToken}
+                placeholder={m.settings_apiToken()}
                 value={r.token}
                 onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, token: e.target.value } : x)))}
               />
-              <Button aria-label={t.common.remove} onClick={() => setRefresh(refresh.filter((_, k) => k !== i))}>
+              <Button aria-label={m.common_remove()} onClick={() => setRefresh(refresh.filter((_, k) => k !== i))}>
                 <XIcon />
               </Button>
             </div>
           ))}
           <div>
             <Button size="sm" onClick={() => setRefresh([...refresh, { kind: "jellyfin", url: "", token: "" }])}>
-              {s.addServer}
+              {m.settings_addServer()}
             </Button>
           </div>
         </Panel>
 
         <Panel className="flex flex-col gap-3 p-5">
-          <h2 className="m-0 text-base font-semibold">{s.notifications}</h2>
+          <h2 className="m-0 text-base font-semibold">{m.settings_notifications()}</h2>
           {notifications.map((n, i) => (
             <div key={i} className="flex gap-2">
               <Select
-                aria-label={s.service}
+                aria-label={m.settings_service()}
                 value={n.kind}
                 onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, kind: e.target.value as "ntfy" } : x)))}
               >
@@ -261,39 +275,39 @@ function SettingsPage() {
                 <option value="webhook">Webhook</option>
               </Select>
               <input
-                aria-label={s.url}
+                aria-label={m.settings_url()}
                 className={cx(inputClass, "flex-grow")}
                 placeholder="https://ntfy.sh/mein-topic"
                 value={n.url}
                 onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, url: e.target.value } : x)))}
               />
               <input
-                aria-label={t.common.token}
+                aria-label={m.common_token()}
                 type="password"
                 className={inputClass}
-                placeholder={s.tokenOptional}
+                placeholder={m.settings_tokenOptional()}
                 value={n.token ?? ""}
                 onChange={(e) =>
                   setNotifications(notifications.map((x, k) => (k === i ? { ...x, token: e.target.value || undefined } : x)))
                 }
               />
-              <Button aria-label={t.common.remove} onClick={() => setNotifications(notifications.filter((_, k) => k !== i))}>
+              <Button aria-label={m.common_remove()} onClick={() => setNotifications(notifications.filter((_, k) => k !== i))}>
                 <XIcon />
               </Button>
             </div>
           ))}
           <div>
             <Button size="sm" onClick={() => setNotifications([...notifications, { kind: "ntfy", url: "" }])}>
-              {s.addNotification}
+              {m.settings_addNotification()}
             </Button>
           </div>
         </Panel>
 
         <ErrorNote error={save.error} />
-        {save.isSuccess && <div className="text-sm text-[#4fd1a5]">{t.common.saved}</div>}
+        {save.isSuccess && <div className="text-sm text-[#4fd1a5]">{m.common_saved()}</div>}
         <div>
           <Button type="submit" variant="accent" size="lg" disabled={save.isPending}>
-            {t.common.save}
+            {m.common_save()}
           </Button>
         </div>
       </form>

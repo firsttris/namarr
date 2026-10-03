@@ -1,6 +1,6 @@
 import { matchAll, parse } from "@namarr/core";
-import { localize } from "@namarr/core/i18n";
 import { describe, expect, it } from "vitest";
+import { text } from "../../core/test/text.ts";
 import { ProviderError, TvdbProvider } from "../src/index.ts";
 import { fakeFetch, status } from "./fake-fetch.ts";
 
@@ -148,7 +148,7 @@ describe("TheTVDB-Provider", () => {
     const denied = tvdb({ "POST /v4/login": status(401) }).provider;
     const err = await denied.searchSeries("Deep Space Nine").catch((e: ProviderError) => e);
     expect(err).toBeInstanceOf(ProviderError);
-    expect(localize((err as Error).message, "de")).toBe("TheTVDB: API-Key oder PIN ungültig");
+    expect(text((err as Error).message, "de")).toBe("TheTVDB: API-Key oder PIN ungültig");
   });
 
   it("die ID im Ordnernamen spart die Suche", async () => {

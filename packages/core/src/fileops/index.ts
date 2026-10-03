@@ -1,7 +1,7 @@
 import { constants, type Stats } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { tr } from "../i18n.ts";
+import { msg } from "../i18n.ts";
 import { splitExtension } from "../parser/index.ts";
 import { compareQuality, type Quality } from "./quality.ts";
 
@@ -12,7 +12,7 @@ export type Action = (typeof ACTIONS)[number];
 export type ConflictPolicy = (typeof CONFLICT_POLICIES)[number];
 
 /** Skip reason when the target exists. */
-export const TARGET_EXISTS = tr("Ziel existiert bereits", "Target already exists");
+export const TARGET_EXISTS = msg("fileops_error_targetExists");
 
 export type PlannedOperation = { from: string; to: string; action: Action };
 
@@ -98,7 +98,7 @@ export async function freeName(target: string): Promise<string> {
     const candidate = path.join(dir, `${stem} (${i})${ext}`);
     if (!(await exists(candidate))) return candidate;
   }
-  throw new FileOpError(tr(`Kein freier Name für ${target}`, `No free name for ${target}`));
+  throw new FileOpError(msg("fileops_error_noFreeName", { path: target }));
 }
 
 /** Copies without ever replacing, then checks the size. */
@@ -107,7 +107,7 @@ async function copyVerified(from: string, to: string): Promise<void> {
   const [a, b] = await Promise.all([fs.stat(from), fs.stat(to)]);
   if (a.size !== b.size) {
     await fs.rm(to, { force: true });
-    throw new FileOpError(tr(`Kopie unvollständig: ${to}`, `Incomplete copy: ${to}`));
+    throw new FileOpError(msg("fileops_error_incompleteCopy", { path: to }));
   }
   await fs.utimes(to, a.atime, a.mtime);
 }
@@ -115,7 +115,7 @@ async function copyVerified(from: string, to: string): Promise<void> {
 /** rename() when possible; across file systems copy + verify + delete. */
 async function moveFile(from: string, to: string): Promise<void> {
   try {
-    if (await exists(to)) throw new FileOpError(tr(`Ziel existiert bereits: ${to}`, `Target already exists: ${to}`));
+    if (await exists(to)) throw new FileOpError(msg("fileops_error_targetExistsAt", { path: to }));
     await fs.rename(from, to);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "EXDEV") throw e;
@@ -136,12 +136,7 @@ async function perform(action: Action, from: string, to: string): Promise<void> 
         return await fs.link(from, to);
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code === "EXDEV") {
-          throw new FileOpError(
-            tr(
-              "Hardlink über Dateisystemgrenzen nicht möglich: Quelle und Ziel müssen im selben Mount liegen",
-              "Hardlinks cannot cross file systems: source and target must be on the same mount",
-            ),
-          );
+          throw new FileOpError(msg("fileops_error_crossDevice"));
         }
         throw e;
       }
@@ -159,8 +154,8 @@ export async function executeOperation(op: PlannedOperation, options: ExecuteOpt
   let to = path.resolve(op.to);
   try {
     const source = await fs.stat(from);
-    if (!source.isFile()) return { status: "failed", error: tr(`Keine Datei: ${from}`, `Not a file: ${from}`) };
-    if (from === to) return { status: "skipped", reason: tr("Name unverändert", "Name unchanged"), to };
+    if (!source.isFile()) return { status: "failed", error: msg("fileops_error_notAFile", { path: from }) };
+    if (from === to) return { status: "skipped", reason: msg("fileops_skip_nameUnchanged"), to };
 
     const existing = await lstatOrUndefined(to);
     if (op.action === "test") return { status: "tested", to, conflict: existing !== undefined };
@@ -170,7 +165,7 @@ export async function executeOperation(op: PlannedOperation, options: ExecuteOpt
     if (existing) {
       // Same file under another name (hardlink already there, case-only rename on macOS).
       if (existing.ino === source.ino && existing.dev === source.dev && op.action !== "rename") {
-        return { status: "skipped", reason: tr("Ziel ist bereits dieselbe Datei", "Target is already the same file"), to };
+        return { status: "skipped", reason: msg("fileops_skip_sameFile"), to };
       }
       if (policy === "skip") return { status: "skipped", reason: TARGET_EXISTS, to };
       if (policy === "suffix") to = await freeName(to);
@@ -183,14 +178,11 @@ export async function executeOperation(op: PlannedOperation, options: ExecuteOpt
             const why = reason ? ` (${reason})` : "";
             return {
               status: "skipped",
-              reason:
-                result < 0
-                  ? `${tr("Vorhandene Datei ist besser", "Existing file is better")}${why}`
-                  : tr("Vorhandene Datei hat gleiche Qualität", "Existing file has the same quality"),
+              reason: result < 0 ? `${msg("fileops_conflict_existingBetter")}${why}` : msg("fileops_conflict_sameQuality"),
               to,
             };
           }
-          note = `${tr("Schlechtere Datei ersetzt", "Replaced a worse file")} (${reason})`;
+          note = `${msg("fileops_conflict_replacedWorse")} (${reason})`;
         }
         backup = `${to}.namarr-bak-${(options.now ?? Date.now)()}`;
         await fs.rename(to, backup);
@@ -240,23 +232,22 @@ export async function undoOperation(record: OperationRecord): Promise<UndoResult
   try {
     if (record.action === "test") return { status: "undone" };
     const current = await lstatOrUndefined(record.to);
-    if (!current) return { status: "failed", reason: tr(`Ziel fehlt: ${record.to}`, `Target missing: ${record.to}`) };
+    if (!current) return { status: "failed", reason: msg("fileops_undo_targetMissing", { path: record.to }) };
 
     if (record.action === "symlink") {
       if (!current.isSymbolicLink() || (await fs.readlink(record.to)) !== path.resolve(record.from)) {
-        return { status: "failed", reason: tr("Symlink wurde verändert", "Symlink was changed") };
+        return { status: "failed", reason: msg("fileops_undo_symlinkChanged") };
       }
       await fs.unlink(record.to);
     } else {
       if (current.size !== record.size || current.ino !== record.inode) {
         return {
           status: "failed",
-          reason: tr("Zieldatei wurde seit der Ausführung verändert", "Target file changed since it was renamed"),
+          reason: msg("fileops_undo_targetChanged"),
         };
       }
       if (record.action === "move" || record.action === "rename") {
-        if (await exists(record.from))
-          return { status: "failed", reason: tr(`Quelle existiert wieder: ${record.from}`, `Source exists again: ${record.from}`) };
+        if (await exists(record.from)) return { status: "failed", reason: msg("fileops_undo_sourceExists", { path: record.from }) };
         await ensureDir(path.dirname(record.from));
         await moveFile(record.to, record.from);
       } else {
@@ -264,7 +255,7 @@ export async function undoOperation(record: OperationRecord): Promise<UndoResult
         if (record.action === "hardlink" && !(await exists(record.from))) {
           return {
             status: "failed",
-            reason: tr("Quelle des Hardlinks fehlt, Ziel ist die letzte Kopie", "Hardlink source is missing, the target is the last copy"),
+            reason: msg("fileops_undo_lastCopy"),
           };
         }
         await fs.unlink(record.to);

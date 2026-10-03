@@ -1,5 +1,5 @@
 import type { MetadataProvider } from "@namarr/core";
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import type { SeriesProvider, Settings } from "@namarr/db";
 import {
   AnidbProvider,
@@ -13,9 +13,9 @@ import {
 } from "@namarr/providers";
 
 export const MISSING = {
-  tmdb: tr("TMDB: API-Key in den Einstellungen hinterlegen", "TMDB: add an API key in the settings"),
-  tvdb: tr("TheTVDB: API-Key in den Einstellungen hinterlegen", "TheTVDB: add an API key in the settings"),
-  anidb: tr("AniDB: registrierten Client in den Einstellungen hinterlegen", "AniDB: add a registered client in the settings"),
+  tmdb: msg("settings_missing_tmdb"),
+  tvdb: msg("settings_missing_tvdb"),
+  anidb: msg("settings_missing_anidb"),
 };
 
 /** Stands in for a source without credentials; says what is missing as soon as it is used. */

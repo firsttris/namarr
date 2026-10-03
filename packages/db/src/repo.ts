@@ -1,4 +1,4 @@
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, or, type SQL, sql } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type * as schema from "./schema.ts";
@@ -126,7 +126,7 @@ export function failInterruptedJobs(db: AnyDb): number {
     .update(jobs)
     .set({
       status: "failed",
-      error: tr("Server wurde während des Jobs beendet", "The server stopped during the job"),
+      error: msg("jobs_error_serverStopped"),
       finishedAt: new Date(),
     })
     .where(inArray(jobs.status, ["pending", "scanning", "matching", "executing"]))
