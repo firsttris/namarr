@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { formatPath, presetTemplate, type SanitizeOptions, sanitizeSegment } from "../formatter/index.ts";
-import { tr } from "../i18n.ts";
+import { msg } from "../i18n.ts";
 import { classify, type MatchResult, NO_MATCH } from "../matcher/index.ts";
 import type { FileMeta } from "../metadata/index.ts";
 import { applyRules, type Rule } from "../rules/index.ts";
@@ -10,8 +10,8 @@ import type { ItemState } from "./states.ts";
 
 export * from "./states.ts";
 
-export const APPROVED = tr("Freigegeben", "Approved");
-const DUPLICATE_TARGET = tr("Doppeltes Ziel", "Duplicate target");
+export const APPROVED = msg("jobs_reason_approved");
+const DUPLICATE_TARGET = msg("jobs_reason_duplicateTarget");
 
 export type Mode = "media" | "rules" | "both";
 
@@ -74,8 +74,8 @@ function companionTarget(target: string, companion: Companion): string {
 export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): PreviewItem[] {
   const items: PreviewItem[] = inputs.map(({ file, parsed, match, targetOverride, excluded, approved }) => {
     const base: PreviewItem = { source: file.path, state: "parsed", confidence: 1, reasons: [], companions: [] };
-    if (excluded) return { ...base, state: "skipped", reasons: [tr("Manuell ausgeschlossen", "Excluded manually")] };
-    if (parsed.sample) return { ...base, state: "skipped", reasons: [tr("Übersprungen: Sample-Datei", "Skipped: sample file")] };
+    if (excluded) return { ...base, state: "skipped", reasons: [msg("jobs_reason_excluded")] };
+    if (parsed.sample) return { ...base, state: "skipped", reasons: [msg("jobs_reason_sample")] };
 
     let relative: string | undefined;
     if (targetOverride) {
@@ -84,7 +84,7 @@ export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): Pre
         ...base,
         target: resolveTarget(relative, file, config),
         state: "ready",
-        reasons: [tr("Manuell festgelegt", "Set manually")],
+        reasons: [msg("jobs_reason_setManually")],
       };
     }
     if (config.mode === "rules") {

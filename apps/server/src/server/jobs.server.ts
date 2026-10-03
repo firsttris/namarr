@@ -11,6 +11,7 @@ import {
   type MatchResult,
   type MetadataProvider,
   matchAll,
+  msg,
   needsMetadata,
   type OperationRecord,
   type Parsed,
@@ -28,7 +29,6 @@ import {
   type ScannedFile,
   scan,
   TARGET_EXISTS,
-  tr,
   undoOperation,
 } from "@namarr/core";
 import {
@@ -71,13 +71,10 @@ export type JobServiceDeps = {
   probe?: (file: string) => Promise<ProbeInfo | undefined>;
 };
 
-export const JOB_BUSY = tr("Job läuft noch", "Job is still running");
-export const JOB_NOT_FOUND = tr("Job nicht gefunden", "Job not found");
-export const NO_PROVIDER = tr(
-  "Kein Metadaten-Anbieter: in den Einstellungen einen Zugang für TMDB, TheTVDB oder AniDB hinterlegen oder TVmaze wählen",
-  "No metadata provider: add access for TMDB, TheTVDB or AniDB in the settings, or choose TVmaze",
-);
-export const ALWAYS_REVIEW = tr("Immer prüfen", "Always review");
+export const JOB_BUSY = msg("jobs_error_running");
+export const JOB_NOT_FOUND = msg("jobs_error_notFound");
+export const NO_PROVIDER = msg("jobs_error_noProvider");
+export const ALWAYS_REVIEW = msg("jobs_reason_alwaysReview");
 
 /** Thrown for user errors; the message is shown in the UI. */
 export class JobError extends Error {
@@ -277,7 +274,7 @@ export class JobService {
         continue;
       }
       if (item.state !== "needs_review" && item.state !== "ready") continue;
-      const reason = item.reasons[0] ?? tr("Treffer unter der Auto-Schwelle", "Match below the auto threshold");
+      const reason = item.reasons[0] ?? msg("jobs_reason_belowThreshold");
       addToInbox(db, item.id, always ? (item.reasons[0] ? `${ALWAYS_REVIEW}: ${reason}` : ALWAYS_REVIEW) : reason);
       updateItem(db, item.id, { state: "needs_review" });
       review.push(item.id);
@@ -428,8 +425,8 @@ export class JobService {
   ) {
     const { db } = this.deps;
     const item = getItem(db, itemId);
-    if (!item) throw new JobError(tr("Datei nicht gefunden", "File not found"));
-    if (item.state === "done") throw new JobError(tr("Bereits ausgeführt: erst rückgängig machen", "Already renamed: undo it first"));
+    if (!item) throw new JobError(msg("jobs_error_fileNotFound"));
+    if (item.state === "done") throw new JobError(msg("jobs_error_alreadyRenamed"));
     const job = getJob(db, item.jobId)!;
     this.assertIdle(job);
     const values: Parameters<typeof updateItem>[2] = {};
@@ -453,7 +450,7 @@ export class JobService {
         episodes,
         alternatives: previous?.alternatives ?? [],
         confidence: 1,
-        reasons: [tr("Manuell gewählt", "Chosen manually")],
+        reasons: [msg("jobs_reason_chosenManually")],
         overridden: true,
       };
       values.matchJson = match;
@@ -570,7 +567,7 @@ export class JobService {
           if (action === "move") await cleanupEmptyDirs(path.dirname(item.sourcePath), job.sourcePaths[0] ?? "/").catch(() => []);
         } else if (result.status === "tested") {
           updateItem(db, item.id, {
-            reasons: [...item.reasons, result.conflict ? tr("Test: Ziel existiert", "Test: target exists") : tr("Test: OK", "Test: OK")],
+            reasons: [...item.reasons, result.conflict ? msg("jobs_test_targetExists") : msg("jobs_test_ok")],
           });
         } else if (result.status === "skipped") {
           updateItem(db, item.id, { state: "skipped", reasons: [...item.reasons, result.reason] });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compareQuality, type Quality, qualityOf } from "../src/fileops/quality.ts";
-import { localize } from "../src/i18n.ts";
 import { parse } from "../src/parser/index.ts";
+import { text } from "./text.ts";
 
 const GB = 1024 ** 3;
 const better = (a: Quality, b: Quality) => compareQuality(a, b).result > 0;
@@ -49,9 +49,9 @@ describe("Qualitätsvergleich", () => {
 
   it("nennt das entscheidende Kriterium in beiden Sprachen", () => {
     const { reason } = compareQuality({ resolution: "1080p" }, { resolution: "2160p" });
-    expect(localize(reason!, "de")).toBe("Auflösung: 1080p vs 2160p");
-    expect(localize(reason!, "en")).toBe("Resolution: 1080p vs 2160p");
-    expect(localize(compareQuality({ size: 3 * GB }, { size: 1.5 * GB }).reason!, "en")).toBe("File size: 3.0 GB vs 1.5 GB");
+    expect(text(reason!, "de")).toBe("Auflösung: 1080p vs 2160p");
+    expect(text(reason!, "en")).toBe("Resolution: 1080p vs 2160p");
+    expect(text(compareQuality({ size: 3 * GB }, { size: 1.5 * GB }).reason!, "en")).toBe("File size: 3.0 GB vs 1.5 GB");
     expect(compareQuality({}, {}).reason).toBeUndefined();
   });
 });

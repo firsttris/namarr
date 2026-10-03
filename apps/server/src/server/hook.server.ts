@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
-import { localize } from "@namarr/core";
 import { getProfile, getSettings, type Job, listProfiles, listWatchFolders } from "@namarr/db";
 import { z } from "zod";
+import { localizeIn } from "../lib/i18n.tsx";
 import { automaticConfig } from "./automation.server.ts";
 import type { Runtime } from "./runtime.server.ts";
 
@@ -100,7 +100,7 @@ export async function createHookJob(rt: Runtime, input: HookInput): Promise<Job>
     });
   } catch (e) {
     // By name, not instanceof: the server entry and the Start bundle each carry a copy of core.
-    if ((e as Error).name === "PathOutsideRootError") throw new HookError(localize((e as Error).message, "en"), 403);
+    if ((e as Error).name === "PathOutsideRootError") throw new HookError(localizeIn((e as Error).message, "en"), 403);
     throw e;
   }
 }

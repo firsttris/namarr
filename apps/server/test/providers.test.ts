@@ -1,7 +1,7 @@
-import { localize } from "@namarr/core";
 import { createProfile, DEFAULT_SETTINGS, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider, MemoryCache, RoutedProvider, TmdbProvider } from "@namarr/providers";
 import { describe, expect, it, vi } from "vitest";
+import { localizeIn } from "~/lib/i18n";
 import { automaticConfig } from "~/server/automation.server";
 import { EventBus } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
@@ -33,7 +33,7 @@ describe("Anbieter je nach Einstellung", () => {
     const p = providerFactory(new MemoryCache(), false)(settings({ seriesProvider: "tvmaze" }))!;
     expect(p.nameFor!("series")).toBe("tvmaze");
     const err = await p.searchMovie("Dune").catch((e: Error) => e);
-    expect(localize((err as Error).message, "de")).toBe("TMDB: API-Key in den Einstellungen hinterlegen");
+    expect(localizeIn((err as Error).message, "de")).toBe("TMDB: API-Key in den Einstellungen hinterlegen");
   });
 
   it("der Job (oder sein Profil) wählt die Serien-Quelle", async () => {
@@ -42,7 +42,7 @@ describe("Anbieter je nach Einstellung", () => {
     expect(provider(s, { series: "tvdb" })!.nameFor!("series")).toBe("tvdb");
     const anidb = provider(s, { series: "anidb" })!;
     const err = await anidb.searchSeries("Frieren").catch((e: Error) => e);
-    expect(localize((err as Error).message, "en")).toBe("AniDB: add a registered client in the settings");
+    expect(localizeIn((err as Error).message, "en")).toBe("AniDB: add a registered client in the settings");
     expect(provider(settings({ anidbClient: "namarr", tmdbApiKey: "k" }), { series: "anidb" })!.nameFor!("series")).toBe("anidb");
   });
 

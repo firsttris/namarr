@@ -13,6 +13,7 @@ import {
 import { parse } from "../src/parser/index.ts";
 import type { MediaCandidate } from "../src/types.ts";
 import { severance, severanceEpisodes } from "./helpers.ts";
+import { text } from "./text.ts";
 
 describe("Template-Sprache", () => {
   it("Tokens und Text", () => {
@@ -48,9 +49,16 @@ describe("Template-Sprache", () => {
 
   it("Fehler mit Position", () => {
     expect(() => parseTemplate("{n")).toThrow(TemplateError);
-    expect(() => parseTemplate("{n|nope}")).toThrow(/Unbekannter Filter 'nope'/);
-    expect(() => parseTemplate("{?edition} x")).toThrow(/nicht mit '\{\/\}' geschlossen/);
-    expect(() => parseTemplate("x{/}")).toThrow(/ohne öffnenden Block/);
+    const error = (template: string) => {
+      try {
+        parseTemplate(template);
+      } catch (e) {
+        return text((e as Error).message, "de");
+      }
+    };
+    expect(error("{n|nope}")).toMatch(/Unbekannter Filter 'nope'/);
+    expect(error("{?edition} x")).toMatch(/nicht mit '\{\/\}' geschlossen/);
+    expect(error("x{/}")).toMatch(/ohne öffnenden Block/);
     expect(() => parseTemplate("a}b")).toThrow(/Position 2/);
   });
 

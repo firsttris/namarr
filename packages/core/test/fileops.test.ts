@@ -14,7 +14,8 @@ import {
   undoOperation,
 } from "../src/fileops/index.ts";
 import type { Quality } from "../src/fileops/quality.ts";
-import { localize, tr } from "../src/i18n.ts";
+import { msg } from "../src/i18n.ts";
+import { text } from "./text.ts";
 
 let tmp: string;
 
@@ -150,7 +151,7 @@ describe("Konflikte", () => {
     const sd = await write("sd.mkv", "a much much bigger 720p file");
     const skipped = await executeOperation({ from: sd, to: p("target.mkv"), action: "copy" }, { conflict: "keep-better", quality });
     expect(skipped).toMatchObject({ status: "skipped" });
-    expect(localize((skipped as { reason: string }).reason, "en")).toBe("Existing file is better (Resolution: 720p vs 1080p)");
+    expect(text((skipped as { reason: string }).reason, "en")).toBe("Existing file is better (Resolution: 720p vs 1080p)");
 
     const uhd = await write("uhd.mkv", "4k");
     const result = await executeOperation(
@@ -158,7 +159,7 @@ describe("Konflikte", () => {
       { conflict: "keep-better", quality, now: () => 7 },
     );
     const record = done(result);
-    expect(localize((result as { note?: string }).note!, "de")).toBe("Schlechtere Datei ersetzt (Auflösung: 2160p vs 1080p)");
+    expect(text((result as { note?: string }).note!, "de")).toBe("Schlechtere Datei ersetzt (Auflösung: 2160p vs 1080p)");
     expect(await read("target.mkv")).toBe("4k");
     // undo brings the old file back
     expect(await undoOperation(record)).toEqual({ status: "undone" });
@@ -169,7 +170,7 @@ describe("Konflikte", () => {
     await write("target.mkv", "same");
     const from = await write("a.mkv", "same");
     const r = await executeOperation({ from, to: p("target.mkv"), action: "copy" }, { conflict: "keep-better" });
-    expect(localize((r as { reason: string }).reason, "en")).toBe("Existing file has the same quality");
+    expect(text((r as { reason: string }).reason, "en")).toBe("Existing file has the same quality");
   });
 
   it("Hardlink, der schon existiert, wird erkannt", async () => {
@@ -177,7 +178,7 @@ describe("Konflikte", () => {
     await fs.link(from, p("b.mkv"));
     expect(await executeOperation({ from, to: p("b.mkv"), action: "hardlink" }, { conflict: "overwrite" })).toMatchObject({
       status: "skipped",
-      reason: tr("Ziel ist bereits dieselbe Datei", "Target is already the same file"),
+      reason: msg("fileops_skip_sameFile"),
     });
   });
 });
@@ -215,8 +216,8 @@ describe("Undo", () => {
     await fs.writeFile(p("b.mkv"), "changed and longer");
     const result = await undoOperation(record);
     expect(result.status).toBe("failed");
-    expect(localize((result as { reason: string }).reason, "de")).toBe("Zieldatei wurde seit der Ausführung verändert");
-    expect(localize((result as { reason: string }).reason, "en")).toBe("Target file changed since it was renamed");
+    expect(text((result as { reason: string }).reason, "de")).toBe("Zieldatei wurde seit der Ausführung verändert");
+    expect(text((result as { reason: string }).reason, "en")).toBe("Target file changed since it was renamed");
     expect(await read("b.mkv")).toBe("changed and longer");
   });
 

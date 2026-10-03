@@ -4,7 +4,8 @@ import { type ReactNode, useState } from "react";
 import { AppShell } from "~/components/AppShell";
 import { getUiLang } from "~/functions/i18n.functions";
 import { LiveProvider } from "~/lib/events";
-import { LangProvider, useLang, useT } from "~/lib/i18n";
+import { LangProvider, useLang } from "~/lib/i18n";
+import * as m from "~/paraglide/messages";
 import styles from "~/styles.css?url";
 
 export const Route = createRootRoute({
@@ -58,7 +59,7 @@ function RootComponent() {
 }
 
 function NotFound() {
-  return <p className="text-muted">{useT().common.notFound}</p>;
+  return <p className="text-muted">{m.common_notFound()}</p>;
 }
 
 function Document({ children }: { children: ReactNode }) {

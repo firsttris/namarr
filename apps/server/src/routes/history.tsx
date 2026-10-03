@@ -5,7 +5,9 @@ import { z } from "zod";
 import { Button, cx, ErrorNote, inputClass, PageHeader, Panel } from "~/components/ui";
 import { undoJob } from "~/functions/jobs.functions";
 import { listHistory } from "~/functions/library.functions";
-import { useLocalize, useT } from "~/lib/i18n";
+import { localeOf, pickMsg, useLocalize } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
+import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/history")({
   validateSearch: z.object({ q: z.string().optional(), undone: z.boolean().optional() }),
@@ -15,10 +17,8 @@ export const Route = createFileRoute("/history")({
 });
 
 function History() {
-  const t = useT();
-  const h = t.history;
   const localize = useLocalize();
-  const dt = new Intl.DateTimeFormat(t.locale, { dateStyle: "short", timeStyle: "short" });
+  const dt = new Intl.DateTimeFormat(localeOf(), { dateStyle: "short", timeStyle: "short" });
   const search = Route.useSearch();
   const initial = Route.useLoaderData();
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ function History() {
 
   return (
     <>
-      <PageHeader title={h.title} subtitle={h.subtitle} />
+      <PageHeader title={m.history_title()} subtitle={m.history_subtitle()} />
       <div className="flex flex-wrap items-end gap-3">
         <form
           role="search"
@@ -48,16 +48,16 @@ function History() {
           }}
         >
           <label htmlFor="hq" className="sr-only">
-            {h.searchLabel}
+            {m.history_searchLabel()}
           </label>
           <input
             id="hq"
             className={cx(inputClass, "w-80")}
-            placeholder={h.searchPlaceholder}
+            placeholder={m.history_searchPlaceholder()}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          <Button type="submit">{t.common.search}</Button>
+          <Button type="submit">{m.common_search()}</Button>
         </form>
         <label className="flex items-center gap-2 text-[13px] text-soft">
           <input
@@ -66,48 +66,49 @@ function History() {
             onChange={(e) => navigate({ to: "/history", search: { ...search, undone: e.target.checked || undefined } })}
             className="h-4 w-4"
           />
-          {h.showUndone}
+          {m.history_showUndone()}
         </label>
         <div className="flex-grow" />
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (until && confirm(h.confirmSince(until.replace("T", " ")))) undo.mutate({ since: new Date(until).toISOString() });
+            if (until && confirm(m.history_confirmSince({ when: until.replace("T", " ") })))
+              undo.mutate({ since: new Date(until).toISOString() });
           }}
         >
           <label htmlFor="until" className="text-[13px] text-muted">
-            {h.undoSince}
+            {m.history_undoSince()}
           </label>
           <input id="until" type="datetime-local" className={inputClass} value={until} onChange={(e) => setUntil(e.target.value)} />
           <Button type="submit" disabled={!until || undo.isPending}>
-            {t.common.undo}
+            {m.common_undo()}
           </Button>
         </form>
       </div>
       <ErrorNote error={undo.error} />
       {undo.data && (
         <div className="text-sm text-muted">
-          {h.result(undo.data.undone)}
-          {undo.data.failed.length ? h.refused(undo.data.failed.length, localize(undo.data.failed[0]!.reason)) : ""}
+          {m.history_result({ undone: undo.data.undone })}
+          {undo.data.failed.length ? m.history_refused({ n: undo.data.failed.length, reason: localize(undo.data.failed[0]!.reason) }) : ""}
         </div>
       )}
       <Panel>
         <div className="grid grid-cols-[130px_110px_minmax(0,1fr)_70px_120px] gap-4 border-b border-row px-5 py-2.5 text-xs text-muted">
-          <div>{h.time}</div>
-          <div>{t.common.action}</div>
-          <div>{h.fromTo}</div>
-          <div>{t.dashboard.job}</div>
-          <div className="text-right">{h.undoColumn}</div>
+          <div>{m.history_time()}</div>
+          <div>{m.common_action()}</div>
+          <div>{m.history_fromTo()}</div>
+          <div>{m.dashboard_job()}</div>
+          <div className="text-right">{m.history_undoColumn()}</div>
         </div>
-        {data.length === 0 && <p className="m-0 px-5 py-6 text-sm text-muted">{h.empty}</p>}
+        {data.length === 0 && <p className="m-0 px-5 py-6 text-sm text-muted">{m.history_empty()}</p>}
         {data.map((op) => (
           <div
             key={op.id}
             className="grid grid-cols-[130px_110px_minmax(0,1fr)_70px_120px] items-center gap-4 border-b border-row px-5 py-2.5 text-[13px] last:border-b-0"
           >
             <div className="text-soft">{dt.format(new Date(op.executedAt))}</div>
-            <div className="text-soft">{t.actions[op.action] ?? op.action}</div>
+            <div className="text-soft">{pickMsg(msgGroup.actions, op.action) ?? op.action}</div>
             <div className="flex min-w-0 flex-col font-mono text-xs">
               <span className="truncate text-muted" title={op.fromPath}>
                 {op.fromPath}
@@ -125,15 +126,15 @@ function History() {
             </div>
             <div className="text-right">
               {op.undoneAt ? (
-                <span className="text-xs text-faint">{h.undone}</span>
+                <span className="text-xs text-faint">{m.history_undone()}</span>
               ) : (
                 <Button
                   size="sm"
-                  aria-label={h.undoFile(op.toPath.split("/").at(-1)!)}
+                  aria-label={m.history_undoFile({ file: op.toPath.split("/").at(-1)! })}
                   onClick={() => undo.mutate({ operationIds: [op.id] })}
                   disabled={undo.isPending}
                 >
-                  {t.common.undo}
+                  {m.common_undo()}
                 </Button>
               )}
             </div>

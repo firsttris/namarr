@@ -6,7 +6,7 @@ import {
   normalizeTitle,
   titleSimilarity,
 } from "@namarr/core";
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import type { ProviderCache } from "./cache.ts";
 import { textOf as bodyText, lang2, ProviderError, ProviderHttp, yearOf } from "./http.ts";
 import { child, childrenOf, parseXml, textOf, type XmlNode } from "./xml.ts";
@@ -62,7 +62,7 @@ export class AnidbProvider implements MetadataProvider {
     this.index ??= (async () => {
       const entries = await this.http.cached<TitleEntry[]>("titles", 3 * 24 * 3600, async () => {
         const res = await this.http.request(this.titlesUrl);
-        if (!res.ok) throw new ProviderError(`AniDB: ${tr("Titelliste", "title list")} HTTP ${res.status}`, res.status);
+        if (!res.ok) throw new ProviderError(msg("providers_anidb_titleListHttp", { status: res.status }), res.status);
         return parseTitleDump(await bodyText(res));
       });
       return entries.map((e) => {
@@ -90,12 +90,8 @@ export class AnidbProvider implements MetadataProvider {
       const error = /<error(?:\s+code="(\d+)")?>([^<]*)<\/error>/i.exec(text);
       if (error) {
         if (/no such anime/i.test(error[2]!)) return undefined;
-        if (/banned/i.test(error[2]!))
-          throw new ProviderError(tr("AniDB: zu viele Anfragen, vorübergehend gesperrt", "AniDB: too many requests, banned for now"));
-        if (/client/i.test(error[2]!))
-          throw new ProviderError(
-            tr("AniDB: Client nicht registriert oder Version falsch", "AniDB: client not registered or wrong version"),
-          );
+        if (/banned/i.test(error[2]!)) throw new ProviderError(msg("providers_anidb_banned"));
+        if (/client/i.test(error[2]!)) throw new ProviderError(msg("providers_anidb_client"));
         throw new ProviderError(`AniDB: ${error[2]}`);
       }
       return text;
@@ -141,7 +137,7 @@ export class AnidbProvider implements MetadataProvider {
 
   async details(kind: "movie" | "series", id: string, opts?: { language?: string }) {
     const found = kind === "series" ? await this.candidate(id, this.language(opts)) : undefined;
-    if (!found) throw new ProviderError(tr(`AniDB: ID ${id} nicht gefunden`, `AniDB: ID ${id} not found`), 404);
+    if (!found) throw new ProviderError(msg("providers_anidb_idNotFound", { id }), 404);
     return found;
   }
 

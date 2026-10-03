@@ -1,4 +1,4 @@
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -22,7 +22,7 @@ export const login = createServerFn({ method: "POST" })
     const rt = runtime();
     if (!checkToken(rt.env, data.token)) {
       await new Promise((r) => setTimeout(r, 500)); // slows down guessing
-      throw new Error(tr("Token ist falsch", "Wrong token"));
+      throw new Error(msg("auth_error_wrongToken"));
     }
     const secure = new URL(getRequest().url).protocol === "https:";
     setResponseHeader("set-cookie", sessionCookie(rt.env.token!, secure));

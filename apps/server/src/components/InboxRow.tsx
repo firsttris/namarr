@@ -2,7 +2,8 @@ import type { MatchResult } from "@namarr/core/matcher";
 import type { Parsed } from "@namarr/core/types";
 import { Link } from "@tanstack/react-router";
 import { pct, splitTarget } from "~/lib/format";
-import { useLocalize, useT } from "~/lib/i18n";
+import { useLocalize } from "~/lib/i18n";
+import * as m from "~/paraglide/messages";
 import { Button, Poster, Progress } from "./ui";
 
 export type InboxEntry = {
@@ -21,7 +22,6 @@ export type InboxEntry = {
 
 /** One uncertain match: old name, proposed name, why it waits, confidence, approve. */
 export function InboxRow({ entry, onApprove, busy, last }: { entry: InboxEntry; onApprove: () => void; busy?: boolean; last?: boolean }) {
-  const t = useT();
   const localize = useLocalize();
   const { item } = entry;
   const match = item.matchJson as MatchResult | null;
@@ -43,7 +43,7 @@ export function InboxRow({ entry, onApprove, busy, last }: { entry: InboxEntry; 
               {target.file}
             </>
           ) : (
-            <span className="text-muted">{t.inbox.noTarget}</span>
+            <span className="text-muted">{m.inbox_noTarget()}</span>
           )}
         </div>
         <div className="text-xs text-muted">{localize(entry.reason)}</div>
@@ -54,10 +54,15 @@ export function InboxRow({ entry, onApprove, busy, last }: { entry: InboxEntry; 
       </div>
       <div className="flex flex-shrink-0 gap-2">
         <Link to="/rename" search={{ job: item.jobId, item: item.id }} className="no-underline">
-          <Button>{t.common.change}</Button>
+          <Button>{m.common_change()}</Button>
         </Link>
-        <Button variant="light" onClick={onApprove} disabled={busy || !item.targetPath} aria-label={t.inbox.approveFile(fileName)}>
-          {t.common.approve}
+        <Button
+          variant="light"
+          onClick={onApprove}
+          disabled={busy || !item.targetPath}
+          aria-label={m.inbox_approveFile({ file: fileName })}
+        >
+          {m.common_approve()}
         </Button>
       </div>
     </div>

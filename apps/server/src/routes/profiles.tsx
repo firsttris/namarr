@@ -7,8 +7,10 @@ import { RuleStack } from "~/components/RuleStack";
 import { TemplateEditor } from "~/components/TemplateEditor";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getProfiles, getSettingsFn, removeProfile, saveProfile } from "~/functions/library.functions";
-import { useT } from "~/lib/i18n";
+import { pickMsg } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
 import { SERIES_SOURCES } from "~/lib/providers";
+import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/profiles")({
   validateSearch: z.object({ id: z.coerce.number().optional() }),
@@ -31,7 +33,6 @@ const EMPTY: Draft = {
 };
 
 function Profiles() {
-  const t = useT();
   const initial = Route.useLoaderData();
   const { id } = Route.useSearch();
   const qc = useQueryClient();
@@ -69,14 +70,14 @@ function Profiles() {
 
   return (
     <>
-      <PageHeader title={t.profiles.title} subtitle={t.profiles.subtitle}>
-        <Button variant="accent" size="lg" onClick={() => setDraft({ ...EMPTY, name: t.profiles.new })}>
-          {t.profiles.new}
+      <PageHeader title={m.profiles_title()} subtitle={m.profiles_subtitle()}>
+        <Button variant="accent" size="lg" onClick={() => setDraft({ ...EMPTY, name: m.profiles_new() })}>
+          {m.profiles_new()}
         </Button>
       </PageHeader>
       <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
         <Panel className="flex flex-col p-2">
-          {data.length === 0 && <p className="m-0 p-3 text-sm text-muted">{t.profiles.none}</p>}
+          {data.length === 0 && <p className="m-0 p-3 text-sm text-muted">{m.profiles_none()}</p>}
           {data.map((p) => (
             <Link
               key={p.id}
@@ -89,7 +90,7 @@ function Profiles() {
             >
               <div className="font-semibold">{p.name}</div>
               <div className="text-xs text-muted">
-                {t.modes[p.mode]} · {t.actions[p.action] ?? p.action}
+                {pickMsg(msgGroup.modes, p.mode)} · {pickMsg(msgGroup.actions, p.action) ?? p.action}
               </div>
             </Link>
           ))}
@@ -103,7 +104,7 @@ function Profiles() {
             }}
           >
             <Panel className="grid gap-4 p-5 md:grid-cols-2">
-              <Field label={t.common.name} htmlFor="p-name">
+              <Field label={m.common_name()} htmlFor="p-name">
                 <input
                   id="p-name"
                   className={inputClass}
@@ -112,56 +113,58 @@ function Profiles() {
                   required
                 />
               </Field>
-              <Field label={t.common.mode} htmlFor="p-mode">
+              <Field label={m.common_mode()} htmlFor="p-mode">
                 <Select id="p-mode" value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as Draft["mode"] })}>
-                  <option value="media">{t.modes.media}</option>
-                  <option value="rules">{t.modes.rules}</option>
-                  <option value="both">{t.modes.both}</option>
+                  <option value="media">{m.modes_media()}</option>
+                  <option value="rules">{m.modes_rules()}</option>
+                  <option value="both">{m.modes_both()}</option>
                 </Select>
               </Field>
-              <Field label={t.common.action} htmlFor="p-action">
+              <Field label={m.common_action()} htmlFor="p-action">
                 <Select
                   id="p-action"
                   value={draft.action}
                   onChange={(e) => setDraft({ ...draft, action: e.target.value as Draft["action"] })}
                 >
-                  {Object.entries(t.actions).map(([k, v]) => (
+                  {Object.entries(msgGroup.actions).map(([k, v]) => (
                     <option key={k} value={k}>
-                      {v}
+                      {v()}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field label={t.common.conflicts} htmlFor="p-conflict">
+              <Field label={m.common_conflicts()} htmlFor="p-conflict">
                 <Select
                   id="p-conflict"
                   value={draft.conflictPolicy}
                   onChange={(e) => setDraft({ ...draft, conflictPolicy: e.target.value as Draft["conflictPolicy"] })}
                 >
-                  {Object.entries(t.conflictPolicies).map(([k, v]) => (
+                  {Object.entries(msgGroup.conflictPolicies).map(([k, v]) => (
                     <option key={k} value={k}>
-                      {v}
+                      {v()}
                     </option>
                   ))}
                 </Select>
               </Field>
               {draft.mode !== "rules" && (
-                <Field label={t.common.seriesSource} htmlFor="p-provider">
+                <Field label={m.common_seriesSource()} htmlFor="p-provider">
                   <Select
                     id="p-provider"
                     value={draft.provider ?? ""}
                     onChange={(e) => setDraft({ ...draft, provider: (e.target.value || null) as Draft["provider"] })}
                   >
-                    <option value="">{t.common.fromSettings(t.providers[settings.data?.seriesProvider ?? "tmdb"])}</option>
+                    <option value="">
+                      {m.common_fromSettings({ name: pickMsg(msgGroup.providers, settings.data?.seriesProvider ?? "tmdb") })}
+                    </option>
                     {SERIES_SOURCES.map((p) => (
                       <option key={p} value={p}>
-                        {t.providers[p]}
+                        {pickMsg(msgGroup.providers, p)}
                       </option>
                     ))}
                   </Select>
                 </Field>
               )}
-              <Field label={t.profiles.targetRoot} htmlFor="p-target" hint={t.profiles.targetHint}>
+              <Field label={m.profiles_targetRoot()} htmlFor="p-target" hint={m.profiles_targetHint()}>
                 <input
                   id="p-target"
                   className={cx(inputClass, "font-mono")}
@@ -172,7 +175,7 @@ function Profiles() {
             </Panel>
             {draft.mode !== "rules" && (
               <div className="flex flex-col gap-2">
-                <div role="group" aria-label={t.profiles.templateFor} className="flex gap-2">
+                <div role="group" aria-label={m.profiles_templateFor()} className="flex gap-2">
                   {(["episode", "movie"] as const).map((k) => (
                     <Button
                       key={k}
@@ -181,7 +184,7 @@ function Profiles() {
                       className={kind === k ? "bg-toggle" : undefined}
                       onClick={() => setKind(k)}
                     >
-                      {k === "episode" ? t.common.series : t.common.movies}
+                      {k === "episode" ? m.common_series() : m.common_movies()}
                     </Button>
                   ))}
                 </div>
@@ -205,22 +208,22 @@ function Profiles() {
             <ErrorNote error={save.error ?? remove.error} />
             <div className="flex gap-2">
               <Button type="submit" variant="accent" size="lg" disabled={save.isPending}>
-                {t.common.save}
+                {m.common_save()}
               </Button>
               {draft.id && (
-                <Button size="lg" onClick={() => confirm(t.profiles.confirmDelete(draft.name)) && remove.mutate(draft.id!)}>
-                  {t.profiles.delete}
+                <Button size="lg" onClick={() => confirm(m.profiles_confirmDelete({ name: draft.name })) && remove.mutate(draft.id!)}>
+                  {m.profiles_delete()}
                 </Button>
               )}
               {draft.id && (
                 <Link to="/rename" search={{ profile: draft.id }} className="no-underline">
-                  <Button size="lg">{t.profiles.useInWorkbench}</Button>
+                  <Button size="lg">{m.profiles_useInWorkbench()}</Button>
                 </Link>
               )}
             </div>
           </form>
         ) : (
-          <Panel className="p-6 text-sm text-muted">{t.profiles.pick}</Panel>
+          <Panel className="p-6 text-sm text-muted">{m.profiles_pick()}</Panel>
         )}
       </div>
     </>

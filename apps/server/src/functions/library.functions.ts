@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { ACTIONS, CONFLICT_POLICIES, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import {
   createProfile,
   createWatchFolder,
@@ -207,7 +207,7 @@ export const saveSettings = createServerFn({ method: "POST" })
       anidbClient: z
         .string()
         .max(50)
-        .regex(/^[a-z0-9]*$/i, tr("AniDB-Client: nur Buchstaben und Ziffern", "AniDB client: letters and digits only"))
+        .regex(/^[a-z0-9]*$/i, msg("settings_error_anidbClient"))
         .optional(),
       anidbClientVersion: z.string().max(10).optional(),
       seriesProvider: z.enum(SERIES_PROVIDERS).optional(),
@@ -224,9 +224,9 @@ export const saveSettings = createServerFn({ method: "POST" })
   .handler(async ({ data, context: { rt } }) => {
     if (data.roots) {
       for (const r of data.roots) {
-        if (!path.isAbsolute(r)) throw new Error(tr(`Wurzelpfad muss absolut sein: ${r}`, `Root path must be absolute: ${r}`));
+        if (!path.isAbsolute(r)) throw new Error(msg("settings_error_rootNotAbsolute", { path: r }));
         const st = await fs.stat(r).catch(() => undefined);
-        if (!st?.isDirectory()) throw new Error(tr(`Ordner existiert nicht: ${r}`, `Folder does not exist: ${r}`));
+        if (!st?.isDirectory()) throw new Error(msg("settings_error_rootMissing", { path: r }));
       }
     }
     // An empty secret field keeps what is stored; "-" removes it.

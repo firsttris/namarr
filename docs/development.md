@@ -16,11 +16,23 @@ bun run build && bun run start
 **Migrations**: change the schema in `packages/db/src/schema.ts`, then run
 `bun run --cwd packages/db generate`. They run automatically at startup.
 
-**Texts**: UI texts live in `apps/server/src/lib/messages.ts`. `de` defines the shape, `en` must
-match it (tsc checks that). Texts from the server are written with `tr("…", "…")` from
-`@namarr/core/i18n` and shown in the viewer's language. The first visit follows the browser language
-(everything but German → English), later the switch in the navigation or the settings; the choice is
-kept in the `namarr_lang` cookie so that server rendering already uses it.
+**Texts**: all texts live in `apps/server/messages/{de,en}.json`
+([Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)), keys follow
+`area_group_name` (`settings_title`, `rules_describe_pad`). `bun run i18n` compiles them to
+`apps/server/src/paraglide` (dev, build, typecheck and test do that on their own). Components call
+them directly: `m.settings_title()`, `m.workbench_run({ n, count, test })`; a key chosen at runtime
+goes through `pickMsg(msgGroup.actions, action)`. Placeholders are `{name}`, a literal brace is `\{`.
+
+Texts the server produces (match reasons, file errors, provider errors) use `msg("key", inputs)`
+from `@namarr/core/i18n`: they travel as key and inputs and are rendered in the viewer's language by
+the UI (`useLocalize()`), or by the server where it answers itself (`localizeIn()`, notifications
+in the title language). Entries stored by older versions, with both texts side by side, still render.
+
+The first visit follows the browser language (everything but German → English), later the switch in
+the navigation or the settings; the choice is kept in the `namarr_lang` cookie, and every request is
+rendered in it (`lang.server.ts`). `apps/server/test/i18n.test.ts` checks that both languages have
+the same keys and placeholders, that every message is used and every used key exists, and that no
+German is left in English.
 
 ## Architecture
 

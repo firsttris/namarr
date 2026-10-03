@@ -1,21 +1,21 @@
-import type { Messages } from "./messages";
+import * as m from "~/paraglide/messages";
 
 export const num = (n: number, locale = "de-DE") => new Intl.NumberFormat(locale).format(n);
 export const pct = (n: number) => `${Math.round(n * 100)} %`;
 
-export function ago(t: Messages, date: Date | string | number | null | undefined, now = Date.now()): string {
-  if (!date) return t.time.never;
+export function ago(date: Date | string | number | null | undefined, now = Date.now()): string {
+  if (!date) return m.time_never();
   const s = Math.max(0, Math.round((now - new Date(date).getTime()) / 1000));
-  if (s < 60) return t.time.justNow;
-  if (s < 3600) return t.time.minutes(Math.round(s / 60));
-  if (s < 86400) return t.time.hours(Math.round(s / 3600));
-  return t.time.days(Math.round(s / 86400));
+  if (s < 60) return m.time_justNow();
+  if (s < 3600) return m.time_minutes({ n: Math.round(s / 60) });
+  if (s < 86400) return m.time_hours({ n: Math.round(s / 3600) });
+  return m.time_days({ n: Math.round(s / 86400) });
 }
 
-export function greeting(t: Messages, hour = new Date().getHours()): string {
-  if (hour < 11) return t.time.greetingMorning;
-  if (hour < 18) return t.time.greetingDay;
-  return t.time.greetingEvening;
+export function greeting(hour = new Date().getHours()): string {
+  if (hour < 11) return m.time_greetingMorning();
+  if (hour < 18) return m.time_greetingDay();
+  return m.time_greetingEvening();
 }
 
 /** Splits a target path into folder part and file name, for the two-tone rendering. */

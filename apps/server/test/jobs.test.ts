@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { APPROVED, DOUBLE_EPISODE, localize } from "@namarr/core";
+import { APPROVED, DOUBLE_EPISODE } from "@namarr/core";
 import {
   allItems,
   createWatchFolder,
@@ -17,6 +17,7 @@ import {
 } from "@namarr/db";
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { localizeIn } from "~/lib/i18n";
 import { EventBus, type NamarrEvent } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
 import type { JobSummary } from "~/server/notify.server";
@@ -104,15 +105,15 @@ describe("JobService: Analyse", () => {
   });
 
   it("lehnt Pfade außerhalb der Wurzelpfade ab", async () => {
-    await expect(jobs.create({ paths: ["/etc"], config: config() })).rejects.toThrow(/außerhalb/);
-    await expect(jobs.create({ paths: [tv()], config: config({ targetRoot: "/etc" }) })).rejects.toThrow(/außerhalb/);
+    await expect(jobs.create({ paths: ["/etc"], config: config() })).rejects.toThrow(/paths_outsideRoots/);
+    await expect(jobs.create({ paths: [tv()], config: config({ targetRoot: "/etc" }) })).rejects.toThrow(/paths_outsideRoots/);
   });
 
   it("ohne Anbieter schlägt der Job mit verständlicher Meldung fehl", async () => {
     jobs = new JobService({ db, bus, provider: () => undefined, log, notify });
     const job = await jobs.create({ paths: [tv()], config: config() });
     await jobs.idle();
-    expect(getJob(db, job.id)).toMatchObject({ status: "failed", error: expect.stringContaining("TMDB, TheTVDB oder AniDB") });
+    expect(getJob(db, job.id)).toMatchObject({ status: "failed", error: expect.stringContaining("jobs_error_noProvider") });
   });
 
   it("Regel-Modus benennt ohne Matching am Ort um", async () => {
@@ -218,7 +219,7 @@ describe("JobService: Vorschau neu berechnen ohne neues Matching", () => {
 
     const manual = await jobs.updateItem(by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").id, { targetPath: "Eigene/Datei.mkv" });
     expect(manual.targetPath).toBe(path.join(media(), "Eigene/Datei.mkv"));
-    await expect(jobs.updateItem(manual.id, { targetPath: "../../../etc/x" })).rejects.toThrow(/außerhalb/);
+    await expect(jobs.updateItem(manual.id, { targetPath: "../../../etc/x" })).rejects.toThrow(/paths_outsideRoots/);
     expect(getJob(db, job.id)!.status).toBe("ready");
   });
 });
@@ -276,7 +277,7 @@ describe("JobService: Ausführen und Undo", () => {
     const { job, by } = await analyzed();
     await jobs.executeNow(job.id);
     await expect(jobs.updateItem(by("Severance.S02E02.German.DL.1080p.WEB.h264-GRP.mkv").id, { excluded: true })).rejects.toThrow(
-      /rückgängig/,
+      /jobs_error_alreadyRenamed/,
     );
   });
 });
@@ -303,9 +304,9 @@ describe("JobService: Review-Fixes", () => {
 
   it("während der Job läuft, sind Vorschau und Items gesperrt", async () => {
     const job = await jobs.create({ paths: [tv()], config: config() });
-    await expect(jobs.recompute(job.id, { preset: "plex" })).rejects.toThrow(/läuft noch/);
+    await expect(jobs.recompute(job.id, { preset: "plex" })).rejects.toThrow(/jobs_error_running/);
     // Thrown synchronously, so the server function can report it before queueing
-    expect(() => jobs.executeNow(job.id)).toThrow(/läuft noch/);
+    expect(() => jobs.executeNow(job.id)).toThrow(/jobs_error_running/);
     await jobs.idle();
     await expect(jobs.recompute(job.id, { preset: "plex" })).resolves.toBeDefined();
   });
@@ -347,8 +348,8 @@ describe("JobService: Review-Fixes", () => {
     await jobs.executeNow(job.id);
     const e1 = allItems(db, job.id).find((i) => i.id === by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").id)!;
     expect(e1.state).toBe("done");
-    expect(localize(e1.error, "de")).toContain("Ziel existiert bereits");
-    expect(localize(e1.error, "en")).toContain("Target already exists");
+    expect(localizeIn(e1.error, "de")).toContain("Ziel existiert bereits");
+    expect(localizeIn(e1.error, "en")).toContain("Target already exists");
   });
 });
 
@@ -370,7 +371,7 @@ describe("JobService: Watch-Jobs", () => {
     await jobs.idle();
     expect(await fs.readdir(media())).toEqual([]);
     expect(listInbox(db)).toHaveLength(3);
-    expect(listInbox(db).every((e) => localize(e.reason, "de").startsWith("Immer prüfen"))).toBe(true);
+    expect(listInbox(db).every((e) => localizeIn(e.reason, "de").startsWith("Immer prüfen"))).toBe(true);
     expect(getJob(db, job.id)!.status).toBe("ready");
   });
 });
@@ -396,7 +397,7 @@ describe("JobService: Bessere Qualität behalten", () => {
     await jobs.executeNow(job.id);
     const item = severanceE01(allItems(db, job.id));
     expect(item.state).toBe("done");
-    expect(localize(item.reasons.at(-1)!, "en")).toBe("Replaced a worse file (Resolution: 1080p vs 720p)");
+    expect(localizeIn(item.reasons.at(-1)!, "en")).toBe("Replaced a worse file (Resolution: 1080p vs 720p)");
     expect(await fs.readFile(`${episode()}.mkv`, "utf8")).toContain("1080p.WEB");
     // The subtitle belongs to the new file, not compared by size
     expect(await fs.readFile(`${episode()}.de.srt`, "utf8")).toContain("1080p.WEB");
@@ -412,7 +413,7 @@ describe("JobService: Bessere Qualität behalten", () => {
     await jobs.executeNow(job.id);
     const item = severanceE01(allItems(db, job.id));
     expect(item.state).toBe("skipped");
-    expect(localize(item.reasons.at(-1)!, "de")).toBe("Vorhandene Datei ist besser (Quelle: WEB vs BluRay)");
+    expect(localizeIn(item.reasons.at(-1)!, "de")).toBe("Vorhandene Datei ist besser (Quelle: WEB vs BluRay)");
     expect(await fs.readFile(`${episode()}.mkv`, "utf8")).toBe("BluRay");
   });
 
@@ -428,7 +429,7 @@ describe("JobService: Bessere Qualität behalten", () => {
     await jobs.executeNow(job.id);
     const item = severanceE01(allItems(db, job.id));
     expect(item.state).toBe("skipped");
-    expect(localize(item.reasons.at(-1)!, "en")).toBe("Existing file is better (Resolution: 1080p vs 2160p)");
+    expect(localizeIn(item.reasons.at(-1)!, "en")).toBe("Existing file is better (Resolution: 1080p vs 2160p)");
   });
 });
 

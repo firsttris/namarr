@@ -1,5 +1,5 @@
 import { ACTIONS, CONFLICT_POLICIES } from "@namarr/core";
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 import { countItemsByState, getJob as findJob, getProfile, getSettings, ITEM_STATES, listItems, SERIES_PROVIDERS } from "@namarr/db";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -143,8 +143,7 @@ export const undoJob = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data, context: { rt } }) => {
-    if (!data.jobId && !data.itemIds && !data.operationIds && !data.since)
-      throw new Error(tr("Nichts zum Rückgängigmachen angegeben", "Nothing to undo given"));
+    if (!data.jobId && !data.itemIds && !data.operationIds && !data.since) throw new Error(msg("history_error_nothingToUndo"));
     return rt.jobs.undo({ ...data, since: data.since ? new Date(data.since) : undefined });
   });
 

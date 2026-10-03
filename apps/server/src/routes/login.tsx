@@ -5,7 +5,7 @@ import { LanguageSwitch } from "~/components/AppShell";
 import { Logo } from "~/components/icons";
 import { Button, ErrorNote, inputClass } from "~/components/ui";
 import { login } from "~/functions/auth.functions";
-import { useT } from "~/lib/i18n";
+import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/login")({
   validateSearch: z.object({ next: z.string().optional() }),
@@ -13,7 +13,6 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
-  const t = useT();
   const { next } = Route.useSearch();
   const navigate = useNavigate();
   const [token, setToken] = useState("");
@@ -47,7 +46,7 @@ function Login() {
           <LanguageSwitch />
         </div>
         <label htmlFor="token" className="text-[13px] text-muted">
-          {t.login.token}
+          {m.login_token()}
         </label>
         <input
           id="token"
@@ -60,7 +59,7 @@ function Login() {
         />
         <ErrorNote error={error} />
         <Button type="submit" variant="accent" size="lg" disabled={busy}>
-          {t.login.submit}
+          {m.login_submit()}
         </Button>
       </form>
     </main>

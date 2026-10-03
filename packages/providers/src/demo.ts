@@ -1,5 +1,5 @@
 import type { EpisodeInfo, ExternalIds, MediaCandidate, MetadataProvider } from "@namarr/core";
-import { tr } from "@namarr/core/i18n";
+import { msg } from "@namarr/core/i18n";
 
 type Entry = MediaCandidate & { episodes?: EpisodeInfo[] };
 
@@ -89,7 +89,7 @@ export class DemoProvider implements MetadataProvider {
 
   async details(_kind: "movie" | "series", id: string) {
     const found = CATALOG.find((e) => e.id === id);
-    if (!found) throw new Error(tr(`Unbekannte ID ${id}`, `Unknown ID ${id}`));
+    if (!found) throw new Error(msg("providers_demo_unknownId", { id }));
     const { episodes: _, ...c } = found;
     return c;
   }

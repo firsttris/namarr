@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { localize } from "../src/i18n.ts";
 import {
   classify,
   DOUBLE_EPISODE,
@@ -15,6 +14,7 @@ import {
 import { parse } from "../src/parser/index.ts";
 import type { MediaCandidate } from "../src/types.ts";
 import { FakeProvider, severance, severanceEpisodes } from "./helpers.ts";
+import { text } from "./text.ts";
 
 describe("Ähnlichkeit", () => {
   it("Jaro-Winkler Referenzwerte", () => {
@@ -60,8 +60,8 @@ describe("Bewertung", () => {
     const uk: MediaCandidate = { provider: "tmdb", id: "2996", kind: "series", title: "The Office", year: 2001 };
     const { confidence, reasons } = rank(parsed, [us, uk]);
     expect(confidence).toBeLessThan(0.9);
-    expect(reasons.map((r) => localize(r, "de"))).toContain("Mehrere Treffer mit gleichem Titel");
-    expect(reasons.map((r) => localize(r, "en"))).toContain("Several matches with the same title");
+    expect(reasons.map((r) => text(r, "de"))).toContain("Mehrere Treffer mit gleichem Titel");
+    expect(reasons.map((r) => text(r, "en"))).toContain("Several matches with the same title");
   });
 
   it("ohne passenden Kandidaten: Confidence 0", () => {
@@ -118,7 +118,7 @@ describe("Gruppierung und matchAll", () => {
     const provider = new FakeProvider({ series: [severance], episodes: { "95396": severanceEpisodes } });
     const input = [{ key: "x", parsed: parse("Severance.S02E09.1080p.mkv") }];
     const result = (await matchAll(input, provider)).get("x")!;
-    expect(result.reasons.map((r) => localize(r, "de"))).toContain("Episode nicht beim Anbieter gefunden");
+    expect(result.reasons.map((r) => text(r, "de"))).toContain("Episode nicht beim Anbieter gefunden");
     expect(classify(result.confidence)).not.toBe("auto");
   });
 
@@ -167,7 +167,7 @@ describe("IDs aus dem Ordnernamen", () => {
     const files = [{ key: "a", parsed: parse("/tv/DS9 [tvdbid-72073]/Season 01/ds9.s01e07.mkv") }];
     const result = (await matchAll(files, provider)).get("a")!;
     expect(result).toMatchObject({ best: ds9, confidence: 1, episodes: [{ title: "Q-Less" }] });
-    expect(localize(result.reasons[0]!, "en")).toBe("ID from the folder name");
+    expect(text(result.reasons[0]!, "en")).toBe("ID from the folder name");
     expect(provider.calls.searchSeries).toBe(0);
   });
 
@@ -196,7 +196,7 @@ describe("Anbieter mit einem Eintrag pro Staffel (AniDB)", () => {
     const result = (await matchAll([{ key: "a", parsed: parse("Sousou.no.Frieren.S02E05.1080p.WEB.mkv") }], provider)).get("a")!;
     expect(result.episodes).toEqual([{ season: 1, episode: 5, absolute: 5, title: "Folge 5" }]);
     expect(result.confidence).toBeLessThanOrEqual(0.7);
-    expect(localize(result.reasons.at(-1)!, "de")).toContain("Staffel 2 ist beim Anbieter ein eigener Eintrag");
+    expect(text(result.reasons.at(-1)!, "de")).toContain("Staffel 2 ist beim Anbieter ein eigener Eintrag");
   });
 
   it("Staffel 1 bleibt unverändert", async () => {

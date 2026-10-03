@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { logout } from "~/functions/auth.functions";
 import { getShellInfo } from "~/functions/library.functions";
 import { useLive } from "~/lib/events";
-import { LANGS, useLang, useT } from "~/lib/i18n";
+import { LANGS, pickMsg, useLang } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
+import * as m from "~/paraglide/messages";
 import { DashboardIcon, EyeIcon, GearIcon, HistoryIcon, InboxIcon, ListIcon, Logo, PenIcon } from "./icons";
 import { cx } from "./ui";
 
@@ -19,7 +21,6 @@ const NAV = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const t = useT();
   const { connected } = useLive();
   const shell = useQuery({ queryKey: ["shell"], queryFn: () => getShellInfo(), refetchInterval: 60_000 });
   const inbox = shell.data?.inboxOpen ?? 0;
@@ -27,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-bg text-ink">
       <nav
-        aria-label={t.nav.main}
+        aria-label={m.nav_main()}
         className="sticky top-0 flex h-screen w-[232px] flex-shrink-0 flex-col gap-7 border-r border-line bg-nav px-4 py-6"
       >
         <Link to="/" className="flex items-center gap-2.5 px-2 text-ink no-underline hover:text-ink">
@@ -47,7 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               activeProps={{ className: "bg-active !text-white font-semibold", "aria-current": "page" }}
             >
               <item.icon />
-              <span className="flex-grow">{t.nav[item.key]}</span>
+              <span className="flex-grow">{pickMsg(msgGroup.nav, item.key)}</span>
               {"badge" in item && inbox > 0 && (
                 <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-accent px-[7px] text-xs font-semibold text-accent-ink">
                   {inbox}
@@ -62,10 +63,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex flex-col gap-1.5 rounded-[10px] border border-line bg-[#161920] px-3 py-3.5">
             <div className="flex items-center gap-2 text-[13px] font-medium">
               <span className={cx("h-2 w-2 rounded-full", connected ? "bg-info" : "bg-faint")} />
-              {connected ? t.nav.connected : t.nav.disconnected}
+              {connected ? m.nav_connected() : m.nav_disconnected()}
             </div>
             <div className="font-mono text-xs text-muted">{shell.data?.host ?? "…"}</div>
-            {shell.data?.demo && <div className="text-xs text-accent-soft">{t.nav.demo}</div>}
+            {shell.data?.demo && <div className="text-xs text-accent-soft">{m.nav_demo()}</div>}
             {shell.data?.authRequired && (
               <button
                 type="button"
@@ -75,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 }}
                 className="mt-1 cursor-pointer self-start border-0 bg-transparent p-0 text-xs text-accent hover:text-accent-soft"
               >
-                {t.nav.logout}
+                {m.nav_logout()}
               </button>
             )}
           </div>
@@ -88,10 +89,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 /** DE | EN toggle, like in haul: the choice is stored in a cookie for the next server render. */
 export function LanguageSwitch() {
-  const t = useT();
   const { lang, setLang } = useLang();
   return (
-    <div role="group" aria-label={t.nav.language} className="flex self-start rounded-lg border border-line-2 bg-[#161920] p-0.5">
+    <div role="group" aria-label={m.nav_language()} className="flex self-start rounded-lg border border-line-2 bg-[#161920] p-0.5">
       {LANGS.map((l) => (
         <button
           key={l.id}

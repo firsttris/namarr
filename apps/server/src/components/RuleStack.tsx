@@ -1,8 +1,10 @@
 import { describeRule, previewRules, type Rule, RuleError } from "@namarr/core/rules";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { parse as parseYaml, stringify as toYaml } from "yaml";
-import { useLocalize, useT } from "~/lib/i18n";
+import { pickMsg, useLocalize } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
 import { rulesSchema } from "~/lib/schemas";
+import * as m from "~/paraglide/messages";
 import { GripIcon, PlusIcon, XIcon } from "./icons";
 import { cx, inputClass, Select } from "./ui";
 
@@ -65,7 +67,6 @@ type Props = {
 
 /** Ordered rule stack: drag to reorder, toggle, edit inline, preview per rule. */
 export function RuleStack({ rules, onChange, sample, title, note }: Props) {
-  const t = useT();
   const localize = useLocalize();
   const [open, setOpen] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
@@ -85,7 +86,7 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
       onChange(importRules(await f.text()));
       setImportError(null);
     } catch (e) {
-      setImportError(t.rules.importError((e as Error).message));
+      setImportError(m.rules_importError({ error: (e as Error).message }));
     }
   };
 
@@ -112,11 +113,11 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
     <section aria-labelledby="rules-h" className="flex flex-col gap-2.5 rounded-[14px] border border-line bg-panel p-4">
       <div className="flex items-center gap-2">
         <h2 id="rules-h" className="m-0 flex-grow text-[15px] font-semibold">
-          {title ?? t.workbench.rulesAfter}
+          {title ?? m.workbench_rulesAfter()}
         </h2>
         <button
           type="button"
-          aria-label={t.rules.add}
+          aria-label={m.rules_add()}
           aria-expanded={adding}
           onClick={() => setAdding((a) => !a)}
           className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-[7px] border border-line-3 bg-transparent text-ink hover:bg-panel-2"
@@ -137,12 +138,12 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
               }}
               className="cursor-pointer rounded-md border-0 bg-chip px-2 py-1 text-xs text-chip-ink hover:bg-toggle"
             >
-              {t.rules.types[type]}
+              {pickMsg(msgGroup.rules_types, type)}
             </button>
           ))}
         </div>
       )}
-      {rules.length === 0 && <div className="text-xs text-faint">{t.rules.none}</div>}
+      {rules.length === 0 && <div className="text-xs text-faint">{m.rules_none()}</div>}
       <ol className="m-0 flex list-none flex-col gap-2 p-0">
         {rules.map((rule, i) => (
           <li
@@ -157,7 +158,7 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
             className={cx("flex flex-col gap-2 rounded-lg border border-line-2 bg-panel-2 px-3 py-2.5", drag === i && "opacity-50")}
           >
             <div className="flex items-center gap-2.5">
-              <span className="cursor-grab text-faint" title={t.rules.drag}>
+              <span className="cursor-grab text-faint" title={m.rules_drag()}>
                 <GripIcon />
               </span>
               <span className="font-mono text-[11px] text-faint">{i + 1}</span>
@@ -176,12 +177,12 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
                 type="checkbox"
                 checked={rule.enabled !== false}
                 onChange={(e) => update(i, { enabled: e.target.checked })}
-                aria-label={t.rules.active(i + 1)}
+                aria-label={m.rules_active({ n: i + 1 })}
                 className="h-4 w-4"
               />
               <button
                 type="button"
-                aria-label={t.rules.remove(i + 1)}
+                aria-label={m.rules_remove({ n: i + 1 })}
                 onClick={() => onChange(rules.filter((_, k) => k !== i))}
                 className="cursor-pointer border-0 bg-transparent p-1 text-faint hover:text-ink"
               >
@@ -198,7 +199,7 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
           </li>
         ))}
       </ol>
-      <div className="text-xs text-muted">{note ?? t.workbench.rulesAfterNote}</div>
+      <div className="text-xs text-muted">{note ?? m.workbench_rulesAfterNote()}</div>
       <div className="flex gap-3 text-xs">
         <button
           type="button"
@@ -206,20 +207,20 @@ export function RuleStack({ rules, onChange, sample, title, note }: Props) {
           disabled={!rules.length}
           className="cursor-pointer border-0 bg-transparent p-0 text-accent hover:text-accent-soft disabled:cursor-default disabled:text-faint"
         >
-          {t.rules.exportRules}
+          {m.rules_exportRules()}
         </button>
         <button
           type="button"
           onClick={() => file.current?.click()}
           className="cursor-pointer border-0 bg-transparent p-0 text-accent hover:text-accent-soft"
         >
-          {t.rules.importRules}
+          {m.rules_importRules()}
         </button>
         <input
           ref={file}
           type="file"
           accept=".yaml,.yml,.json"
-          aria-label={t.rules.importRules}
+          aria-label={m.rules_importRules()}
           className="hidden"
           onChange={(e) => {
             void upload(e.target.files?.[0]);
@@ -250,32 +251,31 @@ function Row({ label, id, children }: { label: string; id: string; children: Rea
 const small = cx(inputClass, "h-8 min-w-0 flex-grow font-mono text-xs");
 
 function RuleEditor({ rule, index, onChange }: { rule: Rule; index: number; onChange: (patch: Partial<Rule>) => void }) {
-  const r = useT().rules;
   const id = (f: string) => `rule-${index}-${f}`;
   const target = (
-    <Row label={r.appliesTo} id={id("target")}>
+    <Row label={m.rules_appliesTo()} id={id("target")}>
       <Select
         id={id("target")}
         className="h-8 text-xs"
         value={rule.target ?? "name"}
         onChange={(e) => onChange({ target: e.target.value as Rule["target"] })}
       >
-        <option value="name">{r.targetName}</option>
-        <option value="extension">{r.targetExtension}</option>
-        <option value="full">{r.targetFull}</option>
+        <option value="name">{m.rules_targetName()}</option>
+        <option value="extension">{m.rules_targetExtension()}</option>
+        <option value="full">{m.rules_targetFull()}</option>
       </Select>
     </Row>
   );
   const position = (value: string | number | undefined) => (
-    <Row label={r.position} id={id("pos")}>
+    <Row label={m.rules_position()} id={id("pos")}>
       <Select
         id={id("pos")}
         className="h-8 text-xs"
         value={String(value ?? "start")}
         onChange={(e) => onChange({ position: e.target.value as "start" } as Partial<Rule>)}
       >
-        <option value="start">{r.start}</option>
-        <option value="end">{r.end}</option>
+        <option value="start">{m.rules_start()}</option>
+        <option value="end">{m.rules_end()}</option>
       </Select>
     </Row>
   );
@@ -316,125 +316,125 @@ function RuleEditor({ rule, index, onChange }: { rule: Rule; index: number; onCh
     <div className="flex flex-col gap-2 border-t border-line-2 pt-2">
       {rule.type === "replace" && (
         <>
-          {text(r.find, "find", rule.find)}
-          {text(r.replace, "replace", rule.replace)}
+          {text(m.rules_find(), "find", rule.find)}
+          {text(m.rules_replace(), "replace", rule.replace)}
           <div className="flex gap-4">
-            {check(r.regex, "regex", rule.regex)}
-            {check(r.caseSensitive, "caseSensitive", rule.caseSensitive)}
+            {check(m.rules_regex(), "regex", rule.regex)}
+            {check(m.rules_caseSensitive(), "caseSensitive", rule.caseSensitive)}
           </div>
         </>
       )}
       {rule.type === "insert" && (
         <>
-          {text(r.text, "text", rule.text)}
+          {text(m.rules_text(), "text", rule.text)}
           {position(rule.position)}
         </>
       )}
       {rule.type === "remove" && (
         <>
-          {number(r.from, "from", rule.from)}
-          {number(r.count, "count", rule.count)}
-          {check(r.fromEnd, "fromEnd", rule.fromEnd)}
+          {number(m.rules_from(), "from", rule.from)}
+          {number(m.rules_count(), "count", rule.count)}
+          {check(m.rules_fromEnd(), "fromEnd", rule.fromEnd)}
         </>
       )}
       {rule.type === "case" && (
-        <Row label={r.mode} id={id("mode")}>
+        <Row label={m.rules_mode()} id={id("mode")}>
           <Select
             id={id("mode")}
             className="h-8 text-xs"
             value={rule.mode}
             onChange={(e) => onChange({ mode: e.target.value as "title" } as Partial<Rule>)}
           >
-            <option value="title">{r.caseTitle}</option>
-            <option value="sentence">{r.caseSentence}</option>
-            <option value="lower">{r.caseLower}</option>
-            <option value="upper">{r.caseUpper}</option>
+            <option value="title">{m.rules_caseTitle()}</option>
+            <option value="sentence">{m.rules_caseSentence()}</option>
+            <option value="lower">{m.rules_caseLower()}</option>
+            <option value="upper">{m.rules_caseUpper()}</option>
           </Select>
         </Row>
       )}
-      {rule.type === "separators" && text(r.separator, "separator", rule.separator)}
+      {rule.type === "separators" && text(m.rules_separator(), "separator", rule.separator)}
       {rule.type === "numbering" && (
         <>
-          {number(r.numberStart, "start", rule.start)}
-          {number(r.step, "step", rule.step)}
-          {number(r.padding, "padding", rule.padding)}
-          {text(r.separator, "separator", rule.separator)}
+          {number(m.rules_numberStart(), "start", rule.start)}
+          {number(m.rules_step(), "step", rule.step)}
+          {number(m.rules_padding(), "padding", rule.padding)}
+          {text(m.rules_separator(), "separator", rule.separator)}
           {position(rule.position)}
-          <Row label={r.order} id={id("sort")}>
+          <Row label={m.rules_order()} id={id("sort")}>
             <Select
               id={id("sort")}
               className="h-8 text-xs"
               value={rule.sort ?? "list"}
               onChange={(e) => onChange({ sort: e.target.value as "name" } as Partial<Rule>)}
             >
-              <option value="list">{r.orderList}</option>
-              <option value="name">{r.orderName}</option>
+              <option value="list">{m.rules_orderList()}</option>
+              <option value="name">{m.rules_orderName()}</option>
             </Select>
           </Row>
         </>
       )}
       {rule.type === "date" && (
         <>
-          {text(r.format, "format", rule.format)}
-          {text(r.separator, "separator", rule.separator)}
+          {text(m.rules_format(), "format", rule.format)}
+          {text(m.rules_separator(), "separator", rule.separator)}
           {position(rule.position)}
         </>
       )}
       {rule.type === "extension" && (
         <>
-          {text(r.newExtension, "to", rule.to)}
-          <Row label={r.types.case!} id={id("case")}>
+          {text(m.rules_newExtension(), "to", rule.to)}
+          <Row label={m.rules_types_case()!} id={id("case")}>
             <Select
               id={id("case")}
               className="h-8 text-xs"
               value={rule.case ?? ""}
               onChange={(e) => onChange({ case: (e.target.value || undefined) as "lower" } as Partial<Rule>)}
             >
-              <option value="">{r.unchanged}</option>
-              <option value="lower">{r.caseLower}</option>
-              <option value="upper">{r.caseUpper}</option>
+              <option value="">{m.rules_unchanged()}</option>
+              <option value="lower">{m.rules_caseLower()}</option>
+              <option value="upper">{m.rules_caseUpper()}</option>
             </Select>
           </Row>
         </>
       )}
-      {rule.type === "transliterate" && check(r.stripDiacritics, "stripDiacritics", rule.stripDiacritics !== false)}
+      {rule.type === "transliterate" && check(m.rules_stripDiacritics(), "stripDiacritics", rule.stripDiacritics !== false)}
       {rule.type === "cutAfter" && (
         <>
-          {text(r.pattern, "pattern", rule.pattern)}
+          {text(m.rules_pattern(), "pattern", rule.pattern)}
           <div className="flex gap-4">
-            {check(r.regex, "regex", rule.regex)}
-            {check(r.keepMatch, "keepMatch", rule.keepMatch)}
+            {check(m.rules_regex(), "regex", rule.regex)}
+            {check(m.rules_keepMatch(), "keepMatch", rule.keepMatch)}
           </div>
         </>
       )}
-      {rule.type === "pad" && number(r.digits, "digits", rule.digits)}
+      {rule.type === "pad" && number(m.rules_digits(), "digits", rule.digits)}
       {rule.type === "cleanup" && (
         <>
-          {check(r.brackets, "brackets", rule.brackets !== false)}
-          {check(r.dotsToSpaces, "separators", rule.separators)}
-          {check(r.tidySpaces, "spaces", rule.spaces !== false)}
+          {check(m.rules_brackets(), "brackets", rule.brackets !== false)}
+          {check(m.rules_dotsToSpaces(), "separators", rule.separators)}
+          {check(m.rules_tidySpaces(), "spaces", rule.spaces !== false)}
         </>
       )}
       {rule.type === "strip" && (
         <>
           <div className="flex gap-4">
-            {check(r.stripDigits, "digits", rule.digits)}
-            {check(r.stripSymbols, "symbols", rule.symbols)}
+            {check(m.rules_stripDigits(), "digits", rule.digits)}
+            {check(m.rules_stripSymbols(), "symbols", rule.symbols)}
           </div>
-          {text(r.stripChars, "chars", rule.chars)}
+          {text(m.rules_stripChars(), "chars", rule.chars)}
         </>
       )}
       {rule.type === "rearrange" && (
         <>
-          {text(r.delimiter, "delimiter", rule.delimiter)}
-          {text(r.pattern, "pattern", rule.pattern)}
-          <div className="text-[11px] text-faint">{r.rearrangeHint}</div>
+          {text(m.rules_delimiter(), "delimiter", rule.delimiter)}
+          {text(m.rules_pattern(), "pattern", rule.pattern)}
+          <div className="text-[11px] text-faint">{m.rules_rearrangeHint()}</div>
         </>
       )}
       {rule.type === "list" && (
         <>
           <label htmlFor={id("names")} className="text-xs text-muted">
-            {r.names}
+            {m.rules_names()}
           </label>
           <textarea
             id={id("names")}
@@ -443,37 +443,37 @@ function RuleEditor({ rule, index, onChange }: { rule: Rule; index: number; onCh
             value={rule.names.join("\n")}
             onChange={(e) => onChange({ names: e.target.value.split("\n") } as Partial<Rule>)}
           />
-          <div className="text-[11px] text-faint">{r.namesHint(rule.names.filter((n) => n.trim()).length)}</div>
-          <Row label={r.order} id={id("sort")}>
+          <div className="text-[11px] text-faint">{m.rules_namesHint({ n: rule.names.filter((n) => n.trim()).length })}</div>
+          <Row label={m.rules_order()} id={id("sort")}>
             <Select
               id={id("sort")}
               className="h-8 text-xs"
               value={rule.sort ?? "list"}
               onChange={(e) => onChange({ sort: e.target.value as "name" } as Partial<Rule>)}
             >
-              <option value="list">{r.orderList}</option>
-              <option value="name">{r.orderName}</option>
+              <option value="list">{m.rules_orderList()}</option>
+              <option value="name">{m.rules_orderName()}</option>
             </Select>
           </Row>
         </>
       )}
       {rule.type === "metadata" && (
         <>
-          {text(r.template, "template", rule.template)}
-          <div className="text-[11px] text-faint">{r.metadataHint}</div>
-          <Row label={r.position} id={id("pos")}>
+          {text(m.rules_template(), "template", rule.template)}
+          <div className="text-[11px] text-faint">{m.rules_metadataHint()}</div>
+          <Row label={m.rules_position()} id={id("pos")}>
             <Select
               id={id("pos")}
               className="h-8 text-xs"
               value={rule.position ?? "replace"}
               onChange={(e) => onChange({ position: e.target.value as "replace" } as Partial<Rule>)}
             >
-              <option value="replace">{r.replaceName}</option>
-              <option value="start">{r.start}</option>
-              <option value="end">{r.end}</option>
+              <option value="replace">{m.rules_replaceName()}</option>
+              <option value="start">{m.rules_start()}</option>
+              <option value="end">{m.rules_end()}</option>
             </Select>
           </Row>
-          {rule.position && rule.position !== "replace" && text(r.separator, "separator", rule.separator ?? " ")}
+          {rule.position && rule.position !== "replace" && text(m.rules_separator(), "separator", rule.separator ?? " ")}
         </>
       )}
       {rule.type !== "extension" && target}

@@ -4,7 +4,7 @@ import type { JobItem } from "@namarr/db/types";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { searchProvider } from "~/functions/jobs.functions";
-import { useT } from "~/lib/i18n";
+import * as m from "~/paraglide/messages";
 import { Button, cx, ErrorNote, inputClass, Poster, Select } from "./ui";
 
 type Props = {
@@ -15,7 +15,6 @@ type Props = {
 
 /** Search dialog: posters, year, episode count, alternatives from the matcher first. */
 export function MatchPicker({ item, onClose, onPick }: Props) {
-  const t = useT();
   const dialog = useRef<HTMLDialogElement>(null);
   const parsed = item?.parsedJson as Parsed | undefined;
   const match = item?.matchJson as MatchResult | null | undefined;
@@ -61,10 +60,10 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
       <div className="flex flex-col gap-4 p-5">
         <div className="flex items-center gap-2">
           <h2 id="picker-h" className="m-0 flex-grow text-base font-semibold">
-            {t.picker.title}
+            {m.picker_title()}
           </h2>
           <Button size="sm" onClick={() => dialog.current?.close()}>
-            {t.common.close}
+            {m.common_close()}
           </Button>
         </div>
         <div className="truncate font-mono text-xs text-muted">{item?.sourcePath.split("/").at(-1)}</div>
@@ -76,21 +75,21 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
           }}
         >
           <label htmlFor="picker-q" className="sr-only">
-            {t.picker.query}
+            {m.picker_query()}
           </label>
           <input id="picker-q" className={cx(inputClass, "flex-grow")} value={q} onChange={(e) => setQ(e.target.value)} />
-          <Select aria-label={t.picker.kind} value={kind} onChange={(e) => setKind(e.target.value as "movie" | "series")}>
-            <option value="series">{t.common.seriesOne}</option>
-            <option value="movie">{t.common.movieOne}</option>
+          <Select aria-label={m.picker_kind()} value={kind} onChange={(e) => setKind(e.target.value as "movie" | "series")}>
+            <option value="series">{m.common_seriesOne()}</option>
+            <option value="movie">{m.common_movieOne()}</option>
           </Select>
           <Button type="submit" variant="light">
-            {t.common.search}
+            {m.common_search()}
           </Button>
         </form>
         <ErrorNote error={results.error ?? error} />
         <ul className="m-0 flex max-h-[420px] list-none flex-col gap-1 overflow-auto p-0">
-          {results.isFetching && !list.length && <li className="text-sm text-muted">{t.picker.searching}</li>}
-          {!results.isFetching && !list.length && submitted && <li className="text-sm text-muted">{t.picker.none}</li>}
+          {results.isFetching && !list.length && <li className="text-sm text-muted">{m.picker_searching()}</li>}
+          {!results.isFetching && !list.length && submitted && <li className="text-sm text-muted">{m.picker_none()}</li>}
           {list.map((c) => (
             <li key={`${c.provider}-${c.id}`}>
               <button
@@ -121,8 +120,8 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
                   <div className="text-xs text-muted">
                     {c.provider.toUpperCase()} {c.id}
                     {c.originalTitle ? ` · ${c.originalTitle}` : ""}
-                    {c.episodeCount ? t.picker.episodes(c.episodeCount) : ""}
-                    {match?.best?.id === c.id ? t.picker.current : ""}
+                    {c.episodeCount ? m.picker_episodes({ n: c.episodeCount }) : ""}
+                    {match?.best?.id === c.id ? m.picker_current() : ""}
                   </div>
                 </div>
                 {busy === c.id && <span className="text-xs text-muted">…</span>}
@@ -132,7 +131,7 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
         </ul>
         <label className="flex items-center gap-2 text-[13px] text-soft">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4" />
-          {t.picker.remember(parsed?.title ?? t.picker.thisTitle)}
+          {m.picker_remember({ title: parsed?.title ?? m.picker_thisTitle() })}
         </label>
       </div>
     </dialog>

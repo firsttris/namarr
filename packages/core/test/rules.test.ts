@@ -1,8 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { sanitizeSegment } from "../src/formatter/index.ts";
-import { localize } from "../src/i18n.ts";
 import { applyRules, describeRule, previewRules, type Rule, RuleError } from "../src/rules/index.ts";
+import { text } from "./text.ts";
 
 const one = (path: string, rules: Rule[], extra: { mtime?: Date } = {}) => applyRules([{ path, ...extra }], rules)[0];
 
@@ -182,9 +182,9 @@ describe("Regel-Engine", () => {
   });
 
   it("Beschriftungen für den Regel-Stack", () => {
-    expect(localize(describeRule({ type: "transliterate" }), "de")).toBe("Umlaute ersetzen ä → ae");
-    expect(localize(describeRule({ type: "transliterate" }), "en")).toBe("Transliterate ä → ae");
-    expect(localize(describeRule({ type: "replace", find: ":", replace: " -" }), "de")).toBe('Ersetzen : → " -"');
+    expect(text(describeRule({ type: "transliterate" }), "de")).toBe("Umlaute ersetzen ä → ae");
+    expect(text(describeRule({ type: "transliterate" }), "en")).toBe("Transliterate ä → ae");
+    expect(text(describeRule({ type: "replace", find: ":", replace: " -" }), "de")).toBe('Ersetzen : → " -"');
   });
 });
 

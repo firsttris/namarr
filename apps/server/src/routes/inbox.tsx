@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { InboxRow } from "~/components/InboxRow";
 import { Button, ErrorNote, PageHeader, Panel } from "~/components/ui";
 import { approveInbox, getInbox } from "~/functions/library.functions";
-import { useT } from "~/lib/i18n";
+import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/inbox")({
   loader: () => getInbox(),
@@ -11,7 +11,6 @@ export const Route = createFileRoute("/inbox")({
 });
 
 function Inbox() {
-  const t = useT();
   const initial = Route.useLoaderData();
   const qc = useQueryClient();
   const { data = initial } = useQuery({ queryKey: ["inbox"], queryFn: () => getInbox(), initialData: initial });
@@ -25,15 +24,17 @@ function Inbox() {
   });
   return (
     <>
-      <PageHeader title={t.inbox.title} subtitle={t.inbox.subtitle(data.length)}>
+      <PageHeader title={m.inbox_title()} subtitle={m.inbox_subtitle({ n: data.length })}>
         <Button onClick={() => approve.mutate({ minConfidence: 0.8 })} disabled={approve.isPending || !data.length}>
-          {t.dashboard.approveAbove80}
+          {m.dashboard_approveAbove80()}
         </Button>
       </PageHeader>
       <ErrorNote error={approve.error} />
-      {approve.data && <div className="text-sm text-muted">{t.inbox.result(approve.data.done, approve.data.approved)}</div>}
+      {approve.data && (
+        <div className="text-sm text-muted">{m.inbox_result({ done: approve.data.done, approved: approve.data.approved })}</div>
+      )}
       <Panel>
-        {data.length === 0 && <p className="m-0 px-5 py-8 text-sm text-muted">{t.inbox.empty}</p>}
+        {data.length === 0 && <p className="m-0 px-5 py-8 text-sm text-muted">{m.inbox_empty()}</p>}
         {data.map((entry, i) => (
           <InboxRow
             key={entry.item.id}
