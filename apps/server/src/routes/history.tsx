@@ -1,16 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { z } from "zod";
 import { Button, cx, ErrorNote, inputClass, PageHeader, Panel } from "~/components/ui";
 import { undoJob } from "~/functions/jobs.functions";
 import { listHistory } from "~/functions/library.functions";
 import { localeOf, pickMsg, useLocalize } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
+import { type Search, searchBoolean, searchString } from "~/lib/search";
 import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/history")({
-  validateSearch: z.object({ q: z.string().optional(), undone: z.boolean().optional() }),
+  validateSearch: (s: Search): { q?: string; undone?: boolean } => ({ q: searchString(s.q), undone: searchBoolean(s.undone) }),
   loaderDeps: ({ search }) => search,
   loader: ({ deps }) => listHistory({ data: { search: deps.q, includeUndone: deps.undone } }),
   component: History,

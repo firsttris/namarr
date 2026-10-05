@@ -8,6 +8,7 @@ import * as path from "node:path";
 import { assertSafeBinding, readEnv } from "./src/server/env.server.ts";
 import { dropPrivileges } from "./src/server/privileges.server.ts";
 import { runtime } from "./src/server/runtime.server.ts";
+import { compressHtml, staticFiles } from "./src/server/static.server.ts";
 
 const env = readEnv();
 assertSafeBinding(env);
@@ -20,17 +21,7 @@ const dist = existsSync(path.join(import.meta.dir, "server/server.js")) ? import
 const { default: handler } = (await import(path.join(dist, "server/server.js"))) as {
   default: { fetch: (req: Request) => Promise<Response> };
 };
-const clientDir = path.join(dist, "client");
-
-async function serveStatic(pathname: string): Promise<Response | undefined> {
-  if (pathname === "/" || pathname.includes("..")) return undefined;
-  const file = Bun.file(path.join(clientDir, pathname));
-  if (!(await file.exists())) return undefined;
-  const immutable = pathname.startsWith("/assets/");
-  return new Response(file, {
-    headers: { "cache-control": immutable ? "public, max-age=31536000, immutable" : "public, max-age=3600" },
-  });
-}
+const serveStatic = staticFiles(path.join(dist, "client"));
 
 const server = Bun.serve({
   hostname: env.host,
@@ -39,11 +30,11 @@ const server = Bun.serve({
   idleTimeout: 0,
   async fetch(req) {
     const url = new URL(req.url);
-    if (req.method === "GET") {
-      const asset = await serveStatic(decodeURIComponent(url.pathname));
+    if (req.method === "GET" || req.method === "HEAD") {
+      const asset = serveStatic(req, decodeURIComponent(url.pathname));
       if (asset) return asset;
     }
-    return handler.fetch(req);
+    return compressHtml(req, await handler.fetch(req));
   },
   error(err) {
     rt.log.error({ err }, "Unbehandelter Fehler");

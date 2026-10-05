@@ -6,5 +6,5 @@
     "allowJs": true,
     "paths": { "~/*": ["./src/*"] }
   },
-  "include": ["src", "test", "server.ts", "vite.config.ts", "playwright.config.ts", "e2e"]
+  "include": ["src", "test", "scripts", "server.ts", "vite.config.ts", "playwright.config.ts", "e2e"]
 }

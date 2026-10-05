@@ -6,7 +6,6 @@ import type { JobItem, SeriesProvider } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { z } from "zod";
 import { FolderBrowser } from "~/components/FolderBrowser";
 import { SearchIcon } from "~/components/icons";
 import { MatchPicker } from "~/components/MatchPicker";
@@ -21,19 +20,21 @@ import { num, pct } from "~/lib/format";
 import { localeOf, pickMsg, useLocalize } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
 import { SERIES_SOURCES } from "~/lib/providers";
+import { type Search, searchEnum, searchNumber, searchString } from "~/lib/search";
 import * as m from "~/paraglide/messages";
 
 type Mode = "media" | "rules" | "both";
+const searchMode = searchEnum<Mode>(["media", "rules", "both"]);
 
 export const Route = createFileRoute("/rename")({
   // Tens of thousands of virtualized rows: SSR brings nothing here.
   ssr: false,
-  validateSearch: z.object({
-    path: z.string().optional(),
-    profile: z.coerce.number().optional(),
-    job: z.coerce.number().optional(),
-    item: z.coerce.number().optional(),
-    mode: z.enum(["media", "rules", "both"]).optional(),
+  validateSearch: (s: Search): { path?: string; profile?: number; job?: number; item?: number; mode?: Mode } => ({
+    path: searchString(s.path),
+    profile: searchNumber(s.profile),
+    job: searchNumber(s.job),
+    item: searchNumber(s.item),
+    mode: searchMode(s.mode),
   }),
   component: Workbench,
 });

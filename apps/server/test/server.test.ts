@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import * as zlib from "node:zlib";
 import { createProfile, createWatchFolder, type Db, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +10,7 @@ import { assertSafeBinding, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
 import { afterExecution, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
+import { accepts, compressHtml, precompress, staticFiles } from "~/server/static.server";
 import { isCandidate, WatchService } from "~/server/watch.server";
 
 describe("Umgebung und Bindung", () => {
@@ -141,6 +143,74 @@ describe("Server-Sent Events", () => {
     expect(second).toBe(`event: job.progress\ndata: {"type":"job.progress","jobId":3,"status":"matching","done":1,"total":4}\n\n`);
     abort.abort();
     expect(bus.size).toBe(0);
+  });
+});
+
+describe("Statische Dateien", () => {
+  const get = (url: string, headers: Record<string, string> = {}, method = "GET") => new Request(`http://x${url}`, { method, headers });
+
+  it("liefert vorkomprimierte Varianten nach Accept-Encoding, HEAD und 304", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "namarr-static-"));
+    await fs.mkdir(path.join(dir, "assets"));
+    const js = "console.log('namarr');\n".repeat(200);
+    await fs.writeFile(path.join(dir, "assets/app.js"), js);
+    await fs.writeFile(path.join(dir, "favicon.svg"), "<svg/>");
+    expect(await precompress(dir)).toBe(2);
+    const serve = staticFiles(dir);
+
+    const br = serve(get("/assets/app.js", { "accept-encoding": "gzip, deflate, br" }), "/assets/app.js")!;
+    expect(br.headers.get("content-encoding")).toBe("br");
+    expect(br.headers.get("vary")).toBe("accept-encoding");
+    expect(br.headers.get("content-type")).toContain("javascript");
+    expect(br.headers.get("cache-control")).toContain("immutable");
+    expect(zlib.brotliDecompressSync(Buffer.from(await br.arrayBuffer())).toString()).toBe(js);
+
+    const gz = serve(get("/assets/app.js", { "accept-encoding": "gzip, br;q=0" }), "/assets/app.js")!;
+    expect(gz.headers.get("content-encoding")).toBe("gzip");
+    const plain = serve(get("/assets/app.js"), "/assets/app.js")!;
+    expect(plain.headers.get("content-encoding")).toBeNull();
+    expect(await plain.text()).toBe(js);
+    // too small to compress
+    expect(serve(get("/favicon.svg", { "accept-encoding": "br" }), "/favicon.svg")!.headers.get("vary")).toBeNull();
+
+    const head = serve(get("/assets/app.js", {}, "HEAD"), "/assets/app.js")!;
+    expect(head.status).toBe(200);
+    expect(head.headers.get("content-length")).toBe(String(js.length));
+    expect(head.body).toBeNull();
+
+    const etag = plain.headers.get("etag")!;
+    expect(serve(get("/assets/app.js", { "if-none-match": etag }), "/assets/app.js")!.status).toBe(304);
+    const lastModified = plain.headers.get("last-modified")!;
+    expect(serve(get("/assets/app.js", { "if-modified-since": lastModified }), "/assets/app.js")!.status).toBe(304);
+    expect(serve(get("/assets/app.js", { "if-none-match": 'W/"other"' }), "/assets/app.js")!.status).toBe(200);
+
+    expect(serve(get("/assets/app.js.br"), "/assets/app.js.br")).toBeUndefined();
+    expect(serve(get("/"), "/")).toBeUndefined();
+    expect(serve(get("/../package.json"), "/../package.json")).toBeUndefined();
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("wertet Accept-Encoding mit q-Werten aus", () => {
+    const h = (v: string) => new Headers({ "accept-encoding": v });
+    expect(accepts(h("gzip, br"), "br")).toBe(true);
+    expect(accepts(h("gzip;q=1.0, br;q=0"), "br")).toBe(false);
+    expect(accepts(h("*"), "gzip")).toBe(true);
+    expect(accepts(h("*;q=0, gzip"), "br")).toBe(false);
+    expect(accepts(new Headers(), "gzip")).toBe(false);
+  });
+
+  it("komprimiert SSR-HTML, aber nicht SSE", async () => {
+    const html = "<!doctype html><p>namarr</p>".repeat(50);
+    const req = get("/", { "accept-encoding": "gzip" });
+    const res = compressHtml(req, new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }));
+    expect(res.headers.get("content-encoding")).toBe("gzip");
+    expect(res.headers.get("vary")).toBe("accept-encoding");
+    expect(zlib.gunzipSync(Buffer.from(await res.arrayBuffer())).toString()).toBe(html);
+
+    const sse = new Response("data: x\n\n", { headers: { "content-type": "text/event-stream; charset=utf-8" } });
+    expect(compressHtml(req, sse)).toBe(sse);
+    const noGzip = new Response(html, { headers: { "content-type": "text/html" } });
+    expect(compressHtml(get("/"), noGzip)).toBe(noGzip);
   });
 });
 

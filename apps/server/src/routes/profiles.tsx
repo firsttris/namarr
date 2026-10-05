@@ -2,7 +2,6 @@ import type { Profile } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { z } from "zod";
 import { RuleStack } from "~/components/RuleStack";
 import { TemplateEditor } from "~/components/TemplateEditor";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
@@ -10,10 +9,11 @@ import { getProfiles, getSettingsFn, removeProfile, saveProfile } from "~/functi
 import { pickMsg } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
 import { SERIES_SOURCES } from "~/lib/providers";
+import { type Search, searchNumber } from "~/lib/search";
 import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/profiles")({
-  validateSearch: z.object({ id: z.coerce.number().optional() }),
+  validateSearch: (s: Search): { id?: number } => ({ id: searchNumber(s.id) }),
   loader: () => getProfiles(),
   component: Profiles,
 });

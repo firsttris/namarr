@@ -52,6 +52,11 @@ the watch folders exactly once (a singleton on `globalThis`, also in Vite dev mo
 only create jobs; scanning, matching and execution run in the queue, progress arrives over SSE. The
 workbench renders on the client (`ssr: false`).
 
+The build writes `.br` and `.gz` next to the client assets (`apps/server/scripts/precompress.ts`);
+`server.ts` serves the variant the browser accepts, answers HEAD and 304 (ETag, Last-Modified) and
+gzips the SSR HTML. Route search params are read without zod (`lib/search.ts`), so zod stays out of
+the initial bundle.
+
 ## Tests
 
 | Area | What is tested |
