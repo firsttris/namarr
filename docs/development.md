@@ -82,7 +82,11 @@ The corpus is a start (the goal is 500+ real names) and was written together wit
 
 ## Releases
 
-A version is a tag. On an up-to-date `main`, with a clean working tree:
+A version is a tag. Without a checkout: *Actions → Bump version → Run workflow* with patch, minor or
+major ([`bump.yml`](../.github/workflows/bump.yml), the shared
+[`bump-version`](https://github.com/firsttris/workflows#bump-version)); it raises the version, commits it
+as `Release vX.Y.Z`, tags it and starts the release. Or on an up-to-date `main`, with a clean working
+tree:
 
 ```bash
 bun run release:minor      # or release:patch / release:major
