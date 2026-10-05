@@ -2,7 +2,6 @@ import type { ItemStateName } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { z } from "zod";
 import { PreviewTable } from "~/components/PreviewTable";
 import { Button, cx, ErrorNote, PageHeader, Progress } from "~/components/ui";
 import { getJob, getJobItems, undoJob } from "~/functions/jobs.functions";
@@ -10,15 +9,15 @@ import { useLive } from "~/lib/events";
 import { num } from "~/lib/format";
 import { localeOf, pickMsg, useLocalize } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
+import { type Search, searchEnum } from "~/lib/search";
 import * as m from "~/paraglide/messages";
 
 const FILTERS: ItemStateName[] = ["ready", "needs_review", "done", "skipped", "failed", "undone"];
+const itemState = searchEnum<ItemStateName>([...FILTERS, "parsed", "matched"]);
 
 export const Route = createFileRoute("/jobs/$jobId")({
   ssr: false,
-  validateSearch: z.object({
-    state: z.enum(["ready", "needs_review", "done", "skipped", "failed", "undone", "parsed", "matched"]).optional(),
-  }),
+  validateSearch: (s: Search): { state?: ItemStateName } => ({ state: itemState(s.state) }),
   component: JobDetail,
 });
 

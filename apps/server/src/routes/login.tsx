@@ -1,14 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { z } from "zod";
 import { LanguageSwitch } from "~/components/AppShell";
 import { Logo } from "~/components/icons";
 import { Button, ErrorNote, inputClass } from "~/components/ui";
 import { login } from "~/functions/auth.functions";
+import { type Search, searchString } from "~/lib/search";
 import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/login")({
-  validateSearch: z.object({ next: z.string().optional() }),
+  validateSearch: (s: Search): { next?: string } => ({ next: searchString(s.next) }),
   component: Login,
 });
 
