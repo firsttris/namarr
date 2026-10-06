@@ -1,4 +1,4 @@
-import { createProfile, DEFAULT_SETTINGS, openDatabase, type Settings, setSettings } from "@namarr/db";
+import { DEFAULT_SETTINGS, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider, MemoryCache, RoutedProvider, TmdbProvider } from "@namarr/providers";
 import { describe, expect, it, vi } from "vitest";
 import { localizeIn } from "~/lib/i18n";
@@ -46,13 +46,16 @@ describe("Anbieter je nach Einstellung", () => {
     expect(provider(settings({ anidbClient: "namarr", tmdbApiKey: "k" }), { series: "anidb" })!.nameFor!("series")).toBe("anidb");
   });
 
-  it("JobService fragt mit der Quelle des Jobs; Profile geben sie an Watch-Jobs weiter", async () => {
+  it("JobService fragt mit der Quelle des Jobs; Watch-Folder geben sie an ihre Jobs weiter", async () => {
     const db = openDatabase(":memory:");
     setSettings(db, { folders: [{ path: "/", name: "root", kind: "folder" }] });
     const factory = vi.fn(() => new DemoProvider());
     const jobs = new JobService({ db, bus: new EventBus(), provider: factory, log: { info: () => {}, error: () => {} } });
-    const profile = createProfile(db, { name: "Anime", provider: "anidb" });
-    const config = automaticConfig(profile, { targets: { movie: "/media", series: "/media" }, autoThreshold: 0.9 });
+    const config = automaticConfig(
+      DEFAULT_SETTINGS,
+      { options: { provider: "anidb" } },
+      { targets: { movie: "/media", series: "/media" }, autoThreshold: 0.9 },
+    );
     expect(config.provider).toBe("anidb");
     await jobs.create({ paths: [import.meta.dirname], config: { ...config, action: "test" } });
     await jobs.idle();

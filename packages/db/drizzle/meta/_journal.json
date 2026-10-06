@@ -29,6 +29,13 @@
       "when": 1791305345657,
       "tag": "0003_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791314094223,
+      "tag": "0004_watch_options",
+      "breakpoints": true
     }
   ]
 }

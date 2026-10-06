@@ -11,9 +11,7 @@ preview, fix what is wrong, run it, and undo it if you change your mind.
    - *Media*: match against a [metadata source](metadata.md) and name by template
    - *Rules*: rename with a rule stack, no database involved
    - *Both*: match first, then polish the result with rules
-2. Optionally pick a **profile**: template, rules, action, conflict policy, target and series source
-   in one.
-3. The **virtualized preview** shows old → new with diff highlighting, series groups, companion files
+2. The **virtualized preview** shows old → new with diff highlighting, series groups, companion files
    (`↳ .de.srt`), confidence badges and skipped samples.
 
 Keyboard: ↑ ↓ select, space includes or excludes a file, Enter opens the **match picker** to choose
@@ -23,12 +21,12 @@ same entry.
 On the right:
 
 - the **template editor** with token auto-completion (type `{`) and a live example for the selected
-  file
+  file. Above it, pick one of the [formats](#formats); an edited template can be saved as a new one
 - the **rule stack** with drag and drop and a preview per rule
 
 At the bottom: action, conflict policy, target and the button that runs the job. The target is
 *Library* by default in media mode: movies go to the default movie library, series to the default
-series library (or the profile's). It can be switched to *rename in place* or to one folder for every
+series library. It can be switched to *rename in place* or to one folder for every
 file. A matched file without a library for its kind stays in its folder, and the preview says so.
 The target of a single file can be set in the side panel, typed or picked with *Browse …*.
 
@@ -39,9 +37,9 @@ The target of a single file can be set in the side panel, typed or picked with *
 | Test (preview only) | nothing; conflicts are marked. **New jobs start here.** |
 | Move | moves the file (across file systems: copy, check size, delete) |
 | Copy | copies and checks the size |
-| Hardlink | a second name for the same data; the download keeps seeding. Source and target must be on the same file system |
-| Symlink | an absolute symbolic link to the source |
 | Rename | renames in place |
+
+Hardlinks and symlinks are gone; operations of earlier versions that used them can still be undone.
 
 Every operation lands in the **history** and can be undone per file, per job or back to a point in
 time, but only while the target file is unchanged since. Folders that namarr created are removed
@@ -92,10 +90,27 @@ with it.
 
 **Conditions**: `{?t}…{/}` only when `t` is set, `{!t}…{/}` only when it is not.
 
-**Presets**: Plex, Jellyfin, Emby, Kodi.
-
 Every path segment is cleaned for the target system: characters Windows forbids, `:` → ` - `,
 reserved names, 255 bytes per segment, NFC.
+
+## Formats
+
+A format is a named template for movies or for series. Under **Formats** (`/formats`):
+
+- **Built-in** formats for Plex, Jellyfin, Emby and Kodi. They cannot be changed; *Copy* makes an
+  own format from one.
+- **Own** formats: add, edit, copy and delete them, each with a live example.
+- One **default** per kind (Jellyfin unless you choose another). New jobs, watch folders and the
+  download client hook use it unless they pick another format.
+
+In the workbench, the select above the template switches the format of the selected file's kind.
+Editing the template there changes only this job; *Save as format* keeps it for later. A format a
+watch folder still uses cannot be deleted.
+
+Profiles of earlier versions were taken over at the first start: their own templates became formats
+named after the profile, and the watch folders that used a profile got its formats, series source,
+action and targets. Rule stacks of profiles were not taken over (the log names those profiles): set
+them up again in the workbench and keep them as YAML.
 
 ## Rules
 
@@ -147,8 +162,8 @@ stays fast. HEIC photos are not read yet.
 ### Sharing rule sets
 
 *Export* below the rule stack saves the rules as `namarr-rules.yaml`; *Import* loads such a file (or
-JSON) and replaces the current rules. Profiles keep rule stacks on the server, export and import move
-them between installations or to other people.
+JSON) and replaces the current rules. That is how rule sets move between jobs, installations or
+people.
 
 ```yaml
 namarr: rules/1

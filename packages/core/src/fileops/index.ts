@@ -5,10 +5,17 @@ import { msg } from "../i18n.ts";
 import { splitExtension } from "../parser/index.ts";
 import { compareQuality, type Quality } from "./quality.ts";
 
-export const ACTIONS = ["move", "copy", "hardlink", "symlink", "rename", "test"] as const;
+export const ACTIONS = ["move", "copy", "rename", "test"] as const;
 export const CONFLICT_POLICIES = ["skip", "overwrite", "suffix", "keep-better"] as const;
 
 export type Action = (typeof ACTIONS)[number];
+
+/** What a watch folder does with a finished download: move it, or copy it and leave the download. */
+export const WATCH_ACTIONS = ["move", "copy"] as const satisfies readonly Action[];
+export type WatchAction = (typeof WATCH_ACTIONS)[number];
+
+/** Earlier versions also linked files; those operations can still be undone. */
+export type RecordedAction = Action | "hardlink" | "symlink";
 export type ConflictPolicy = (typeof CONFLICT_POLICIES)[number];
 
 /** Skip reason when the target exists. */
@@ -17,7 +24,7 @@ export const TARGET_EXISTS = msg("fileops_error_targetExists");
 export type PlannedOperation = { from: string; to: string; action: Action };
 
 export type OperationRecord = {
-  action: Action;
+  action: RecordedAction;
   from: string;
   to: string;
   size: number;
@@ -131,17 +138,6 @@ async function perform(action: Action, from: string, to: string): Promise<void> 
       return moveFile(from, to);
     case "copy":
       return copyVerified(from, to);
-    case "hardlink":
-      try {
-        return await fs.link(from, to);
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === "EXDEV") {
-          throw new FileOpError(msg("fileops_error_crossDevice"));
-        }
-        throw e;
-      }
-    case "symlink":
-      return fs.symlink(path.resolve(from), to);
     case "test":
       return;
   }
@@ -163,7 +159,7 @@ export async function executeOperation(op: PlannedOperation, options: ExecuteOpt
     let backup: string | undefined;
     let note: string | undefined;
     if (existing) {
-      // Same file under another name (hardlink already there, case-only rename on macOS).
+      // Same file under another name (a hardlink, a case-only rename on macOS).
       if (existing.ino === source.ino && existing.dev === source.dev && op.action !== "rename") {
         return { status: "skipped", reason: msg("fileops_skip_sameFile"), to };
       }

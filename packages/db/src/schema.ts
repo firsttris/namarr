@@ -1,4 +1,4 @@
-import { ACTIONS, type Action, CONFLICT_POLICIES, type ConflictPolicy } from "@namarr/core/fileops";
+import { ACTIONS, type Action, CONFLICT_POLICIES, type ConflictPolicy, type WatchAction } from "@namarr/core/fileops";
 import type { MatchResult } from "@namarr/core/matcher";
 import type { Rule } from "@namarr/core/rules";
 import type { Parsed } from "@namarr/core/types";
@@ -21,6 +21,15 @@ export type MovieProvider = (typeof MOVIE_PROVIDERS)[number];
  */
 export type Targets = { movie?: string; series?: string; other?: string };
 
+/** How a watch folder renames: formats by kind (ids, unset = default), series source, action. */
+export type WatchOptions = {
+  formats?: { movie?: string; series?: string };
+  provider?: SeriesProvider;
+  action?: WatchAction;
+  conflictPolicy?: ConflictPolicy;
+};
+
+/** Replaced by naming formats and watch folder options; read once to take them over (migrateProfiles). */
 export const profiles = sqliteTable("profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -31,7 +40,9 @@ export const profiles = sqliteTable("profiles", {
   /** `{ movie?: string; episode?: string }`; empty uses the preset. */
   template: text("template", { mode: "json" }).$type<{ movie?: string; episode?: string }>().notNull().default({}),
   rulesJson: text("rules_json", { mode: "json" }).$type<Rule[]>().notNull().default([]),
-  action: text("action", { enum: ACTIONS }).notNull().default("test"),
+  action: text("action", { enum: [...ACTIONS, "hardlink", "symlink"] })
+    .notNull()
+    .default("test"),
   conflictPolicy: text("conflict_policy", { enum: CONFLICT_POLICIES }).notNull().default("skip"),
   /** Replaced by `targets` (migration 0003), kept so older rows read. */
   targetRoot: text("target_root"),
@@ -51,6 +62,7 @@ export const watchFolders = sqliteTable("watch_folders", {
     .notNull()
     .$default(() => ""),
   targets: text("targets_json", { mode: "json" }).$type<Targets>().notNull().default({}),
+  options: text("options_json", { mode: "json" }).$type<WatchOptions>().notNull().default({}),
   /** Matches at or above this go through without a click; null = always review. */
   autoThreshold: real("auto_threshold").default(0.9),
   stableSeconds: integer("stable_seconds").notNull().default(30),
@@ -70,6 +82,8 @@ export type JobConfig = {
   targetRoot?: string;
   /** Library folders by kind for media mode, resolved when the job is created. */
   targets?: { movie?: string; series?: string };
+  /** The formats `template` came from (ids), for showing which one is in use. */
+  formats?: { movie?: string; series?: string };
   language?: string;
   order?: "aired" | "dvd" | "absolute";
   /** Series source; unset = the setting. */

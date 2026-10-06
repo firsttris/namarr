@@ -1,35 +1,32 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { ACTIONS, CONFLICT_POLICIES, isInside, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
+import { CONFLICT_POLICIES, isInside, resolveInRoots, VIDEO_EXTENSIONS, WATCH_ACTIONS } from "@namarr/core";
 import { msg } from "@namarr/core/i18n";
 import {
   allowedRoots,
-  createProfile,
   createWatchFolder,
   dashboardStats,
-  deleteProfile,
   deleteWatchFolder,
   FOLDER_KINDS,
+  FORMAT_KINDS,
   type FolderKind,
+  findFormat,
   getItem,
   getSettings,
   type LibraryFolder,
   listInbox,
   listJobs,
   listOperations,
-  listProfiles,
   listWatchFolders,
   MOVIE_PROVIDERS,
   SERIES_PROVIDERS,
   type Settings,
   setSettings,
   type Targets,
-  updateProfile,
   updateWatchFolder,
 } from "@namarr/db";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { rulesSchema, templateSchema } from "~/lib/schemas";
 import { authed } from "./middleware";
 
 const id = z.number().int().positive();
@@ -51,6 +48,8 @@ export const getDashboard = createServerFn({ method: "GET" })
         inboxCount: inbox.filter((i) => i.item.sourcePath.startsWith(f.path + path.sep)).length,
       })),
       jobs,
+      /** No folders yet: namarr can neither find files nor put them anywhere. */
+      noFolders: !getSettings(rt.db).folders.length,
       server: { host: `${rt.env.host}:${rt.env.port}`, demo: rt.env.demo },
     };
   });
@@ -134,37 +133,36 @@ export const listHistory = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context: { rt } }) => listOperations(rt.db, { ...data, limit: 200 }));
 
-// ---------- profiles ----------
+// ---------- naming formats ----------
 
-const profileInput = z.object({
-  name: z.string().min(1).max(100),
-  mode: z.enum(["media", "rules", "both"]),
-  preset: z.string(),
-  template: templateSchema,
-  rulesJson: rulesSchema,
-  action: z.enum(ACTIONS),
-  conflictPolicy: z.enum(CONFLICT_POLICIES),
-  targets: targetsSchema,
-  provider: z.enum(SERIES_PROVIDERS).nullable().optional(),
-});
-
-export const getProfiles = createServerFn({ method: "GET" })
+/** Built-in formats (with the presets) are fixed; own ones are saved as a whole with the defaults. */
+export const saveFormats = createServerFn({ method: "POST" })
   .middleware([authed])
-  .handler(async ({ context: { rt } }) => listProfiles(rt.db));
-
-export const saveProfile = createServerFn({ method: "POST" })
-  .middleware([authed])
-  .validator(profileInput.extend({ id: id.optional() }))
-  .handler(async ({ data: { id: profileId, ...values }, context: { rt } }) => {
-    const saved = { ...values, targets: await resolveTargetsIn(values.targets, allowedRoots(getSettings(rt.db))), targetRoot: null };
-    return profileId ? updateProfile(rt.db, profileId, saved) : createProfile(rt.db, saved);
-  });
-
-export const removeProfile = createServerFn({ method: "POST" })
-  .middleware([authed])
-  .validator(z.object({ id }))
+  .validator(
+    z.object({
+      formats: z.array(
+        z.object({
+          id: z.string().regex(/^f-[a-z0-9]+$/),
+          name: z.string().trim().min(1).max(100),
+          kind: z.enum(FORMAT_KINDS),
+          template: z.string().trim().min(1).max(500),
+        }),
+      ),
+      defaultFormats: z.object({ movie: z.string().optional(), series: z.string().optional() }),
+    }),
+  )
   .handler(async ({ data, context: { rt } }) => {
-    deleteProfile(rt.db, data.id);
+    const formats = data.formats.map((f) => ({ id: f.id, name: f.name, kind: f.kind, template: f.template }));
+    if (new Set(formats.map((f) => f.id)).size !== formats.length) throw new Error(msg("formats_error_duplicate"));
+    // A format a watch folder renames with cannot go: the folder would silently use another one.
+    const gone = (fid?: string) => Boolean(fid?.startsWith("f-")) && !formats.some((f) => f.id === fid);
+    const users = listWatchFolders(rt.db).filter((w) => gone(w.options.formats?.movie) || gone(w.options.formats?.series));
+    if (users.length) throw new Error(msg("formats_error_inUse", { users: users.map((w) => w.name).join(", ") }));
+    // A default that no longer exists falls back to Jellyfin.
+    const defaultFormats = Object.fromEntries(
+      FORMAT_KINDS.flatMap((kind) => (findFormat({ formats }, kind, data.defaultFormats[kind]) ? [[kind, data.defaultFormats[kind]]] : [])),
+    );
+    setSettings(rt.db, { formats, defaultFormats });
     return { ok: true };
   });
 
@@ -182,7 +180,12 @@ export const saveWatchFolder = createServerFn({ method: "POST" })
       name: z.string().min(1).max(100),
       path: z.string().min(1),
       targets: targetsSchema,
-      profileId: id.nullable(),
+      options: z.object({
+        formats: z.object({ movie: z.string().optional(), series: z.string().optional() }).optional(),
+        provider: z.enum(SERIES_PROVIDERS).optional(),
+        action: z.enum(WATCH_ACTIONS).optional(),
+        conflictPolicy: z.enum(CONFLICT_POLICIES).optional(),
+      }),
       autoThreshold: z.number().min(0).max(1).nullable(),
       stableSeconds: z.number().int().min(1).max(3600),
       enabled: z.boolean(),
@@ -265,15 +268,10 @@ export const saveSettings = createServerFn({ method: "POST" })
         if (!st?.isDirectory()) throw new Error(msg("settings_error_rootMissing", { path: f.path }));
       }
       data.folders = normalizeFolders(data.folders);
-      // A folder still used by a profile or watch folder cannot go: they would point nowhere.
+      // A folder still used by a watch folder cannot go: it would point nowhere.
       const roots = allowedRoots({ folders: data.folders });
       const outside = (p?: string) => Boolean(p) && !roots.some((r) => isInside(path.resolve(p!), path.resolve(r)));
       const users = [
-        ...listProfiles(rt.db).flatMap((p) =>
-          Object.values(p.targets)
-            .filter(outside)
-            .map((t) => ({ name: p.name, path: t! })),
-        ),
         ...listWatchFolders(rt.db).flatMap((w) =>
           [w.path, ...Object.values(w.targets)].filter(outside).map((t) => ({ name: w.name, path: t! })),
         ),

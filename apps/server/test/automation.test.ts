@@ -2,7 +2,6 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
-  createProfile,
   createWatchFolder,
   type Db,
   getJob,
@@ -67,9 +66,9 @@ describe("Watch-Folder: Abgleich beim Start", () => {
     });
     // Arrived while the server was down:
     const missed = await touch("dl/Severance.S02.German.DL.1080p.WEB-GRP/severance.s02e01.mkv");
-    // Already taken by a job (e.g. hardlinked, the download stays for seeding):
+    // Already taken by a job (e.g. copied, the download stays):
     const known = await touch("dl/Severance.S02.German.DL.1080p.WEB-GRP/severance.s02e02.mkv");
-    const job = insertJob(db, { sourcePaths: [dl], config: { mode: "media", action: "hardlink", conflictPolicy: "skip" } });
+    const job = insertJob(db, { sourcePaths: [dl], config: { mode: "media", action: "copy", conflictPolicy: "skip" } });
     insertItems(db, [{ jobId: job.id, sourcePath: known }]);
     // Not a video, temp file, hidden:
     await touch("dl/notes.txt");
@@ -113,12 +112,11 @@ describe("Watch-Folder: Abgleich beim Start", () => {
 
   it("beim Start wird daraus ein Watch-Job", async () => {
     const dl = path.join(tmp, "dl");
-    const profile = createProfile(db, { name: "Serien", action: "hardlink", preset: "plex" });
-    createWatchFolder(db, {
+    const folder = createWatchFolder(db, {
       name: "TV",
       path: dl,
       targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
-      profileId: profile.id,
+      options: { formats: { series: "plex" }, action: "copy" },
       stableSeconds: 1,
     });
     await touch("dl/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv");
@@ -127,7 +125,8 @@ describe("Watch-Folder: Abgleich beim Start", () => {
     await expect.poll(() => listJobs(db).length, { timeout: 5000 }).toBe(1);
     await jobs.idle();
     const [job] = listJobs(db);
-    expect(job).toMatchObject({ kind: "watch", profileId: profile.id, status: "done" });
+    expect(job).toMatchObject({ kind: "watch", watchFolderId: folder.id, status: "done" });
+    expect(job!.config.formats).toEqual({ movie: "jellyfin", series: "plex" });
     expect(await exists(path.join(tmp, "media/Severance (2022)/Season 02"))).toBe(true);
   });
 
@@ -152,16 +151,18 @@ describe("Hook für Download-Clients", () => {
     new Request(`http://x/api/jobs${query}`, { method: "POST", body, headers: type ? { "content-type": type } : {} });
 
   it("liest JSON, Formulare und Query-Parameter", async () => {
-    expect(await readHookInput(req(JSON.stringify({ path: "/a", profile: 2, review: true }), "application/json"))).toEqual({
+    expect(await readHookInput(req(JSON.stringify({ path: "/a", watchFolder: 2, review: true }), "application/json"))).toEqual({
       path: "/a",
-      profile: 2,
+      watchFolder: 2,
       review: true,
     });
     expect(
-      await readHookInput(req(new URLSearchParams({ path: "/b", profile: "Serien", review: "0" }), "application/x-www-form-urlencoded")),
+      await readHookInput(
+        req(new URLSearchParams({ path: "/b", watchFolder: "Serien", review: "0" }), "application/x-www-form-urlencoded"),
+      ),
     ).toEqual({
       path: "/b",
-      profile: "Serien",
+      watchFolder: "Serien",
       review: false,
     });
     expect(await readHookInput(req(undefined, undefined, "?path=/c&threshold=0.8&target="))).toEqual({ path: "/c", threshold: 0.8 });
@@ -184,15 +185,16 @@ describe("Hook für Download-Clients", () => {
   it("legt einen Job an, der wie ein Watch-Job läuft", async () => {
     await touch("dl/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv");
     await touch("dl/Severance.S02.German.DL.1080p.WEB-GRP/severance.204-205.720p.mkv");
-    const profile = createProfile(db, {
+    const folder = createWatchFolder(db, {
       name: "Serien",
-      action: "hardlink",
+      path: path.join(tmp, "dl"),
       targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      options: { action: "copy" },
     });
-    const job = await createHookJob(rt(), { path: "/downloads/Severance.S02.German.DL.1080p.WEB-GRP", profile: "serien" });
+    const job = await createHookJob(rt(), { path: "/downloads/Severance.S02.German.DL.1080p.WEB-GRP", watchFolder: "serien" });
     expect(job).toMatchObject({
       kind: "hook",
-      profileId: profile.id,
+      watchFolderId: folder.id,
       sourcePaths: [path.join(tmp, "dl/Severance.S02.German.DL.1080p.WEB-GRP")],
     });
     await jobs.idle();
@@ -202,7 +204,7 @@ describe("Hook für Download-Clients", () => {
     expect(listInbox(db).map((e) => path.basename(e.item.sourcePath))).toEqual(["severance.204-205.720p.mkv"]);
   });
 
-  it("übernimmt Profil, Ziel und Schwelle eines Watch-Folders, review hält alles an", async () => {
+  it("übernimmt Format, Ziel und Schwelle eines Watch-Folders, review hält alles an", async () => {
     await touch("dl/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv");
     createWatchFolder(db, {
       name: "TV",
@@ -218,7 +220,7 @@ describe("Hook für Download-Clients", () => {
     expect(job.config).toMatchObject({
       targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
       alwaysReview: true,
-      action: "hardlink",
+      action: "move",
     });
     await jobs.idle();
     expect(listInbox(db)).toHaveLength(1);
@@ -244,9 +246,14 @@ describe("Hook für Download-Clients", () => {
       404,
       expect.stringContaining("not found"),
     ]);
-    expect(await err(createHookJob(rt(), { path: path.join(tmp, "dl/a.mkv"), profile: "Gibt es nicht" }))).toEqual([
+    expect(await err(createHookJob(rt(), { path: path.join(tmp, "dl/a.mkv"), watchFolder: "Gibt es nicht" }))).toEqual([
       404,
-      "Unknown profile: Gibt es nicht",
+      "Unknown watch folder: Gibt es nicht",
+    ]);
+    // Profiles are gone: an old hook call says what to send instead.
+    expect(await err(createHookJob(rt(), { path: path.join(tmp, "dl/a.mkv"), profile: "Serien" }))).toEqual([
+      400,
+      expect.stringContaining("watchFolder"),
     ]);
   });
 });

@@ -9,7 +9,6 @@ export default defineConfig({
   timeout: 60_000,
   fullyParallel: false,
   workers: 1,
-  globalSetup: "./e2e/setup.ts",
   use: {
     baseURL: "http://127.0.0.1:8431",
     viewport: { width: 1440, height: 1000 },
@@ -18,7 +17,8 @@ export default defineConfig({
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {},
   },
   webServer: {
-    command: "bun run server.ts",
+    // The fake files first: the server takes NAMARR_ROOTS over only if the folder exists.
+    command: "bun run e2e/setup.ts && bun run server.ts",
     url: "http://127.0.0.1:8431/api/health",
     reuseExistingServer: false,
     timeout: 60_000,

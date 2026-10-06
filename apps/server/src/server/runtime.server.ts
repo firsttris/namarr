@@ -1,7 +1,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { type MetadataProvider, probe } from "@namarr/core";
-import { type Db, failInterruptedJobs, getSettings, openDatabase, type SeriesProvider, SqliteProviderCache, setSettings } from "@namarr/db";
+import {
+  type Db,
+  failInterruptedJobs,
+  getSettings,
+  migrateProfiles,
+  openDatabase,
+  type SeriesProvider,
+  SqliteProviderCache,
+  setSettings,
+} from "@namarr/db";
 import pino from "pino";
 import { type Env, readEnv } from "./env.server.ts";
 import { EventBus } from "./events.server.ts";
@@ -29,6 +38,18 @@ type Holder = { [KEY]?: Runtime };
  * entry touches it at boot, dev mode on the first request. Migrations run here, then the job
  * worker and the watch folders start, exactly once (also across Vite HMR reloads).
  */
+/**
+ * First start only (no folders yet): the folders given in NAMARR_ROOTS, as far as they exist. A
+ * mount that is not there would only be a folder that cannot be saved; it is logged instead.
+ */
+export function seedFolders(db: Db, roots: string[], log: { warn: (obj: object, msg: string) => void }): void {
+  if (getSettings(db).folders.length || !roots.length) return;
+  const existing = roots.filter((p) => fs.statSync(p, { throwIfNoEntry: false })?.isDirectory());
+  const missing = roots.filter((p) => !existing.includes(p));
+  if (missing.length) log.warn({ missing }, "NAMARR_ROOTS: Ordner nicht gefunden, nicht übernommen");
+  if (existing.length) setSettings(db, { folders: existing.map((p) => ({ path: p, name: path.basename(p) || p, kind: "folder" })) });
+}
+
 export function runtime(): Runtime {
   const holder = globalThis as Holder;
   if (holder[KEY]) return holder[KEY];
@@ -40,10 +61,10 @@ export function runtime(): Runtime {
   const interrupted = failInterruptedJobs(db);
   if (interrupted) log.warn({ interrupted }, "Unterbrochene Jobs als fehlgeschlagen markiert");
 
-  // First start: seed the folders from NAMARR_ROOTS.
-  const settings = getSettings(db);
-  if (!settings.folders.length && env.roots.length)
-    setSettings(db, { folders: env.roots.map((p) => ({ path: p, name: path.basename(p) || p, kind: "folder" })) });
+  seedFolders(db, env.roots, log);
+  const { skippedRules } = migrateProfiles(db);
+  if (skippedRules.length)
+    log.warn({ profiles: skippedRules }, "Profile mit Regeln: Regeln nicht übernommen (Werkbank → Regeln importieren)");
 
   const bus = new EventBus();
   const cache = new SqliteProviderCache(db);

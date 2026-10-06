@@ -87,8 +87,8 @@ test("Workbench: Media-Modus, Vorschau, Treffer korrigieren, ausführen, rückg�
   await page.getByRole("button", { name: "Freigeben" }).click();
   await expect(grid.getByText(/% prüfen/)).toHaveCount(0);
 
-  // Execute as hardlink
-  await page.getByLabel("Aktion").selectOption("hardlink");
+  // Execute as copy
+  await page.getByLabel("Aktion").selectOption("copy");
   await page.getByRole("button", { name: /6 Dateien umbenennen/ }).click();
   await expect(grid.getByText("erledigt").first()).toBeVisible();
   await expect
@@ -99,7 +99,7 @@ test("Workbench: Media-Modus, Vorschau, Treffer korrigieren, ausführen, rückg�
     .toBe(true);
   await expect.poll(() => fs.existsSync(path.join(movies, "The Matrix (1999)/The Matrix (1999).mp4"))).toBe(true);
   await expect(page.getByText("6 erledigt")).toBeVisible();
-  // Hardlink: the download stays for seeding
+  // Copy: the download stays
   expect(fs.existsSync(path.join(data, "downloads/tv/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv"))).toBe(true);
 
   // History shows the operations; undo the whole job from the dashboard
@@ -180,4 +180,28 @@ test("Health und Events antworten, mit der Version", async ({ request, page }) =
   const link = page.getByRole("link", { name: `namarr v${version}` });
   await expect(link).toBeVisible();
   await expect(link).toHaveAttribute("href", `https://github.com/firsttris/namarr/releases/tag/v${version}`);
+});
+
+test("Formate: eigenes Serien-Format anlegen, als Standard setzen, im Watch-Folder wählen", async ({ page }) => {
+  await page.goto("/formats");
+  const series = page.getByRole("group", { name: "Serien" });
+  await expect(series.getByText("Jellyfin")).toBeVisible();
+  await series.getByRole("button", { name: "+ Neu" }).click();
+  await page.getByLabel("Name").fill("Kurz");
+  await page.getByLabel("Format-Template").fill("{n}/{s00e00}");
+  await expect(page.getByText("Severance/S02E01.mkv")).toBeVisible();
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(series.getByRole("link", { name: /Kurz/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Als Standard für Serien" }).click();
+  await expect(series.getByRole("link", { name: /Kurz/ }).getByText("Standard")).toBeVisible();
+  // Built-in formats stay as they are: copy, not edit.
+  await series.getByRole("link", { name: /Plex/ }).click();
+  await expect(page.getByText("Eingebautes Format")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Speichern" })).toHaveCount(0);
+
+  await page.goto("/watch");
+  await page.getByRole("button", { name: "Watch-Folder anlegen" }).click();
+  await expect(page.getByLabel("Format für Serien")).toContainText("Wie in den Einstellungen (Kurz)");
+  await expect(page.getByLabel("Aktion").locator("option")).toHaveText(["Verschieben", "Kopieren"]);
 });

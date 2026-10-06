@@ -59,20 +59,6 @@ describe("Aktionen", () => {
     expect(await read("b.mkv")).toBe("data");
   });
 
-  it("hardlink teilt die Inode (Seeding läuft weiter)", async () => {
-    const from = await write("dl/a.mkv");
-    const record = done(await executeOperation({ from, to: p("media/a.mkv"), action: "hardlink" }));
-    const [a, b] = await Promise.all([fs.stat(from), fs.stat(p("media/a.mkv"))]);
-    expect(a.ino).toBe(b.ino);
-    expect(record.inode).toBe(a.ino);
-  });
-
-  it("symlink zeigt absolut auf die Quelle", async () => {
-    const from = await write("a.mkv");
-    done(await executeOperation({ from, to: p("links/a.mkv"), action: "symlink" }));
-    expect(await fs.readlink(p("links/a.mkv"))).toBe(from);
-  });
-
   it("test ändert nichts und meldet Konflikte", async () => {
     const from = await write("a.mkv");
     await write("b.mkv", "other");
@@ -176,7 +162,7 @@ describe("Konflikte", () => {
   it("Hardlink, der schon existiert, wird erkannt", async () => {
     const from = await write("a.mkv");
     await fs.link(from, p("b.mkv"));
-    expect(await executeOperation({ from, to: p("b.mkv"), action: "hardlink" }, { conflict: "overwrite" })).toMatchObject({
+    expect(await executeOperation({ from, to: p("b.mkv"), action: "copy" }, { conflict: "overwrite" })).toMatchObject({
       status: "skipped",
       reason: msg("fileops_skip_sameFile"),
     });
@@ -192,10 +178,11 @@ describe("Undo", () => {
     expect(await exists("out")).toBe(false);
   });
 
-  it("copy und hardlink: nur das Ziel verschwindet", async () => {
+  it("copy und Hardlinks früherer Versionen: nur das Ziel verschwindet", async () => {
     const from = await write("a.mkv");
     const copy = done(await executeOperation({ from, to: p("c.mkv"), action: "copy" }));
-    const link = done(await executeOperation({ from, to: p("l.mkv"), action: "hardlink" }));
+    await fs.link(from, p("l.mkv"));
+    const link = { action: "hardlink" as const, from, to: p("l.mkv"), size: 4, inode: (await fs.stat(from)).ino, createdDirs: [] };
     expect(await undoOperation(copy)).toEqual({ status: "undone" });
     expect(await undoOperation(link)).toEqual({ status: "undone" });
     expect(await exists("c.mkv")).toBe(false);
@@ -203,9 +190,10 @@ describe("Undo", () => {
     expect(await read("a.mkv")).toBe("data");
   });
 
-  it("symlink-Undo", async () => {
+  it("Undo eines Symlinks früherer Versionen", async () => {
     const from = await write("a.mkv");
-    const record = done(await executeOperation({ from, to: p("s.mkv"), action: "symlink" }));
+    await fs.symlink(from, p("s.mkv"));
+    const record = { action: "symlink" as const, from, to: p("s.mkv"), size: 4, inode: 0, createdDirs: [] };
     expect(await undoOperation(record)).toEqual({ status: "undone" });
     expect(await exists("s.mkv")).toBe(false);
   });

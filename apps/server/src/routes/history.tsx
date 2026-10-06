@@ -108,7 +108,7 @@ function History() {
             className="grid grid-cols-[130px_110px_minmax(0,1fr)_70px_120px] items-center gap-4 border-b border-row px-5 py-2.5 text-[13px] last:border-b-0"
           >
             <div className="text-soft">{dt.format(new Date(op.executedAt))}</div>
-            <div className="text-soft">{pickMsg(msgGroup.actions, op.action) ?? op.action}</div>
+            <div className="text-soft">{pickMsg({ ...msgGroup.actions, ...msgGroup.pastActions }, op.action) ?? op.action}</div>
             <div className="flex min-w-0 flex-col font-mono text-xs">
               <span className="truncate text-muted" title={op.fromPath}>
                 {op.fromPath}

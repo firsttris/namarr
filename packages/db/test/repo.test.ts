@@ -10,8 +10,8 @@ import {
   createWatchFolder,
   dashboardStats,
   defaultFolder,
-  deleteProfile,
   failInterruptedJobs,
+  formatsOf,
   getJob,
   getSettings,
   getWatchFolder,
@@ -26,8 +26,10 @@ import {
   listProfiles,
   listWatchFolders,
   markUndone,
+  migrateProfiles,
   openDatabase,
   removeFromInbox,
+  resolveFormats,
   resolveTargets,
   SqliteProviderCache,
   saveOverride,
@@ -140,14 +142,48 @@ describe("Ordner", () => {
   });
 });
 
-describe("Profile und Watch-Folder", () => {
-  it("Watch-Folder verliert sein Profil beim Löschen nicht", () => {
+describe("Formate", () => {
+  it("eingebaute und eigene Formate, Standard pro Art, Watch-Folder wählen andere", () => {
+    const own = { id: "f-mine", name: "Meins", kind: "series" as const, template: "{n}/{s00e00}" };
+    const s = { formats: [own], defaultFormats: { movie: "plex" } };
+    expect(formatsOf(s, "series").map((f) => f.id)).toEqual(["plex", "jellyfin", "emby", "kodi", "f-mine"]);
+    expect(formatsOf(s, "movie").map((f) => f.id)).not.toContain("f-mine");
+    expect(resolveFormats(s)).toMatchObject({ movie: { id: "plex" }, series: { id: "jellyfin" } });
+    expect(resolveFormats(s, { series: "f-mine" })).toMatchObject({
+      movie: { id: "plex" },
+      series: { id: "f-mine", template: "{n}/{s00e00}" },
+    });
+    // Gone or unknown: the default.
+    expect(resolveFormats(s, { series: "f-weg", movie: "f-mine" })).toMatchObject({ movie: { id: "plex" }, series: { id: "jellyfin" } });
+  });
+
+  it("Profile werden einmalig zu Formaten und Watch-Folder-Optionen", () => {
     const db = fresh();
-    const profile = createProfile(db, { name: "Serien", preset: "jellyfin", action: "hardlink" });
-    expect(profile).toMatchObject({ id: 1, mode: "media", conflictPolicy: "skip", template: {}, rulesJson: [] });
-    const wf = createWatchFolder(db, { name: "Serien", path: "/dl/tv", targetRoot: "/media/tv", profileId: profile.id });
-    deleteProfile(db, profile.id);
-    expect(getWatchFolder(db, wf.id)).toMatchObject({ profileId: null, autoThreshold: 0.9, enabled: true, stableSeconds: 30 });
+    const custom = createProfile(db, {
+      name: "Anime",
+      template: { episode: "{n}/{absolute}" },
+      provider: "anidb",
+      action: "hardlink",
+      targets: { series: "/anime" },
+    });
+    const plex = createProfile(db, { name: "Plex", preset: "plex", action: "move", rulesJson: [{ type: "case", mode: "lower" }] as never });
+    const a = createWatchFolder(db, { name: "Anime", path: "/dl/anime", profileId: custom.id, targets: { movie: "/movies" } });
+    const b = createWatchFolder(db, { name: "Rest", path: "/dl/rest", profileId: plex.id });
+
+    expect(migrateProfiles(db)).toEqual({ skippedRules: ["Plex"] });
+    const [format] = getSettings(db).formats;
+    expect(format).toMatchObject({ name: "Anime", kind: "series", template: "{n}/{absolute}" });
+    expect(getWatchFolder(db, a.id)).toMatchObject({
+      profileId: null,
+      targets: { movie: "/movies", series: "/anime" },
+      // Links are gone: copy leaves the download in place.
+      options: { formats: { series: format!.id }, provider: "anidb", action: "copy", conflictPolicy: "skip" },
+    });
+    expect(getWatchFolder(db, b.id)!.options).toMatchObject({ formats: { movie: "plex", series: "plex" }, action: "move" });
+
+    // Only once.
+    expect(migrateProfiles(db)).toEqual({ skippedRules: [] });
+    expect(getSettings(db).formats).toHaveLength(1);
   });
 });
 

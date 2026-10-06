@@ -69,7 +69,7 @@ afterEach(async () => {
 const config = (extra: Partial<JobConfig> = {}): JobConfig => ({
   mode: "media",
   preset: "jellyfin",
-  action: "hardlink",
+  action: "copy",
   conflictPolicy: "skip",
   targetRoot: media(),
   ...extra,

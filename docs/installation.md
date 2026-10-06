@@ -1,12 +1,7 @@
 # Installation
 
-namarr is one Bun process in one container: web UI, API, job queue and watch folders. It needs two
-volumes, `/config` for its SQLite database and `/data` for your files.
-
-> [!IMPORTANT]
-> Keep your downloads and your library **in the same mount**, for example `/mnt/data/downloads` and
-> `/mnt/data/media` mounted together as `/data`. Hardlinks cannot cross file systems, and hardlinks
-> are what keep torrents seeding after a rename.
+namarr is one Bun process in one container: web UI, API, job queue and watch folders. It needs
+`/config` for its SQLite database and your files, in one mount (`/data`) or several.
 
 ## Docker Compose
 
@@ -21,14 +16,17 @@ services:
       NAMARR_TOKEN: change-me
     volumes:
       - ./config:/config
-      - /mnt/data:/data # downloads and library in the same mount, otherwise no hardlinks
+      - /mnt/data:/data # downloads and library
     restart: unless-stopped
 ```
 
 The same file is in [`docker/compose.example.yml`](../docker/compose.example.yml). Then open
-`http://<host>:8420`, sign in with the token and add your own TMDB API key under **Settings**
-(themoviedb.org → Settings → API; a v3 key or a v4 token), or set up one of the
-[other metadata sources](metadata.md).
+`http://<host>:8420`, sign in with the token and, under **Settings**:
+
+1. add your [folders](#folders-and-libraries): `/data` from the example, or your own mounts, each
+   picked with *Browse …*; until then the dashboard asks for them;
+2. add your own TMDB API key (themoviedb.org → Settings → API; a v3 key or a v4 token), or set up
+   one of the [other metadata sources](metadata.md).
 
 ## Podman Quadlet
 
@@ -79,8 +77,8 @@ Each folder has a type:
 
 Matched files go to the **default** library of their kind: a movie to the default movie library, an
 episode to the default series library. Mark one library per kind as default; the first one is it
-automatically. Profiles and watch folders can choose another library per kind (an anime profile
-with its own series folder, say), and the workbench can put a whole job into one folder or rename
+automatically. Watch folders can choose another library per kind (an anime download folder with
+its own series library, say), and the workbench can put a whole job into one folder or rename
 in place. Rule mode does not use libraries: it renames in place unless you choose a folder.
 
 Example with movies and series on separate mounts:
@@ -97,9 +95,8 @@ Volume=/mnt/tvshows:/tvshows
 | `/movies` | Library: movies | ✓ |
 | `/tvshows` | Library: series | ✓ |
 
-Separate mounts work for *move* and *copy*; **hardlinks** need source and target on the same file
-system. For hardlinks, mount one parent (`/mnt/data:/data` with `downloads/`, `movies/` and `tv/`
-inside) and add `/data/downloads`, `/data/movies` and `/data/tv` as folders.
+Within one mount, *move* is a rename and instant; across mounts namarr copies, checks the size and
+then deletes the source.
 
 Settings from earlier versions are taken over: the allowed root paths become folders, the default
 target becomes the default library for movies and series.
@@ -110,7 +107,7 @@ target becomes the default library for movies and series.
 |---|---|---|
 | `NAMARR_TOKEN` | – | Access token for the UI (login) and the API (`Authorization: Bearer …` or Basic auth). **Required** as soon as namarr listens on more than `127.0.0.1`, so always in the Docker image. |
 | `NAMARR_AUTH_HEADER` | – | Alternative: a header set by a trusted reverse proxy, e.g. `Remote-User`. |
-| `NAMARR_ROOTS` | `/data` (Docker) | The first folders, comma-separated, on the very first start. Afterwards the folders are managed under *Settings → Folders* (see [below](#folders-and-libraries)). |
+| `NAMARR_ROOTS` | – | Optional: folders to set up on the very first start, comma-separated, e.g. `/downloads,/movies`; only those that exist. Afterwards the folders are managed under *Settings → Folders* (see [below](#folders-and-libraries)). |
 | `NAMARR_CONFIG_DIR` | `/config` (Docker), `./config` | SQLite database (WAL). |
 | `NAMARR_HOST` / `NAMARR_PORT` | `127.0.0.1` / `8420` | Outside Docker only reachable locally by default. |
 | `PUID` / `PGID` | `1000` | The server starts as root, hands `/config` over and then runs as this user. |

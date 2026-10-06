@@ -8,9 +8,12 @@ export const msgGroup = {
     test: m.actions_test,
     move: m.actions_move,
     copy: m.actions_copy,
+    rename: m.actions_rename,
+  },
+  /** Actions of earlier versions, still in the history. */
+  pastActions: {
     hardlink: m.actions_hardlink,
     symlink: m.actions_symlink,
-    rename: m.actions_rename,
   },
   conflictPolicies: {
     skip: m.conflictPolicies_skip,
@@ -40,7 +43,7 @@ export const msgGroup = {
     workbench: m.nav_workbench,
     inbox: m.nav_inbox,
     history: m.nav_history,
-    profiles: m.nav_profiles,
+    formats: m.nav_formats,
     watch: m.nav_watch,
     settings: m.nav_settings,
     connected: m.nav_connected,

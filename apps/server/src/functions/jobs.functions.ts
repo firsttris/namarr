@@ -3,10 +3,10 @@ import { msg } from "@namarr/core/i18n";
 import {
   countItemsByState,
   getJob as findJob,
-  getProfile,
   getSettings,
   ITEM_STATES,
   listItems,
+  resolveFormats,
   resolveTargets,
   SERIES_PROVIDERS,
 } from "@namarr/db";
@@ -26,8 +26,9 @@ export const createJob = createServerFn({ method: "POST" })
   .validator(
     z.object({
       paths: z.array(z.string().min(1)).min(1).max(100),
-      profileId: id.optional(),
       mode: mode.optional(),
+      /** Format ids per kind (unset: the defaults); `template` wins where given. */
+      formats: z.object({ movie: z.string().optional(), series: z.string().optional() }).optional(),
       preset: z.string().optional(),
       template: template.optional(),
       rules: rules.optional(),
@@ -43,26 +44,28 @@ export const createJob = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data, context: { rt } }) => {
-    const profile = data.profileId ? getProfile(rt.db, data.profileId) : undefined;
     const settings = getSettings(rt.db);
-    const mode = data.mode ?? profile?.mode ?? "media";
-    const targets = resolveTargets(settings, profile?.targets);
+    const mode = data.mode ?? "media";
+    const targets = resolveTargets(settings);
+    const formats = resolveFormats(settings, data.formats);
     const job = await rt.jobs.create({
       paths: data.paths,
-      profileId: profile?.id,
       config: {
         mode,
-        preset: data.preset ?? profile?.preset ?? "jellyfin",
-        template: data.template ?? profile?.template ?? {},
-        rules: data.rules ?? profile?.rulesJson ?? [],
+        template: {
+          movie: data.template?.movie ?? formats.movie.template,
+          episode: data.template?.episode ?? formats.series.template,
+        },
+        formats: { movie: formats.movie.id, series: formats.series.id },
+        rules: data.rules ?? [],
         // Test mode is the default: nothing happens without a second, explicit step.
-        action: data.action ?? profile?.action ?? "test",
-        conflictPolicy: data.conflictPolicy ?? profile?.conflictPolicy ?? "skip",
+        action: data.action ?? "test",
+        conflictPolicy: data.conflictPolicy ?? "skip",
         // Rule mode renames in place unless a folder is chosen; media sorts by kind into the library.
-        targetRoot: data.targetRoot ?? (mode === "rules" ? targets.other : undefined),
+        targetRoot: data.targetRoot,
         targets: data.targets === null ? undefined : (data.targets ?? { movie: targets.movie, series: targets.series }),
         order: data.order,
-        provider: data.provider ?? profile?.provider ?? undefined,
+        provider: data.provider,
         language: data.language,
         recursive: data.recursive,
       },
@@ -116,6 +119,8 @@ export const recomputePreview = createServerFn({ method: "POST" })
       mode: mode.optional(),
       preset: z.string().optional(),
       template: template.optional(),
+      /** The formats the template came from (ids), shown in the workbench. */
+      formats: z.object({ movie: z.string().optional(), series: z.string().optional() }).optional(),
       rules: rules.optional(),
       /** One folder for every file; `null`: none. */
       targetRoot: z.string().min(1).nullable().optional(),

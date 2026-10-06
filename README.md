@@ -47,10 +47,11 @@ kinds of renaming for any folder you point it at:
 - **Photos and music**: name photos by their EXIF capture date and sort MP3s into
   `{artist}/{album}/{track} {title}` from their tags; rule sets export and import as YAML
 - **Template language** with auto-completion and a live example: `{n} ({y})/Season {s00}/{n} - {s00e00} - {t}`,
-  with filters, conditions and presets for Plex, Jellyfin, Emby and Kodi
-- **Move, copy, hardlink, symlink or rename in place**. Hardlinks keep torrents seeding
+  with filters, conditions and built-in formats for Plex, Jellyfin, Emby and Kodi
+- **Own naming formats** for movies and series: add, edit, copy, delete, one default per kind
+- **Move, copy or rename in place**
 - **Libraries for movies and series**: every matched file lands in the default folder of its kind,
-  profiles and watch folders can pick another; every path is chosen with a folder browser
+  watch folders can pick another; every path is chosen with a folder browser
 - **Conflict handling**, including *keep better*, which compares resolution, source, HDR, codecs and
   audio before it looks at file size
 - **Watch folders** that wait until downloads are finished, rename sure matches on their own and
@@ -72,8 +73,8 @@ kinds of renaming for any folder you point it at:
 | **TVmaze** | | ✅ | | none, free |
 | **AniDB** | | | ✅ | registered client |
 
-Series and movies can come from different sources, and every profile can pick its own series source,
-for example AniDB for an anime profile. Details: [docs/metadata.md](docs/metadata.md).
+Series and movies can come from different sources, and every watch folder can pick its own series
+source, for example AniDB for an anime folder. Details: [docs/metadata.md](docs/metadata.md).
 
 ## 🐳 Quick start
 
@@ -84,8 +85,9 @@ curl -o compose.yml https://raw.githubusercontent.com/firsttris/namarr/main/dock
 docker compose up -d
 ```
 
-Open **http://localhost:8420**, sign in with your token and add a TMDB API key under *Settings*, or
-set up one of the [other sources](docs/metadata.md).
+Open **http://localhost:8420**, sign in with your token, then under *Settings* add your
+[folders](docs/installation.md#folders-and-libraries) (`/data`, or your download, movie and series
+mounts) and a TMDB API key, or set up one of the [other sources](docs/metadata.md).
 
 <details>
 <summary><b>docker run</b></summary>
@@ -125,7 +127,7 @@ Use the template in [`docker/unraid/namarr.xml`](docker/unraid/namarr.xml).
 | Volume | Content |
 |---|---|
 | `/config` | SQLite database |
-| `/data` | your downloads and your library. Keep both in the same mount, otherwise hardlinks are impossible |
+| `/data` | your downloads and your library (or one mount each, see the installation guide) |
 
 Environment variables, image tags, updates and the API are in the
 [installation guide](docs/installation.md).
