@@ -41,6 +41,8 @@ describe("TVmaze-Provider", () => {
         title: "Star Trek: Deep Space Nine",
         year: 1993,
         poster: "https://static.tvmaze.com/ds9.jpg",
+        rating: undefined,
+        ids: { imdb: "tt0106145", tvdb: "72073" },
       },
     ]);
     expect(await provider.searchMovie()).toEqual([]);

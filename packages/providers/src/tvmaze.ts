@@ -16,6 +16,7 @@ type TvmazeShow = {
   premiered?: string | null;
   image?: { medium?: string; original?: string } | null;
   externals?: { thetvdb?: number | null; imdb?: string | null };
+  rating?: { average?: number | null } | null;
 };
 type TvmazeEpisode = { season: number; number: number | null; name?: string | null; airdate?: string | null; type?: string };
 
@@ -53,6 +54,12 @@ export class TvmazeProvider implements MetadataProvider {
       title: s.name,
       year: yearOf(s.premiered),
       poster: s.image?.medium ?? undefined,
+      rating: s.rating?.average ?? undefined,
+      // TVmaze answers with its IDs in other databases right away: nothing more to look up.
+      ids: {
+        ...(s.externals?.imdb ? { imdb: s.externals.imdb } : {}),
+        ...(s.externals?.thetvdb ? { tvdb: String(s.externals.thetvdb) } : {}),
+      },
     };
   }
 

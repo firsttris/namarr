@@ -84,7 +84,9 @@ with it.
 
 **Tokens**: `n` name, `y` year, `s`/`e`, `s00`, `e00`, `s00e00` (double episodes: `S02E04-E05`),
 `sxe`, `t` episode title, `absolute`, `d` date, `vf` resolution, `vc` video codec, `ac`/`af` audio,
-`hdr`, `source`, `group`, `lang`, `edition`, `part`, `id`, `provider`, `orig`, `ext`.
+`hdr`, `source`, `group`, `lang`, `edition`, `part`, `id`, `provider`, `orig`, `ext`, `imdb`, `tmdb`,
+`tvdb` (IDs in those databases, from the folder name or the source: `[imdbid-{imdb}]`), `rating`
+(average rating with one decimal, `7.5`).
 
 **Filters**: `lower upper title trim replace default pad truncate ascii space first`.
 
@@ -106,7 +108,8 @@ A format is a named template for movies or for series. Under **Formats** (`/form
 **Detect from library**: pick one file of a library you already have, say
 `/tvshows/Dark/Staffel 01/Dark - S01E01 - Geheimnisse.mkv`. namarr matches it like any other file,
 puts the tokens back where the values are (`{n}/Staffel {s00}/{n} - {s00e00}{?t} - {t}{/}`) and
-checks the result against up to a dozen more files of the same library, spread over its series or
+merges what the files show (a rating only some have becomes a condition, `EAC3` a
+`replace` filter for the audio codec) and checks the result against up to a dozen more files of the same library, spread over its series or
 movies. It says which built-in formats fit, or offers the detected one as a new format, and lists
 every file it does not fit with the name namarr would write instead. Episode titles are compared in
 the language of the settings and in English. Without a metadata source only what the names say

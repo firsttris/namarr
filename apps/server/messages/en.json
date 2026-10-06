@@ -589,5 +589,9 @@
   "settings_refreshCheck_unreachable": "{host} cannot be reached ({detail}). Are address and port right, and can the namarr container reach the server?",
   "settings_refreshCheck_token": "The server rejects the token (HTTP {status})",
   "settings_refreshCheck_http": "The server answers with HTTP {status}",
-  "settings_refreshCheck_wrongKind": "The server answers, but not like a {kind} server. Check type and address."
+  "settings_refreshCheck_wrongKind": "The server answers, but not like a {kind} server. Check type and address.",
+  "template_tokens_imdb": "IMDb ID",
+  "template_tokens_tmdb": "TMDB ID",
+  "template_tokens_tvdb": "TVDB ID",
+  "template_tokens_rating": "Rating"
 }

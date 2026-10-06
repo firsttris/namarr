@@ -92,12 +92,19 @@ export function buildValues({ parsed, match, episodes = [], original }: FormatIn
     part: parsed.part,
     id: match?.id,
     provider: match?.provider,
+    imdb: match?.ids?.imdb ?? parsed.ids?.imdb,
+    tmdb: match?.provider === "tmdb" ? match.id : (match?.ids?.tmdb ?? parsed.ids?.tmdb),
+    tvdb: match?.provider === "tvdb" ? match.id : (match?.ids?.tvdb ?? parsed.ids?.tvdb),
+    rating: match?.rating ? match.rating.toFixed(1) : undefined,
     orig: stem,
     kind: parsed.kind.value,
   };
 }
 
 export type FormatOptions = SanitizeOptions;
+
+/** Whether a template names IDs of other databases, which only the details of a title carry. */
+export const usesIds = (template: string) => /\{[?!]?(imdb|tmdb|tvdb)\b/.test(template);
 
 /**
  * Renders the template for one file and appends its full extension suffix

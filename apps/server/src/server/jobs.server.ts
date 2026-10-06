@@ -8,6 +8,7 @@ import {
   entryParsed,
   executeOperation,
   type FileMeta,
+  loadIds,
   type MatchResult,
   type MetadataProvider,
   matchAll,
@@ -30,6 +31,7 @@ import {
   scan,
   TARGET_EXISTS,
   undoOperation,
+  usesIds,
 } from "@namarr/core";
 import {
   addToInbox,
@@ -369,6 +371,7 @@ export class JobService {
     // Undone files are back at their source and can be renamed again.
     const items = allItems(db, jobId).filter((i) => i.state !== "done");
     const inputs = await Promise.all(items.map((i) => this.toInput(i)));
+    if (job.config.mode !== "rules") await this.loadIdsFor(job.config, items, inputs);
     if (job.config.mode !== "media" && needsMetadata(job.config.rules ?? [])) await this.loadMetadata(inputs);
     const preview = buildPreview(inputs, this.previewConfig(job.config));
     await this.markExisting(preview);
@@ -387,6 +390,22 @@ export class JobService {
     });
     this.deps.bus.emit({ type: "item.updated", jobId, itemIds: items.map((i) => i.id) });
     return countItemsByState(db, jobId);
+  }
+
+  /** `{imdb}` and `{tvdb}` in the template: the matches need the IDs from the details of their title. */
+  private async loadIdsFor(config: JobConfig, items: JobItem[], inputs: PreviewInput[]) {
+    if (![config.template?.movie, config.template?.episode].some((t) => t && usesIds(t))) return;
+    const matches = inputs.map((i) => i.match).filter((m): m is MatchResult => Boolean(m?.best && !m.best.ids));
+    if (!matches.length) return;
+    const settings = this.settings();
+    const provider = this.deps.provider(settings, { series: config.provider });
+    if (!provider) return;
+    const changed = new Set(await loadIds(matches, provider, { language: config.language ?? settings.language }));
+    this.deps.db.transaction(() => {
+      inputs.forEach((input, i) => {
+        if (input.match && changed.has(input.match)) updateItem(this.deps.db, items[i]!.id, { matchJson: input.match });
+      });
+    });
   }
 
   /**

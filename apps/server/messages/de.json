@@ -589,5 +589,9 @@
   "settings_refreshCheck_unreachable": "{host} ist nicht erreichbar ({detail}). Stimmen Adresse und Port, und erreicht der namarr-Container den Server?",
   "settings_refreshCheck_token": "Der Server lehnt den Token ab (HTTP {status})",
   "settings_refreshCheck_http": "Der Server antwortet mit HTTP {status}",
-  "settings_refreshCheck_wrongKind": "Der Server antwortet, aber nicht wie ein {kind}-Server. Typ und Adresse prüfen."
+  "settings_refreshCheck_wrongKind": "Der Server antwortet, aber nicht wie ein {kind}-Server. Typ und Adresse prüfen.",
+  "template_tokens_imdb": "IMDb-ID",
+  "template_tokens_tmdb": "TMDB-ID",
+  "template_tokens_tvdb": "TVDB-ID",
+  "template_tokens_rating": "Bewertung"
 }

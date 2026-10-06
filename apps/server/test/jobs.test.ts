@@ -84,6 +84,17 @@ async function analyzed(extra: Partial<JobConfig> = {}, kind: "manual" | "watch"
 }
 
 describe("JobService: Analyse", () => {
+  it("{imdb} im Template: die IDs kommen einmal pro Titel aus den Details", async () => {
+    const { by } = await analyzed({ template: { episode: "{n} [imdbid-{imdb}]/{s00e00}" } });
+    expect(by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").targetPath).toBe(
+      path.join(media(), "Severance [imdbid-tt11280740]/S02E01.mkv"),
+    );
+    expect((by("Severance.S02E02.German.DL.1080p.WEB.h264-GRP.mkv").matchJson as { best: { ids?: object } }).best.ids).toEqual({
+      tmdb: "95396",
+      imdb: "tt11280740",
+    });
+  });
+
   it("scannt, parst, matcht und berechnet die Vorschau im Worker", async () => {
     const { job, items, by } = await analyzed();
     expect(job.status).toBe("ready");

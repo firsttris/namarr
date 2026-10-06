@@ -255,3 +255,32 @@ export async function matchAll(
   }
   return results;
 }
+
+/**
+ * IDs in other databases (`{imdb}`, `{tvdb}`) come only with the details of a title, not with search
+ * results: looked up once per title for the matches that lack them. Sets `best.ids` in place (an
+ * empty object when the source has none, so it is not asked again) and returns the changed matches.
+ */
+export async function loadIds(
+  matches: MatchResult[],
+  provider: MetadataProvider,
+  options: { language?: string } = {},
+): Promise<MatchResult[]> {
+  const todo = matches.filter((m) => m.best && !m.best.ids);
+  const lookups = new Map<string, Promise<MediaCandidate["ids"]>>();
+  for (const m of todo) {
+    const best = m.best!;
+    const key = `${best.kind}:${best.id}`;
+    if (!lookups.has(key)) {
+      lookups.set(
+        key,
+        provider.details(best.kind, best.id, options).then(
+          (d) => d.ids ?? {},
+          () => ({}),
+        ),
+      );
+    }
+  }
+  for (const m of todo) m.best!.ids = await lookups.get(`${m.best!.kind}:${m.best!.id}`)!;
+  return todo;
+}
