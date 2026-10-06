@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-/** Fresh config and fake media files before every run. */
+/** Fresh config and fake media files before every run (run by the webServer command). */
 export default function setup() {
   const root = path.resolve("e2e/.tmp");
   fs.rmSync(root, { recursive: true, force: true });
@@ -30,3 +30,5 @@ export default function setup() {
   fs.writeFileSync(path.join(hook, "Dark.S01E01.German.DL.1080p.WEB.h264-GRP.mkv"), "dark");
   fs.mkdirSync(path.join(root, "config"), { recursive: true });
 }
+
+if (import.meta.main) setup();
