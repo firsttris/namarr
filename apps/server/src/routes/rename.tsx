@@ -2,17 +2,18 @@ import type { Action, ConflictPolicy } from "@namarr/core/fileops";
 import type { MatchResult } from "@namarr/core/matcher";
 import type { Rule } from "@namarr/core/rules";
 import type { Parsed } from "@namarr/core/types";
-import type { JobItem, SeriesProvider } from "@namarr/db/types";
+import { type JobItem, jobTargetRoots, type SeriesProvider } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FolderBrowser } from "~/components/FolderBrowser";
 import { SearchIcon } from "~/components/icons";
 import { MatchPicker } from "~/components/MatchPicker";
+import { PathInput } from "~/components/PathInput";
 import { PreviewTable } from "~/components/PreviewTable";
 import { RuleStack } from "~/components/RuleStack";
 import { TemplateEditor } from "~/components/TemplateEditor";
-import { Button, cx, ErrorNote, inputClass, Panel, Poster, Progress, Select } from "~/components/ui";
+import { Button, cx, ErrorNote, Panel, Poster, Progress, Select } from "~/components/ui";
 import { cancelJob, createJob, executeJob, getJob, getJobItems, recomputePreview, updateJobItem } from "~/functions/jobs.functions";
 import { getProfiles, getSettingsFn } from "~/functions/library.functions";
 import { useLive } from "~/lib/events";
@@ -214,7 +215,16 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
   });
   const cancel = useMutation({ mutationFn: () => cancelJob({ data: { jobId } }) });
   const retarget = useMutation({
-    mutationFn: (targetRoot: string | null) => recomputePreview({ data: { jobId, targetRoot } }),
+    // "library": sorted by kind into the library folders; "": in place; else one folder for everything.
+    mutationFn: (choice: string) =>
+      recomputePreview({
+        data:
+          choice === "library"
+            ? { jobId, targetRoot: null, targets: "library" }
+            : choice
+              ? { jobId, targetRoot: choice }
+              : { jobId, targetRoot: null, targets: null },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["job", jobId] });
       qc.invalidateQueries({ queryKey: ["items", jobId] });
@@ -231,6 +241,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
           template: config?.template,
           rules: config?.rules,
           targetRoot: j.config.targetRoot,
+          targets: j.config.targets ?? null,
           order: extra.order ?? j.config.order,
           provider: extra.provider ?? j.config.provider,
           language: extra.language ?? j.config.language,
@@ -274,9 +285,11 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
   const match = selected?.matchJson as MatchResult | null | undefined;
   const sample = selected && parsed ? { parsed, match, original: selected.sourcePath.split("/").at(-1)! } : undefined;
   const kind = match?.best?.kind === "movie" || parsed?.kind.value === "movie" ? "movie" : "episode";
-  const roots = settings.data?.roots ?? [];
-  const targets = [...new Set([j?.config.targetRoot, settings.data?.defaultTargetRoot, ...roots].filter((t): t is string => Boolean(t)))];
-  const targetRoot = j?.config.targetRoot;
+  const folders = settings.data?.folders ?? [];
+  // Every allowed folder can take all files of the job; the one chosen stays listed even if no longer allowed.
+  const fixedTargets = [...new Set([j?.config.targetRoot, ...folders.map((f) => f.path)].filter((t): t is string => Boolean(t)))];
+  const targetChoice = j?.config.targetRoot ?? (j?.config.targets ? "library" : "");
+  const targetRoots = j ? jobTargetRoots(j.config) : [];
 
   const setMode = (mode: Mode) => {
     if (!config) return;
@@ -399,7 +412,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
           ) : (
             <PreviewTable
               items={list}
-              targetRoot={targetRoot}
+              targetRoots={targetRoots}
               sourceRoot={sourceRoot}
               selectedId={selected?.id}
               onSelect={setSelectedId}
@@ -452,11 +465,17 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
               <Select
                 id="target"
                 className="h-10 max-w-60 font-mono"
-                value={targetRoot ?? ""}
-                onChange={(e) => retarget.mutate(e.target.value || null)}
+                value={targetChoice}
+                title={
+                  targetChoice === "library"
+                    ? m.workbench_libraryTitle({ movie: j?.config.targets?.movie ?? "–", series: j?.config.targets?.series ?? "–" })
+                    : undefined
+                }
+                onChange={(e) => retarget.mutate(e.target.value)}
               >
+                {config?.mode !== "rules" && <option value="library">{m.workbench_library()}</option>}
                 <option value="">{m.workbench_inPlace()}</option>
-                {targets.map((t) => (
+                {fixedTargets.map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>
@@ -525,7 +544,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
               {selected.reasons.length > 0 && <div className="text-xs text-muted">{localize(selected.reasons.join(" · "))}</div>}
               {selected.error && <div className="text-xs text-danger">{localize(selected.error)}</div>}
               <form
-                className="flex gap-2"
+                className="flex flex-col gap-2"
                 onSubmit={(e) => {
                   e.preventDefault();
                   update.mutate({ itemId: selected.id, targetPath: targetDraft || null });
@@ -534,14 +553,21 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
                 <label htmlFor="target-override" className="sr-only">
                   {m.workbench_targetOverride()}
                 </label>
-                <input
+                <PathInput
                   id="target-override"
-                  className={cx(inputClass, "h-8 min-w-0 flex-grow font-mono text-xs")}
+                  size="sm"
+                  label={m.workbench_targetOverride()}
+                  fileName={(targetDraft || selected.targetPath || selected.sourcePath).split("/").at(-1)}
                   placeholder={selected.overrideTarget ? m.workbench_targetClear() : m.workbench_targetPlaceholder()}
                   value={targetDraft}
-                  onChange={(e) => setTargetDraft(e.target.value)}
+                  onChange={setTargetDraft}
                 />
-                <Button size="sm" type="submit" disabled={update.isPending || (!targetDraft && !selected.overrideTarget)}>
+                <Button
+                  size="sm"
+                  type="submit"
+                  className="self-end"
+                  disabled={update.isPending || (!targetDraft && !selected.overrideTarget)}
+                >
                   {m.workbench_set()}
                 </Button>
               </form>

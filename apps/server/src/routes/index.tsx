@@ -125,7 +125,7 @@ function Dashboard() {
                   </div>
                 </div>
                 <div className="font-mono text-xs text-soft">
-                  {f.path} → {f.targetRoot}
+                  {f.path} → {f.targets.movie && f.targets.movie === f.targets.series ? f.targets.movie : m.targets_library()}
                 </div>
                 <div className="flex gap-1.5">
                   <Chip>{f.autoThreshold === null ? m.dashboard_alwaysReview() : m.dashboard_autoFrom({ pct: pct(f.autoThreshold) })}</Chip>

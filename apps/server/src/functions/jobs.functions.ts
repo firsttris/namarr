@@ -1,6 +1,15 @@
 import { ACTIONS, CONFLICT_POLICIES } from "@namarr/core";
 import { msg } from "@namarr/core/i18n";
-import { countItemsByState, getJob as findJob, getProfile, getSettings, ITEM_STATES, listItems, SERIES_PROVIDERS } from "@namarr/db";
+import {
+  countItemsByState,
+  getJob as findJob,
+  getProfile,
+  getSettings,
+  ITEM_STATES,
+  listItems,
+  resolveTargets,
+  SERIES_PROVIDERS,
+} from "@namarr/db";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { rulesSchema, templateSchema } from "~/lib/schemas";
@@ -25,6 +34,8 @@ export const createJob = createServerFn({ method: "POST" })
       action: z.enum(ACTIONS).optional(),
       conflictPolicy: z.enum(CONFLICT_POLICIES).optional(),
       targetRoot: z.string().optional(),
+      /** Library folders by kind (taken over when matching again); `null`: none. Unset: the profile's, else the defaults. */
+      targets: z.object({ movie: z.string().optional(), series: z.string().optional() }).nullable().optional(),
       order: z.enum(["aired", "dvd", "absolute"]).optional(),
       provider: z.enum(SERIES_PROVIDERS).optional(),
       language: z.string().optional(),
@@ -35,6 +46,7 @@ export const createJob = createServerFn({ method: "POST" })
     const profile = data.profileId ? getProfile(rt.db, data.profileId) : undefined;
     const settings = getSettings(rt.db);
     const mode = data.mode ?? profile?.mode ?? "media";
+    const targets = resolveTargets(settings, profile?.targets);
     const job = await rt.jobs.create({
       paths: data.paths,
       profileId: profile?.id,
@@ -46,8 +58,9 @@ export const createJob = createServerFn({ method: "POST" })
         // Test mode is the default: nothing happens without a second, explicit step.
         action: data.action ?? profile?.action ?? "test",
         conflictPolicy: data.conflictPolicy ?? profile?.conflictPolicy ?? "skip",
-        // Rule mode renames in place unless a target is chosen explicitly.
-        targetRoot: data.targetRoot ?? profile?.targetRoot ?? (mode === "rules" ? undefined : settings.defaultTargetRoot),
+        // Rule mode renames in place unless a folder is chosen; media sorts by kind into the library.
+        targetRoot: data.targetRoot ?? (mode === "rules" ? targets.other : undefined),
+        targets: data.targets === null ? undefined : (data.targets ?? { movie: targets.movie, series: targets.series }),
         order: data.order,
         provider: data.provider ?? profile?.provider ?? undefined,
         language: data.language,
@@ -104,8 +117,10 @@ export const recomputePreview = createServerFn({ method: "POST" })
       preset: z.string().optional(),
       template: template.optional(),
       rules: rules.optional(),
-      /** `null` renames in place again. */
+      /** One folder for every file; `null`: none. */
       targetRoot: z.string().min(1).nullable().optional(),
+      /** "library": by kind into the library folders; `null`: none (in place unless `targetRoot`). */
+      targets: z.literal("library").nullable().optional(),
     }),
   )
   .handler(async ({ data: { jobId, ...patch }, context: { rt } }) => rt.jobs.recompute(jobId, patch));

@@ -6,12 +6,24 @@ import * as m from "~/paraglide/messages";
 import { FileIcon, FolderIcon } from "./icons";
 import { Button, cx, ErrorNote } from "./ui";
 
-type Props = { initial?: string; onChoose: (path: string) => void; chooseLabel?: string };
+type Props = {
+  initial?: string;
+  onChoose: (path: string) => void;
+  chooseLabel?: string;
+  /** "all": the whole file system, folders only (for choosing the allowed folders themselves). */
+  scope?: "allowed" | "all";
+};
 
-/** Server-side folder browser, limited to the allowed root paths. */
-export function FolderBrowser({ initial, onChoose, chooseLabel }: Props) {
+/** Server-side folder browser, limited to the allowed folders unless `scope` is "all". */
+export function FolderBrowser({ initial, onChoose, chooseLabel, scope = "allowed" }: Props) {
   const [path, setPath] = useState<string | undefined>(initial);
-  const q = useQuery({ queryKey: ["browse", path ?? ""], queryFn: () => browseFolder({ data: { path } }) });
+  const q = useQuery({
+    queryKey: ["browse", scope, path ?? ""],
+    queryFn: () => browseFolder({ data: { path, scope } }),
+    // A typed path that does not exist (yet): start at the top instead of showing an error.
+    retry: false,
+  });
+  if (q.isError && path && path === initial) setPath(undefined);
   const data = q.data;
 
   if (data && !data.path) {
@@ -35,7 +47,10 @@ export function FolderBrowser({ initial, onChoose, chooseLabel }: Props) {
   return (
     <div className="flex min-h-0 flex-col gap-3">
       <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-grow truncate font-mono text-[13px] text-ink">{data?.path ?? path}</div>
+        {/* Long paths: the end (where you are) stays visible. */}
+        <div className="min-w-0 flex-grow truncate text-left font-mono text-[13px] text-ink [direction:rtl]" title={data?.path ?? path}>
+          <bdi>{data?.path ?? path}</bdi>
+        </div>
         <Button size="sm" onClick={() => setPath(data?.parent ?? undefined)} disabled={!data}>
           {data?.parent ? m.folders_up() : m.folders_roots()}
         </Button>

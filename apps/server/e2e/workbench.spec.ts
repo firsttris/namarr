@@ -4,17 +4,42 @@ import { expect, type Page, test } from "@playwright/test";
 
 const data = path.resolve("e2e/.tmp/data");
 const media = path.join(data, "media/tv");
+const movies = path.join(data, "media/movies");
 
 async function openFolder(page: Page, ...segments: string[]) {
-  await page.getByRole("button", { name: data }).click();
+  await page.getByRole("button", { name: data, exact: true }).click();
   for (const s of segments) await page.getByRole("button", { name: s, exact: true }).click();
 }
 
 test.describe.configure({ mode: "serial" });
 
-test("Einstellungen: Standard-Zielordner setzen", async ({ page }) => {
+test("Einstellungen: Serien-Mediathek per Datei-Explorer anlegen", async ({ page }) => {
   await page.goto("/settings");
-  await page.getByLabel("Standard-Zielordner").fill(media);
+  // NAMARR_ROOTS became the first folder.
+  await expect(page.getByRole("group", { name: "data" })).toBeVisible();
+  await expect(page.getByText("Kein Standard-Ziel f체r Serien")).toBeVisible();
+
+  await page.getByRole("button", { name: "+ Ordner hinzuf체gen" }).click();
+  const row = page.getByRole("group").last();
+  await row.getByRole("textbox", { name: /^Pfad/ }).fill(data);
+  await row.getByRole("button", { name: /^Ordner w채hlen/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Ordner w채hlen" });
+  await dialog.getByRole("button", { name: "media", exact: true }).click();
+  await dialog.getByRole("button", { name: "tv", exact: true }).click();
+  await dialog.getByRole("button", { name: "Diesen Ordner w채hlen" }).click();
+  await expect(dialog).toBeHidden();
+
+  const tv = page.getByRole("group", { name: "tv" });
+  await expect(tv.getByRole("textbox", { name: /^Pfad/ })).toHaveValue(media);
+  await tv.getByLabel("Typ").selectOption("series");
+  await expect(page.getByText(`Serien landen in ${media}`)).toBeVisible();
+
+  // A second library, typed instead of browsed: movies.
+  await page.getByRole("button", { name: "+ Ordner hinzuf체gen" }).click();
+  const moviesRow = page.getByRole("group").last();
+  await moviesRow.getByRole("textbox", { name: /^Pfad/ }).fill(movies);
+  await moviesRow.getByLabel("Typ").selectOption("movies");
+  await expect(page.getByText(`Filme landen in ${movies}`)).toBeVisible();
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Gespeichert.")).toBeVisible();
 });
@@ -72,7 +97,7 @@ test("Workbench: Media-Modus, Vorschau, Treffer korrigieren, ausf체hren, r체ckg�
   await expect
     .poll(() => fs.existsSync(path.join(media, "Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.de.srt")))
     .toBe(true);
-  await expect.poll(() => fs.existsSync(path.join(media, "The Matrix (1999)/The Matrix (1999).mp4"))).toBe(true);
+  await expect.poll(() => fs.existsSync(path.join(movies, "The Matrix (1999)/The Matrix (1999).mp4"))).toBe(true);
   await expect(page.getByText("6 erledigt")).toBeVisible();
   // Hardlink: the download stays for seeding
   expect(fs.existsSync(path.join(data, "downloads/tv/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv"))).toBe(true);

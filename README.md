@@ -49,6 +49,8 @@ kinds of renaming for any folder you point it at:
 - **Template language** with auto-completion and a live example: `{n} ({y})/Season {s00}/{n} - {s00e00} - {t}`,
   with filters, conditions and presets for Plex, Jellyfin, Emby and Kodi
 - **Move, copy, hardlink, symlink or rename in place**. Hardlinks keep torrents seeding
+- **Libraries for movies and series**: every matched file lands in the default folder of its kind,
+  profiles and watch folders can pick another; every path is chosen with a folder browser
 - **Conflict handling**, including *keep better*, which compares resolution, source, HDR, codecs and
   audio before it looks at file size
 - **Watch folders** that wait until downloads are finished, rename sure matches on their own and

@@ -62,13 +62,55 @@ A new version is published by pushing a tag `vX.Y.Z` (see [Releases](development
 `edge` is built by hand with the *Release* workflow on `main`. The image contains a static `ffprobe`, so
 resolution and codecs are read even from files whose names say nothing about them.
 
+## Folders and libraries
+
+Under **Settings → Folders** you list every folder namarr may use. namarr reads and writes only
+inside them, and you pick files from them in the workbench and for watch folders. Every path field
+has a **Browse …** button that opens a folder browser; in the settings it shows the whole container,
+so you can find your mounts.
+
+Each folder has a type:
+
+| Type | Meaning |
+|---|---|
+| Folder | browse and change files there: downloads, photos, music |
+| Library: movies | also a target for movies in media mode |
+| Library: series | also a target for series in media mode |
+
+Matched files go to the **default** library of their kind: a movie to the default movie library, an
+episode to the default series library. Mark one library per kind as default; the first one is it
+automatically. Profiles and watch folders can choose another library per kind (an anime profile
+with its own series folder, say), and the workbench can put a whole job into one folder or rename
+in place. Rule mode does not use libraries: it renames in place unless you choose a folder.
+
+Example with movies and series on separate mounts:
+
+```ini
+Volume=/mnt/downloads:/downloads
+Volume=/mnt/movies:/movies
+Volume=/mnt/tvshows:/tvshows
+```
+
+| Folder | Type | Default |
+|---|---|---|
+| `/downloads` | Folder | |
+| `/movies` | Library: movies | ✓ |
+| `/tvshows` | Library: series | ✓ |
+
+Separate mounts work for *move* and *copy*; **hardlinks** need source and target on the same file
+system. For hardlinks, mount one parent (`/mnt/data:/data` with `downloads/`, `movies/` and `tv/`
+inside) and add `/data/downloads`, `/data/movies` and `/data/tv` as folders.
+
+Settings from earlier versions are taken over: the allowed root paths become folders, the default
+target becomes the default library for movies and series.
+
 ## Environment variables
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `NAMARR_TOKEN` | – | Access token for the UI (login) and the API (`Authorization: Bearer …` or Basic auth). **Required** as soon as namarr listens on more than `127.0.0.1`, so always in the Docker image. |
 | `NAMARR_AUTH_HEADER` | – | Alternative: a header set by a trusted reverse proxy, e.g. `Remote-User`. |
-| `NAMARR_ROOTS` | `/data` (Docker) | Allowed root paths, comma-separated. namarr reads and writes only inside them; they can be changed later in the settings. |
+| `NAMARR_ROOTS` | `/data` (Docker) | The first folders, comma-separated, on the very first start. Afterwards the folders are managed under *Settings → Folders* (see [below](#folders-and-libraries)). |
 | `NAMARR_CONFIG_DIR` | `/config` (Docker), `./config` | SQLite database (WAL). |
 | `NAMARR_HOST` / `NAMARR_PORT` | `127.0.0.1` / `8420` | Outside Docker only reachable locally by default. |
 | `PUID` / `PGID` | `1000` | The server starts as root, hands `/config` over and then runs as this user. |

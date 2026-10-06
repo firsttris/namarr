@@ -11,6 +11,8 @@ A watch folder renames new downloads on its own:
 - It bundles a release folder into **one job**, so a season pack is one job, not ten.
 - Only matches above the **auto threshold** (default 90 %) run. Everything else waits in the
   [inbox](#inbox). *Always review* runs nothing without your approval.
+- Matched files go to the **libraries**: the watch folder's own choice per kind, else the profile's,
+  else the default library for movies and series (see [Folders and libraries](installation.md#folders-and-libraries)).
 - The default action is **hardlink**, so torrents keep seeding. A profile can choose another one;
   *test* becomes hardlink, since a watch job that only previews would do nothing.
 - **At startup** it catches up on what arrived while namarr was down: video files that no job knows
@@ -39,14 +41,14 @@ curl -X POST http://namarr:8420/api/jobs \
 |---|---|
 | `path` | file or folder, as the client sees it (`NAMARR_PATH_MAP` translates it) |
 | `profile` | profile ID or name (format, rules, action, series source; `test` becomes hardlink) |
-| `watchFolder` | ID or name of a watch folder: its profile, target and auto threshold |
-| `target` | target folder; otherwise from the profile, the watch folder or the default target |
+| `watchFolder` | ID or name of a watch folder: its profile, targets and auto threshold |
+| `target` | one folder for every file; otherwise movies and series go to the libraries of the profile, the watch folder or the defaults |
 | `review` | `true`: nothing runs without approval, everything goes to the inbox |
 | `threshold` | auto threshold 0–1, default 0.9 |
 
 Fields may be sent as JSON, as a form or as query parameters. The answer is
 `202 {"jobId", "status", "url"}`; `GET /api/jobs/<id>` reports the progress. Errors come as
-`{"error"}` with 400 (invalid), 401 (token), 403 (outside the root paths) or 404 (path, profile or
+`{"error"}` with 400 (invalid, or no target at all), 401 (token), 403 (outside the folders) or 404 (path, profile or
 watch folder unknown).
 
 - **qBittorrent** → Options → Downloads → *Run external program on torrent finished*:

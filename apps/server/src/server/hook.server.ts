@@ -1,5 +1,5 @@
 import * as fs from "node:fs/promises";
-import { getProfile, getSettings, type Job, listProfiles, listWatchFolders } from "@namarr/db";
+import { getProfile, getSettings, type Job, listProfiles, listWatchFolders, resolveTargets } from "@namarr/db";
 import { z } from "zod";
 import { localizeIn } from "../lib/i18n.tsx";
 import { automaticConfig } from "./automation.server.ts";
@@ -83,8 +83,10 @@ export async function createHookJob(rt: Runtime, input: HookInput): Promise<Job>
         : undefined;
   if (input.profile !== undefined && !profile) throw new HookError(`Unknown profile: ${input.profile}`, 404);
 
-  const target = input.target ?? profile?.targetRoot ?? watchFolder?.targetRoot ?? settings.defaultTargetRoot;
-  if (!target) throw new HookError("No target folder: pass target, or set one in the profile or as default target", 400);
+  const targetRoot = input.target ? mapPath(input.target, rt.env.pathMap) : undefined;
+  const targets = resolveTargets(settings, profile?.targets, watchFolder?.targets);
+  if (!targetRoot && (profile?.mode ?? "media") !== "rules" && !targets.movie && !targets.series)
+    throw new HookError("No target folder: pass target, or add a library folder for movies or series in the settings", 400);
   const autoThreshold = input.review ? null : (input.threshold ?? watchFolder?.autoThreshold ?? 0.9);
 
   const source = mapPath(input.path, rt.env.pathMap);
@@ -96,7 +98,7 @@ export async function createHookJob(rt: Runtime, input: HookInput): Promise<Job>
       kind: "hook",
       profileId: profile?.id ?? null,
       watchFolderId: watchFolder?.id ?? null,
-      config: automaticConfig(profile, { targetRoot: mapPath(target, rt.env.pathMap), autoThreshold }),
+      config: automaticConfig(profile, { targets, targetRoot, autoThreshold }),
     });
   } catch (e) {
     // By name, not instanceof: the server entry and the Start bundle each carry a copy of core.

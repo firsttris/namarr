@@ -1,12 +1,15 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   addToInbox,
   allItems,
+  allowedRoots,
   countItemsByState,
   createJob,
   createProfile,
   createWatchFolder,
   dashboardStats,
+  defaultFolder,
   deleteProfile,
   failInterruptedJobs,
   getJob,
@@ -20,11 +23,15 @@ import {
   listItems,
   listOperations,
   listOverrides,
+  listProfiles,
+  listWatchFolders,
   markUndone,
   openDatabase,
   removeFromInbox,
+  resolveTargets,
   SqliteProviderCache,
   saveOverride,
+  schema,
   setSettings,
   updateItem,
 } from "../src/index.ts";
@@ -58,11 +65,78 @@ describe("Migrationen", () => {
 describe("Einstellungen", () => {
   it("Defaults, Patch und Löschen", () => {
     const db = fresh();
-    expect(getSettings(db)).toMatchObject({ language: "de-DE", roots: [] });
-    setSettings(db, { roots: ["/data"], tmdbApiKey: "abc" });
-    expect(getSettings(db)).toMatchObject({ roots: ["/data"], tmdbApiKey: "abc", language: "de-DE" });
+    expect(getSettings(db)).toMatchObject({ language: "de-DE", folders: [] });
+    const folders = [{ path: "/data", name: "data", kind: "folder" as const }];
+    setSettings(db, { folders, tmdbApiKey: "abc" });
+    expect(getSettings(db)).toMatchObject({ folders, tmdbApiKey: "abc", language: "de-DE" });
     setSettings(db, { tmdbApiKey: undefined });
     expect(getSettings(db).tmdbApiKey).toBeUndefined();
+  });
+});
+
+describe("Ordner", () => {
+  it("übernimmt Wurzelpfade und Standard-Ziel älterer Versionen, bis Ordner gespeichert werden", () => {
+    const db = fresh();
+    db.insert(schema.settings)
+      .values({ key: "roots", valueJson: ["/downloads", "/media"] })
+      .run();
+    db.insert(schema.settings).values({ key: "defaultTargetRoot", valueJson: "/media" }).run();
+    const s = getSettings(db);
+    expect(s.folders).toEqual([
+      { path: "/downloads", name: "downloads", kind: "folder" },
+      { path: "/media", name: "media", kind: "folder" },
+      { path: "/media", name: "media", kind: "movies", default: true },
+      { path: "/media", name: "media", kind: "series", default: true },
+    ]);
+    expect(s).not.toHaveProperty("roots");
+    expect(allowedRoots(s)).toEqual(["/downloads", "/media"]);
+    setSettings(db, { folders: s.folders });
+    expect(
+      db
+        .select()
+        .from(schema.settings)
+        .all()
+        .map((r) => r.key),
+    ).toEqual(["folders"]);
+  });
+
+  it("Standard je Typ, Ebenen vor Standard, Regel-Ziel ohne Standard", () => {
+    const s = {
+      folders: [
+        { path: "/movies", name: "Filme", kind: "movies" as const, default: true },
+        { path: "/movies-4k", name: "Filme 4K", kind: "movies" as const },
+        { path: "/tv", name: "Serien", kind: "series" as const },
+      ],
+    };
+    expect(defaultFolder(s, "movies")).toBe("/movies");
+    // The only one of its kind is the default without the mark.
+    expect(defaultFolder(s, "series")).toBe("/tv");
+    expect(defaultFolder({ folders: [...s.folders, { path: "/anime", name: "Anime", kind: "series" }] }, "series")).toBeUndefined();
+    expect(resolveTargets(s)).toEqual({ movie: "/movies", series: "/tv", other: undefined });
+    expect(resolveTargets(s, { movie: "/movies-4k" }, { movie: "/x", other: "/photos" })).toEqual({
+      movie: "/movies-4k",
+      series: "/tv",
+      other: "/photos",
+    });
+  });
+
+  it("Migration 0003: ein Zielordner wird Film- und Serien-Ziel, im Regel-Modus Regel-Ziel", () => {
+    const db = fresh();
+    db.$client.run(
+      "INSERT INTO profiles (name, mode, target_root) VALUES ('Medien', 'media', '/media'), ('Fotos', 'rules', '/photos'), ('Leer', 'media', NULL)",
+    );
+    db.$client.run("INSERT INTO watch_folders (name, path, target_root) VALUES ('TV', '/dl/tv', '/media/tv')");
+    const sql = readFileSync(new URL("../drizzle/0003_targets.sql", import.meta.url), "utf8");
+    for (const statement of sql.split("--> statement-breakpoint").filter((s) => s.includes("UPDATE"))) db.$client.run(statement);
+    expect(listProfiles(db).map((p) => [p.name, p.targets, p.targetRoot])).toEqual([
+      ["Fotos", { other: "/photos" }, null],
+      ["Leer", {}, null],
+      ["Medien", { movie: "/media", series: "/media" }, null],
+    ]);
+    expect(listWatchFolders(db)[0]).toMatchObject({
+      targetRoot: "",
+      targets: { movie: "/media/tv", series: "/media/tv", other: "/media/tv" },
+    });
   });
 });
 

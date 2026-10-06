@@ -1,6 +1,7 @@
 import { msg } from "@namarr/core/i18n";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, or, type SQL, sql } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+import { jobTargetRoots, type LibraryFolder, migrateFolders } from "./folders.ts";
 import type * as schema from "./schema.ts";
 import {
   ITEM_STATES,
@@ -46,8 +47,8 @@ export type Settings = {
   seriesProvider?: SeriesProvider;
   movieProvider?: MovieProvider;
   language: string;
-  roots: string[];
-  defaultTargetRoot?: string;
+  /** Every folder namarr may read and write; some of them are library folders for movies or series. */
+  folders: LibraryFolder[];
   notifications: { kind: "ntfy" | "gotify" | "telegram" | "discord" | "webhook"; url: string; token?: string }[];
   libraryRefresh: { kind: "jellyfin" | "plex" | "emby"; url: string; token: string }[];
 };
@@ -56,19 +57,26 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "de-DE",
   seriesProvider: "tmdb",
   movieProvider: "tmdb",
-  roots: [],
+  folders: [],
   notifications: [],
   libraryRefresh: [],
 };
 
 export function getSettings(db: AnyDb): Settings {
   const rows = db.select().from(settings).all();
-  const stored = Object.fromEntries(rows.map((r) => [r.key, r.valueJson]));
-  return { ...DEFAULT_SETTINGS, ...stored } as Settings;
+  const { roots, defaultTargetRoot, ...stored } = Object.fromEntries(rows.map((r) => [r.key, r.valueJson])) as Record<string, unknown>;
+  const result = { ...DEFAULT_SETTINGS, ...stored } as Settings;
+  if (!stored.folders) result.folders = migrateFolders(roots as string[] | undefined, defaultTargetRoot as string | undefined);
+  return result;
 }
 
 export function setSettings(db: AnyDb, patch: Partial<Settings>): Settings {
   db.transaction((tx) => {
+    // Folders replace the old keys; once they are saved, the old ones go.
+    if (patch.folders)
+      tx.delete(settings)
+        .where(inArray(settings.key, ["roots", "defaultTargetRoot"]))
+        .run();
     for (const [key, value] of Object.entries(patch)) {
       if (value === undefined) {
         tx.delete(settings).where(eq(settings.key, key)).run();
@@ -266,14 +274,15 @@ export function listInbox(db: AnyDb, limit = 100) {
       reason: inbox.reason,
       createdAt: inbox.createdAt,
       item: jobItems,
-      targetRoot: sql<string | null>`json_extract(${jobs.config}, '$.targetRoot')`,
+      config: jobs.config,
     })
     .from(inbox)
     .innerJoin(jobItems, eq(inbox.jobItemId, jobItems.id))
     .innerJoin(jobs, eq(jobItems.jobId, jobs.id))
     .orderBy(desc(inbox.createdAt), desc(inbox.jobItemId))
     .limit(limit)
-    .all();
+    .all()
+    .map(({ config, ...row }) => ({ ...row, targetRoots: jobTargetRoots(config) }));
 }
 
 // ---------- overrides ----------

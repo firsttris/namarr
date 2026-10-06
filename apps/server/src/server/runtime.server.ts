@@ -40,9 +40,10 @@ export function runtime(): Runtime {
   const interrupted = failInterruptedJobs(db);
   if (interrupted) log.warn({ interrupted }, "Unterbrochene Jobs als fehlgeschlagen markiert");
 
-  // First start: seed the allowed roots from NAMARR_ROOTS.
+  // First start: seed the folders from NAMARR_ROOTS.
   const settings = getSettings(db);
-  if (!settings.roots.length && env.roots.length) setSettings(db, { roots: env.roots });
+  if (!settings.folders.length && env.roots.length)
+    setSettings(db, { folders: env.roots.map((p) => ({ path: p, name: path.basename(p) || p, kind: "folder" })) });
 
   const bus = new EventBus();
   const cache = new SqliteProviderCache(db);

@@ -19,9 +19,13 @@ export function greeting(hour = new Date().getHours()): string {
 }
 
 /** Splits a target path into folder part and file name, for the two-tone rendering. */
-export function splitTarget(target: string, root?: string | null): { dir: string; file: string } {
+export function splitTarget(target: string, roots: (string | null | undefined)[]): { dir: string; file: string } {
+  // The deepest folder the target lies in (a job can have one for movies and one for series).
+  const root = roots
+    .filter((r): r is string => Boolean(r) && target.startsWith(r!.endsWith("/") ? r! : `${r}/`))
+    .sort((a, b) => b.length - a.length)[0];
   let rel = target;
-  if (root && target.startsWith(root.endsWith("/") ? root : `${root}/`)) rel = target.slice(root.length).replace(/^\/+/, "");
+  if (root) rel = target.slice(root.length).replace(/^\/+/, "");
   const slash = rel.lastIndexOf("/");
   return slash < 0 ? { dir: "", file: rel } : { dir: rel.slice(0, slash + 1), file: rel.slice(slash + 1) };
 }

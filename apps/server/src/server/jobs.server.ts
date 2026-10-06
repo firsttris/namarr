@@ -34,12 +34,14 @@ import {
 import {
   addToInbox,
   allItems,
+  allowedRoots,
   countItemsByState,
   createJob,
   type Db,
   findDoneItemByTarget,
   getItem,
   getJob,
+  getProfile,
   getSettings,
   insertItems,
   insertOperation,
@@ -51,6 +53,7 @@ import {
   listOverrides,
   markUndone,
   removeFromInbox,
+  resolveTargets,
   type SeriesProvider,
   type Settings,
   saveOverride,
@@ -82,6 +85,14 @@ export class JobError extends Error {
 }
 
 type StoredMatch = MatchResult;
+
+/** Changes to a job before its preview is computed again. */
+export type TargetPatch = Partial<Pick<JobConfig, "mode" | "preset" | "template" | "rules">> & {
+  /** One folder for every file; null: none. */
+  targetRoot?: string | null;
+  /** "library": the library folders by kind; null: none (renamed in place). */
+  targets?: "library" | null;
+};
 
 /**
  * Runs the job pipeline (scan → parse → match → preview → execute → undo) in the server process.
@@ -145,8 +156,9 @@ export class JobService {
   }): Promise<Job> {
     const settings = this.settings();
     const resolved: string[] = [];
-    for (const p of input.paths) resolved.push(await resolveInRoots(p, settings.roots));
-    if (input.config.targetRoot) input.config.targetRoot = await resolveInRoots(input.config.targetRoot, settings.roots);
+    for (const p of input.paths) resolved.push(await resolveInRoots(p, allowedRoots(settings)));
+    if (input.config.targetRoot) input.config.targetRoot = await resolveInRoots(input.config.targetRoot, allowedRoots(settings));
+    input.config.targets = await this.resolveTargetFolders(input.config.targets, allowedRoots(settings));
     const job = createJob(this.deps.db, {
       sourcePaths: resolved,
       config: input.config,
@@ -314,6 +326,13 @@ export class JobService {
     };
   }
 
+  /** Library folders must lie inside the allowed folders too, like every other target. */
+  private async resolveTargetFolders(targets: JobConfig["targets"], roots: string[]): Promise<JobConfig["targets"]> {
+    if (!targets) return undefined;
+    const resolve = async (p?: string) => (p ? resolveInRoots(p, roots) : undefined);
+    return { movie: await resolve(targets.movie), series: await resolve(targets.series) };
+  }
+
   private previewConfig(config: JobConfig): PreviewConfig {
     return {
       mode: config.mode,
@@ -321,33 +340,36 @@ export class JobService {
       template: config.template,
       rules: (config.rules ?? []) as Rule[],
       targetRoot: config.targetRoot,
+      targets: config.targets,
       autoThreshold: config.autoThreshold,
     };
   }
 
   /** Recomputes targets from stored parse and match results, without matching again. */
-  async recompute(
-    jobId: number,
-    patch?: Partial<Pick<JobConfig, "mode" | "preset" | "template" | "rules">> & { targetRoot?: string | null },
-  ) {
+  async recompute(jobId: number, patch?: TargetPatch) {
     const job = getJob(this.deps.db, jobId);
     if (!job) throw new JobError(JOB_NOT_FOUND);
     this.assertIdle(job);
     return this.computePreview(jobId, patch);
   }
 
-  private async computePreview(
-    jobId: number,
-    patch?: Partial<Pick<JobConfig, "mode" | "preset" | "template" | "rules">> & { targetRoot?: string | null },
-  ) {
+  private async computePreview(jobId: number, patch?: TargetPatch) {
     const { db } = this.deps;
     let job = getJob(db, jobId);
     if (!job) throw new JobError(JOB_NOT_FOUND);
     if (patch) {
-      const { targetRoot, ...rest } = patch;
+      const { targetRoot, targets, ...rest } = patch;
       const config: JobConfig = { ...job.config, ...rest };
+      const settings = this.settings();
       if (targetRoot === null) delete config.targetRoot;
-      else if (targetRoot !== undefined) config.targetRoot = await resolveInRoots(targetRoot, this.settings().roots);
+      else if (targetRoot !== undefined) config.targetRoot = await resolveInRoots(targetRoot, allowedRoots(settings));
+      // "library": the library folders by kind (the profile's, else the defaults); null: none, in place.
+      if (targets === null) delete config.targets;
+      else if (targets === "library") {
+        const profile = job.profileId ? getProfile(db, job.profileId) : undefined;
+        const { movie, series } = resolveTargets(settings, profile?.targets);
+        config.targets = await this.resolveTargetFolders({ movie, series }, allowedRoots(settings));
+      }
       job = updateJob(db, jobId, { config })!;
     }
     // Undone files are back at their source and can be renamed again.
@@ -462,7 +484,7 @@ export class JobService {
       if (change.targetPath) {
         const root = job.config.targetRoot ?? path.dirname(item.sourcePath);
         const absolute = path.isAbsolute(change.targetPath) ? change.targetPath : path.join(root, change.targetPath);
-        values.overrideTarget = await resolveInRoots(absolute, this.settings().roots);
+        values.overrideTarget = await resolveInRoots(absolute, allowedRoots(this.settings()));
       } else values.overrideTarget = null;
     }
     if (change.excluded !== undefined) values.excluded = change.excluded;
@@ -534,7 +556,7 @@ export class JobService {
     for (const [index, item] of items.entries()) {
       if (signal.aborted) break;
       try {
-        const target = await resolveInRoots(item.targetPath!, settings.roots);
+        const target = await resolveInRoots(item.targetPath!, allowedRoots(settings));
         const quality =
           conflict === "keep-better"
             ? (file: string, role: string) => this.quality(file, role === "incoming" ? item : undefined)
@@ -549,7 +571,7 @@ export class JobService {
           for (const c of item.companions) {
             if (!c.to) continue;
             const cr = await executeOperation(
-              { from: c.from, to: await resolveInRoots(c.to, settings.roots), action },
+              { from: c.from, to: await resolveInRoots(c.to, allowedRoots(settings)), action },
               { conflict: companionConflict },
             );
             if (cr.status === "done") this.record(jobId, item.id, cr.record);

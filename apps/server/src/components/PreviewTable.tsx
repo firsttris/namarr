@@ -42,7 +42,8 @@ export function buildRows(items: JobItem[]): Row[] {
 
 type Props = {
   items: JobItem[];
-  targetRoot?: string | null;
+  /** The folders targets lie under (job folder, movie and series library). */
+  targetRoots: string[];
   sourceRoot?: string;
   selectedId?: number;
   onSelect: (id: number) => void;
@@ -51,7 +52,7 @@ type Props = {
   height?: number;
 };
 
-export function PreviewTable({ items, targetRoot, sourceRoot, selectedId, onSelect, onToggle, onSearch }: Props) {
+export function PreviewTable({ items, targetRoots, sourceRoot, selectedId, onSelect, onToggle, onSearch }: Props) {
   const rows = useMemo(() => buildRows(items), [items]);
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -111,7 +112,7 @@ export function PreviewTable({ items, targetRoot, sourceRoot, selectedId, onSele
                 <ItemRow
                   item={row.item}
                   original={relative(row.item.sourcePath)}
-                  targetRoot={targetRoot}
+                  targetRoots={targetRoots}
                   selected={row.item.id === selectedId}
                   onSelect={() => onSelect(row.item.id)}
                   onToggle={() => onToggle(row.item)}
@@ -181,7 +182,7 @@ function GroupRow({ match, count }: { match: MatchResult; count: number }) {
 function ItemRow({
   item,
   original,
-  targetRoot,
+  targetRoots,
   selected,
   onSelect,
   onToggle,
@@ -189,7 +190,7 @@ function ItemRow({
 }: {
   item: JobItem;
   original: string;
-  targetRoot?: string | null;
+  targetRoots: string[];
   selected: boolean;
   onSelect: () => void;
   onToggle: () => void;
@@ -200,7 +201,7 @@ function ItemRow({
   const skipped = item.state === "skipped" || item.excluded;
   const done = item.state === "done";
   const failed = item.state === "failed";
-  const target = item.targetPath ? splitTarget(item.targetPath, targetRoot ?? item.sourcePath.replace(/\/[^/]*$/, "")) : null;
+  const target = item.targetPath ? splitTarget(item.targetPath, [...targetRoots, item.sourcePath.replace(/\/[^/]*$/, "")]) : null;
   const fileName = item.sourcePath.split("/").at(-1)!;
 
   return (

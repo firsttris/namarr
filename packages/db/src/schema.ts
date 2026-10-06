@@ -15,6 +15,12 @@ export const MOVIE_PROVIDERS = ["tmdb", "tvdb"] as const;
 export type SeriesProvider = (typeof SERIES_PROVIDERS)[number];
 export type MovieProvider = (typeof MOVIE_PROVIDERS)[number];
 
+/**
+ * Where a profile or watch folder puts files: a movie and a series folder for media mode, a folder
+ * for rule mode. Unset: the default library folder of that kind (settings), or in place for rules.
+ */
+export type Targets = { movie?: string; series?: string; other?: string };
+
 export const profiles = sqliteTable("profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -27,7 +33,9 @@ export const profiles = sqliteTable("profiles", {
   rulesJson: text("rules_json", { mode: "json" }).$type<Rule[]>().notNull().default([]),
   action: text("action", { enum: ACTIONS }).notNull().default("test"),
   conflictPolicy: text("conflict_policy", { enum: CONFLICT_POLICIES }).notNull().default("skip"),
+  /** Replaced by `targets` (migration 0003), kept so older rows read. */
   targetRoot: text("target_root"),
+  targets: text("targets_json", { mode: "json" }).$type<Targets>().notNull().default({}),
   /** Series source for this profile (an anime profile uses AniDB); null = the setting. */
   provider: text("provider", { enum: SERIES_PROVIDERS }),
   createdAt: createdAt(),
@@ -38,7 +46,11 @@ export const watchFolders = sqliteTable("watch_folders", {
   name: text("name").notNull(),
   path: text("path").notNull(),
   profileId: integer("profile_id").references(() => profiles.id, { onDelete: "set null" }),
-  targetRoot: text("target_root").notNull(),
+  /** Replaced by `targets` (migration 0003), kept so older rows read. */
+  targetRoot: text("target_root")
+    .notNull()
+    .$default(() => ""),
+  targets: text("targets_json", { mode: "json" }).$type<Targets>().notNull().default({}),
   /** Matches at or above this go through without a click; null = always review. */
   autoThreshold: real("auto_threshold").default(0.9),
   stableSeconds: integer("stable_seconds").notNull().default(30),
@@ -54,7 +66,10 @@ export type JobConfig = {
   rules?: Rule[];
   action: Action;
   conflictPolicy: ConflictPolicy;
+  /** One folder for every file (chosen in the workbench, or the rule-mode target); wins over `targets`. */
   targetRoot?: string;
+  /** Library folders by kind for media mode, resolved when the job is created. */
+  targets?: { movie?: string; series?: string };
   language?: string;
   order?: "aired" | "dvd" | "absolute";
   /** Series source; unset = the setting. */

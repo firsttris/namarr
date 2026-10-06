@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { RuleStack } from "~/components/RuleStack";
+import { TargetFields } from "~/components/TargetFields";
 import { TemplateEditor } from "~/components/TemplateEditor";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getProfiles, getSettingsFn, removeProfile, saveProfile } from "~/functions/library.functions";
@@ -29,6 +30,7 @@ const EMPTY: Draft = {
   action: "hardlink",
   conflictPolicy: "skip",
   targetRoot: null,
+  targets: {},
   provider: null,
 };
 
@@ -164,14 +166,13 @@ function Profiles() {
                   </Select>
                 </Field>
               )}
-              <Field label={m.profiles_targetRoot()} htmlFor="p-target" hint={m.profiles_targetHint()}>
-                <input
-                  id="p-target"
-                  className={cx(inputClass, "font-mono")}
-                  value={draft.targetRoot ?? ""}
-                  onChange={(e) => setDraft({ ...draft, targetRoot: e.target.value || null })}
-                />
-              </Field>
+              <TargetFields
+                idPrefix="p-target"
+                mode={draft.mode}
+                targets={draft.targets}
+                folders={settings.data?.folders ?? []}
+                onChange={(targets) => setDraft({ ...draft, targets })}
+              />
             </Panel>
             {draft.mode !== "rules" && (
               <div className="flex flex-col gap-2">
