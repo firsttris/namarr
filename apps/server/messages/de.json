@@ -554,5 +554,7 @@
   "settings_error_folderInUse": "{path} wird noch verwendet von: {users}. Erst dort ein anderes Ziel wählen.",
   "jobs_reason_noMovieLibrary": "Kein Standard-Ziel für Filme: bleibt im Quellordner",
   "jobs_reason_noSeriesLibrary": "Kein Standard-Ziel für Serien: bleibt im Quellordner",
-  "folders_pathOf": "Pfad: {field}"
+  "folders_pathOf": "Pfad: {field}",
+  "nav_version": "namarr v{version}",
+  "nav_releaseNotes": "Was ist neu in dieser Version"
 }

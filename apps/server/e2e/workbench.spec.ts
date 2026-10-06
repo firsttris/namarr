@@ -170,6 +170,14 @@ test("History: einzelne Operation rückgängig", async ({ page }) => {
     .toEqual(["01 - IMG_0001.jpg", "02 - IMG_0002.jpg", "IMG_0003.JPG"]);
 });
 
-test("Health und Events antworten", async ({ request }) => {
-  expect((await request.get("/api/health")).ok()).toBe(true);
+test("Health und Events antworten, mit der Version", async ({ request, page }) => {
+  const version = JSON.parse(fs.readFileSync(path.resolve("../../package.json"), "utf8")).version as string;
+  const health = await request.get("/api/health");
+  expect(health.ok()).toBe(true);
+  expect(await health.json()).toMatchObject({ status: "ok", version });
+
+  await page.goto("/");
+  const link = page.getByRole("link", { name: `namarr v${version}` });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", `https://github.com/firsttris/namarr/releases/tag/v${version}`);
 });

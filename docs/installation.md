@@ -120,7 +120,7 @@ target becomes the default library for movies and series.
 
 ## Health and live events
 
-- `GET /api/health`: health check for Docker, Quadlet or a load balancer.
+- `GET /api/health`: health check for Docker, Quadlet or a load balancer; answers `{"status": "ok", "version": "x.y.z", "uptime": …}`. The UI shows the version at the bottom of the navigation, linked to its release notes.
 - `GET /api/events`: Server-Sent Events: `job.progress`, `item.updated`, `inbox.added`,
   `watch.detected`.
 - `POST /api/jobs` and `GET /api/jobs/<id>`: the [download client hook](automation.md#download-client-hook).
