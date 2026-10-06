@@ -554,5 +554,7 @@
   "settings_error_folderInUse": "{path} is still used by: {users}. Choose another target there first.",
   "jobs_reason_noMovieLibrary": "No default target for movies: stays in the source folder",
   "jobs_reason_noSeriesLibrary": "No default target for series: stays in the source folder",
-  "folders_pathOf": "Path: {field}"
+  "folders_pathOf": "Path: {field}",
+  "nav_version": "namarr v{version}",
+  "nav_releaseNotes": "What's new in this version"
 }

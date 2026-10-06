@@ -6,6 +6,7 @@ import { getShellInfo } from "~/functions/library.functions";
 import { useLive } from "~/lib/events";
 import { LANGS, pickMsg, useLang } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
+import { APP_VERSION, releaseUrl } from "~/lib/version";
 import * as m from "~/paraglide/messages";
 import { DashboardIcon, EyeIcon, GearIcon, HistoryIcon, InboxIcon, ListIcon, Logo, PenIcon } from "./icons";
 import { cx } from "./ui";
@@ -67,6 +68,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div className="font-mono text-xs text-muted">{shell.data?.host ?? "…"}</div>
             {shell.data?.demo && <div className="text-xs text-accent-soft">{m.nav_demo()}</div>}
+            <a
+              href={releaseUrl()}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-xs text-muted no-underline hover:text-ink"
+              title={m.nav_releaseNotes()}
+            >
+              {m.nav_version({ version: APP_VERSION })}
+            </a>
             {shell.data?.authRequired && (
               <button
                 type="button"
