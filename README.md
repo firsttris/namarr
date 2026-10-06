@@ -23,47 +23,28 @@ Every change starts as a preview, and every change can be undone.
 
 </div>
 
-## 💡 Why namarr?
+## 💡 How it works
 
-FileBot matches media better than anything else, but it is a paid Java desktop app. ReNamer has the
-best rules for everything else, but it only runs on Windows. Sonarr and Radarr rename well, but only
-what they downloaded themselves. namarr is one small container for a home server that does both
-kinds of renaming for any folder you point it at:
+1. **Point it at a folder**: downloads, an old collection, photos or music.
+2. **Check the preview**: namarr matches every file against TMDB, TheTVDB, TVmaze or AniDB (or
+   applies your rules) and shows old → new. Nothing moves yet.
+3. **Rename**, and undo it any time, per file or per job.
 
-- **Preview first**: new jobs start in test mode. You see old → new for every file before anything
-  moves.
-- **Undo for everything**: per file, per job or back to a point in time. namarr refuses when a file
-  has changed since, so an undo never destroys anything.
-- **Names come from a database, never from guesses**: TMDB, TheTVDB, TVmaze or AniDB. Uncertain
-  matches wait in the inbox instead of being renamed wrong.
+One container for your home server: FileBot-style matching for movies, series and anime,
+ReNamer-style rules for everything else.
 
 ## ✨ Features
 
-- **Workbench**: pick a folder on the server and get a virtualized preview with diff highlighting,
-  series groups, subtitles and other companion files, confidence badges and skipped samples, all
-  usable from the keyboard
-- **Media, rules or both**: match against a database, or rename with 16 ReNamer-style rules (replace,
-  regex, numbering, padding, clean up, rearrange, name lists …), or match first and polish with rules
-- **Photos and music**: name photos by their EXIF capture date and sort MP3s into
-  `{artist}/{album}/{track} {title}` from their tags; rule sets export and import as YAML
-- **Template language** with auto-completion and a live example: `{n} ({y})/Season {s00}/{n} - {s00e00} - {t}`,
-  with filters, conditions and built-in formats for Plex, Jellyfin, Emby and Kodi
-- **Own naming formats** for movies and series: add, edit, copy, delete, one default per kind; or let namarr
-  **detect the format of an existing library** from one of its files
-- **Move, copy or rename in place**
-- **Libraries for movies and series**: every matched file lands in the default folder of its kind,
-  watch folders can pick another; every path is chosen with a folder browser
-- **Conflict handling**, including *keep better*, which compares resolution, source, HDR, codecs and
-  audio before it looks at file size
-- **Watch folders** that wait until downloads are finished, rename sure matches on their own and
-  send the rest to the inbox
-- **Download client hook**: qBittorrent, SABnzbd or NZBGet call `POST /api/jobs` after every download
-- **IDs in folder names**: `[tvdbid-72073]`, `{tmdb-1399}`, `{imdb-tt…}` or `[anidb-…]`, as Sonarr,
-  Radarr and Jellyfin write them, replace the search
-- **Library refresh** for Jellyfin, Emby and Plex, **notifications** via ntfy, Gotify, Telegram,
-  Discord or webhook
-- **ffprobe built in** for files whose names say nothing about resolution or codec
-- **English and German UI**, including every message from the server
+| | |
+|---|---|
+| 🎬 **Movies, series, anime** | Matching against TMDB, TheTVDB, TVmaze and AniDB · IDs in folder names (`{tmdb-1399}`, `[tvdbid-72073]`) · ffprobe for names without resolution or codec |
+| ✏️ **Rules for everything else** | 16 ReNamer-style rules (replace, regex, numbering, clean up …) · photos by EXIF date · music by tags · rule sets as YAML |
+| 🧩 **Naming formats** | Template language with live example · built in: Plex, Jellyfin, Emby, Kodi · own formats per kind · **detect the format of your existing library** |
+| 🔍 **Preview & undo** | Test mode by default · diff view, keyboard control · conflicts incl. *keep better* (resolution, HDR, codecs, audio) · undo per file, job or point in time |
+| 🤖 **Automation** | Watch folders that wait for finished downloads · inbox for uncertain matches · hook for qBittorrent, SABnzbd, NZBGet |
+| 📚 **Libraries** | One default folder each for movies and series · move, copy or rename in place · folder browser for every path |
+| 🔔 **After a job** | Library refresh for Jellyfin, Emby, Plex · notifications via ntfy, Gotify, Telegram, Discord, webhook |
+| 🌍 **UI** | English and German, including every server message |
 
 ## 🗂️ Metadata sources
 
