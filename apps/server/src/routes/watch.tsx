@@ -2,8 +2,10 @@ import type { WatchFolder } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { PathInput } from "~/components/PathInput";
+import { TargetFields } from "~/components/TargetFields";
 import { Button, Chip, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
-import { getProfiles, getWatchFolders, removeWatchFolder, saveWatchFolder } from "~/functions/library.functions";
+import { getProfiles, getSettingsFn, getWatchFolders, removeWatchFolder, saveWatchFolder } from "~/functions/library.functions";
 import { ago, pct } from "~/lib/format";
 import * as m from "~/paraglide/messages";
 
@@ -12,16 +14,27 @@ export const Route = createFileRoute("/watch")({
   component: Watch,
 });
 
-type Draft = Pick<WatchFolder, "name" | "path" | "targetRoot" | "profileId" | "autoThreshold" | "stableSeconds" | "enabled"> & {
+type Draft = Pick<WatchFolder, "name" | "path" | "targets" | "profileId" | "autoThreshold" | "stableSeconds" | "enabled"> & {
   id?: number;
 };
-const EMPTY: Draft = { name: "", path: "", targetRoot: "", profileId: null, autoThreshold: 0.9, stableSeconds: 30, enabled: true };
+const EMPTY: Draft = { name: "", path: "", targets: {}, profileId: null, autoThreshold: 0.9, stableSeconds: 30, enabled: true };
 
 function Watch() {
   const initial = Route.useLoaderData();
   const qc = useQueryClient();
   const { data = initial } = useQuery({ queryKey: ["watch"], queryFn: () => getWatchFolders(), initialData: initial });
   const profiles = useQuery({ queryKey: ["profiles"], queryFn: () => getProfiles() });
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => getSettingsFn() });
+  const folders = settings.data?.folders ?? [];
+  /** Where a watch folder's files go, for its card: its own folders, else the profile's, else the defaults. */
+  const targetsOf = (f: Pick<WatchFolder, "targets" | "profileId">) => {
+    const profile = profiles.data?.find((p) => p.id === f.profileId);
+    const fallback = (kind: "movies" | "series") => folders.find((x) => x.kind === kind && x.default)?.path;
+    const movie = f.targets.movie ?? profile?.targets.movie ?? fallback("movies");
+    const series = f.targets.series ?? profile?.targets.series ?? fallback("series");
+    if (profile?.mode === "rules") return f.targets.other ?? profile.targets.other ?? m.targets_inPlace();
+    return movie === series ? (movie ?? "–") : `${m.targets_movies()} ${movie ?? "–"} · ${m.targets_series()} ${series ?? "–"}`;
+  };
   const [draft, setDraft] = useState<Draft | null>(null);
   const done = () => {
     qc.invalidateQueries({ queryKey: ["watch"] });
@@ -72,25 +85,22 @@ function Watch() {
               </Select>
             </Field>
             <Field label={m.watch_folder()} htmlFor="w-path">
-              <input
+              <PathInput
                 id="w-path"
-                className={cx(inputClass, "font-mono")}
+                label={m.watch_folder()}
                 placeholder="/data/downloads/tv"
                 value={draft.path}
-                onChange={(e) => setDraft({ ...draft, path: e.target.value })}
+                onChange={(path) => setDraft({ ...draft, path })}
                 required
               />
             </Field>
-            <Field label={m.common_target()} htmlFor="w-target" hint={m.watch_targetHint()}>
-              <input
-                id="w-target"
-                className={cx(inputClass, "font-mono")}
-                placeholder="/data/media/tv"
-                value={draft.targetRoot}
-                onChange={(e) => setDraft({ ...draft, targetRoot: e.target.value })}
-                required
-              />
-            </Field>
+            <TargetFields
+              idPrefix="w-target"
+              mode={profiles.data?.find((p) => p.id === draft.profileId)?.mode ?? "media"}
+              targets={draft.targets}
+              folders={folders}
+              onChange={(targets) => setDraft({ ...draft, targets })}
+            />
             <Field label={m.watch_autoFrom()} htmlFor="w-auto">
               <Select
                 id="w-auto"
@@ -143,7 +153,7 @@ function Watch() {
               <div className="text-xs text-muted">{f.enabled ? m.watch_lastEvent({ when: ago(f.lastEventAt) }) : m.watch_paused()}</div>
             </div>
             <div className="font-mono text-xs text-soft">
-              {f.path} → {f.targetRoot}
+              {f.path} → {targetsOf(f)}
             </div>
             <div className="flex gap-1.5">
               <Chip>{f.autoThreshold === null ? m.watch_alwaysReview() : m.dashboard_autoFrom({ pct: pct(f.autoThreshold) })}</Chip>

@@ -1,7 +1,8 @@
-import type { MovieProvider, SeriesProvider, Settings } from "@namarr/db/types";
+import type { LibraryFolder, MovieProvider, SeriesProvider, Settings } from "@namarr/db/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { FolderList } from "~/components/FolderList";
 import { XIcon } from "~/components/icons";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
 import { getSettingsFn, saveSettings } from "~/functions/library.functions";
@@ -28,8 +29,7 @@ function SettingsPage() {
   const [anidbClient, setAnidbClient] = useState(initial.anidbClient ?? "");
   const [anidbVersion, setAnidbVersion] = useState(initial.anidbClientVersion ?? "1");
   const [language, setLanguage] = useState(initial.language);
-  const [roots, setRoots] = useState(initial.roots.join("\n"));
-  const [defaultTarget, setDefaultTarget] = useState(initial.defaultTargetRoot ?? "");
+  const [folders, setFolders] = useState<LibraryFolder[]>(initial.folders);
   const [notifications, setNotifications] = useState<Settings["notifications"]>(initial.notifications);
   const [refresh, setRefresh] = useState<Settings["libraryRefresh"]>(initial.libraryRefresh);
 
@@ -54,11 +54,7 @@ function SettingsPage() {
           seriesProvider,
           movieProvider,
           language,
-          roots: roots
-            .split("\n")
-            .map((r) => r.trim())
-            .filter(Boolean),
-          defaultTargetRoot: defaultTarget || undefined,
+          folders: folders.filter((f) => f.path.trim()).map((f) => ({ ...f, path: f.path.trim(), name: f.name.trim() || f.path.trim() })),
           notifications,
           libraryRefresh: refresh,
         },
@@ -198,25 +194,9 @@ function SettingsPage() {
         </Panel>
 
         <Panel className="flex flex-col gap-4 p-5">
-          <h2 className="m-0 text-base font-semibold">{m.settings_filesystem()}</h2>
-          <Field label={m.settings_roots()} htmlFor="s-roots" hint={m.settings_rootsHint()}>
-            <textarea
-              id="s-roots"
-              rows={3}
-              className={cx(inputClass, "h-auto py-2 font-mono")}
-              value={roots}
-              onChange={(e) => setRoots(e.target.value)}
-            />
-          </Field>
-          <Field label={m.settings_defaultTarget()} htmlFor="s-target">
-            <input
-              id="s-target"
-              className={cx(inputClass, "font-mono")}
-              placeholder="/data/media"
-              value={defaultTarget}
-              onChange={(e) => setDefaultTarget(e.target.value)}
-            />
-          </Field>
+          <h2 className="m-0 text-base font-semibold">{m.settings_folders()}</h2>
+          <p className="m-0 text-[13px] text-muted">{m.settings_foldersIntro()}</p>
+          <FolderList folders={folders} onChange={setFolders} />
         </Panel>
 
         <Panel className="flex flex-col gap-3 p-5">

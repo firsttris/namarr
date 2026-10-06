@@ -8,7 +8,7 @@ import { Button, Poster, Progress } from "./ui";
 
 export type InboxEntry = {
   reason: string;
-  targetRoot: string | null;
+  targetRoots: string[];
   item: {
     id: number;
     jobId: number;
@@ -27,7 +27,7 @@ export function InboxRow({ entry, onApprove, busy, last }: { entry: InboxEntry; 
   const match = item.matchJson as MatchResult | null;
   const parsed = item.parsedJson as Parsed | null;
   const fileName = item.sourcePath.split("/").at(-1)!;
-  const target = item.targetPath ? splitTarget(item.targetPath, entry.targetRoot) : null;
+  const target = item.targetPath ? splitTarget(item.targetPath, entry.targetRoots) : null;
   const tone = item.confidence >= 0.8 ? "info" : "accent";
   return (
     <div className={`flex items-center gap-4 px-5 py-4 ${last ? "" : "border-b border-row"}`}>

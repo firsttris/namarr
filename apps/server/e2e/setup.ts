@@ -21,6 +21,7 @@ export default function setup() {
     fs.writeFileSync(path.join(tv, f), `fake ${f}`);
   }
   fs.mkdirSync(path.join(root, "data/media/tv"), { recursive: true });
+  fs.mkdirSync(path.join(root, "data/media/movies"), { recursive: true });
   const photos = path.join(root, "data/photos");
   fs.mkdirSync(photos, { recursive: true });
   for (const f of ["IMG_0003.JPG", "IMG_0001.JPG", "IMG_0002.JPG"]) fs.writeFileSync(path.join(photos, f), f);

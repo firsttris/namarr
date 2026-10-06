@@ -1,4 +1,4 @@
-import type { ItemStateName } from "@namarr/db/types";
+import { type ItemStateName, jobTargetRoots } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -86,7 +86,7 @@ function JobDetail() {
       >
         <PreviewTable
           items={items.data?.items ?? []}
-          targetRoot={j?.config.targetRoot}
+          targetRoots={j ? jobTargetRoots(j.config) : []}
           sourceRoot={j?.sourcePaths.length === 1 ? j.sourcePaths[0] : undefined}
           selectedId={selected}
           onSelect={setSelected}

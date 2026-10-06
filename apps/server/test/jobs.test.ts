@@ -48,7 +48,7 @@ const exists = (p: string) =>
 beforeEach(async () => {
   tmp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "namarr-jobs-")));
   db = openDatabase(":memory:");
-  setSettings(db, { roots: [tmp] });
+  setSettings(db, { folders: [{ path: tmp, name: "root", kind: "folder" }] });
   bus = new EventBus();
   events = [];
   bus.subscribe((e) => events.push(e));
@@ -206,6 +206,27 @@ describe("JobService: Vorschau neu berechnen ohne neues Matching", () => {
     expect(inPlace.targetPath?.startsWith(tv())).toBe(true);
   });
 
+  it("Mediathek: Serien in den Serien-Ordner, umschaltbar auf am Ort und zurück", async () => {
+    const shows = path.join(tmp, "media/shows");
+    await fs.mkdir(shows, { recursive: true });
+    setSettings(db, {
+      folders: [
+        { path: tmp, name: "root", kind: "folder" },
+        { path: shows, name: "Serien", kind: "series", default: true },
+      ],
+    });
+    const { job, by } = await analyzed({ targetRoot: undefined, targets: { series: shows } });
+    const e1 = () => allItems(db, job.id).find((i) => i.id === by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").id)!;
+    expect(e1().targetPath?.startsWith(`${shows}/Severance (2022)/`)).toBe(true);
+    await jobs.recompute(job.id, { targets: null });
+    expect(e1().targetPath?.startsWith(tv())).toBe(true);
+    await jobs.recompute(job.id, { targets: "library" });
+    expect(e1().targetPath?.startsWith(`${shows}/`)).toBe(true);
+    // A folder chosen for the whole job wins over the library.
+    await jobs.recompute(job.id, { targetRoot: media() });
+    expect(e1().targetPath?.startsWith(`${media()}/Severance (2022)/`)).toBe(true);
+  });
+
   it("Treffer manuell wählen, merken, ausschließen, Ziel überschreiben", async () => {
     const { job, by } = await analyzed();
     const double = by("severance.204-205.720p.mkv");
@@ -355,7 +376,7 @@ describe("JobService: Review-Fixes", () => {
 
 describe("JobService: Watch-Jobs", () => {
   it("sichere Treffer laufen automatisch, unsichere landen in der Inbox", async () => {
-    const wf = createWatchFolder(db, { name: "Serien", path: tv(), targetRoot: media() });
+    const wf = createWatchFolder(db, { name: "Serien", path: tv(), targets: { movie: media(), series: media() } });
     const job = await jobs.create({ paths: [tv()], config: config({ autoThreshold: 0.9 }), kind: "watch", watchFolderId: wf.id });
     await jobs.idle();
     expect(getJob(db, job.id)!.status).toBe("done");

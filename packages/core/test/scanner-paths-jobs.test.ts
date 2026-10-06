@@ -154,6 +154,32 @@ describe("Vorschau (Workbench-Szenario aus dem Design)", () => {
     return files.map((file, i) => ({ file, parsed: parsed[i]!.parsed, match: matches.get(file.path) }));
   }
 
+  it("legt Filme und Serien in ihre Mediathek; ohne Mediathek bleibt die Datei, wo sie ist", async () => {
+    await touch("dl/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv", "dl/Inception.2010.1080p.BluRay.x264.mkv");
+    const { files } = await scan(path.join(tmp, "dl"));
+    const inception = { provider: "tmdb", id: "27205", kind: "movie" as const, title: "Inception", year: 2010 };
+    const matchFor = (f: (typeof files)[number]) =>
+      f.relative.startsWith("Inception")
+        ? { best: inception, episodes: [], alternatives: [], confidence: 0.98, reasons: [] }
+        : { best: severance, episodes: [severanceEpisodes[0]!], alternatives: [], confidence: 0.98, reasons: [] };
+    const input = files.map((file) => ({ file, parsed: parse(file.relative), match: matchFor(file) }));
+    const target = (items: ReturnType<typeof buildPreview>, start: string) => items.find((i) => path.basename(i.source).startsWith(start))!;
+
+    const both = buildPreview(input, { mode: "media", targets: { movie: "/movies", series: "/tvshows" } });
+    expect(target(both, "Inception").target).toBe("/movies/Inception (2010)/Inception (2010).mkv");
+    expect(target(both, "Severance").target).toMatch(/^\/tvshows\/Severance \(2022\)\//);
+
+    // A folder chosen for the whole job wins over the library.
+    const fixed = buildPreview(input, { mode: "media", targetRoot: "/media", targets: { movie: "/movies", series: "/tvshows" } });
+    expect(target(fixed, "Inception").target).toMatch(/^\/media\/Inception/);
+
+    const moviesOnly = buildPreview(input, { mode: "media", targets: { movie: "/movies" } });
+    const episode = target(moviesOnly, "Severance");
+    expect(episode.target).toMatch(new RegExp(`^${path.join(tmp, "dl")}/Severance \\(2022\\)/`));
+    expect(episode.reasons).toContain(msg("jobs_reason_noSeriesLibrary"));
+    expect(target(moviesOnly, "Inception").reasons).not.toContain(msg("jobs_reason_noMovieLibrary"));
+  });
+
   it("berechnet Ziele, Zustände und Zusammenfassung", async () => {
     const items = buildPreview(await inputs(), { mode: "media", preset: "jellyfin", targetRoot: "/media/tv" });
     const bySource = (n: string) => items.find((i) => i.source.endsWith(`/${n}`))!;

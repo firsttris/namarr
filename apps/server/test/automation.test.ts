@@ -30,7 +30,7 @@ const log = { info: () => {}, error: () => {} };
 beforeEach(async () => {
   tmp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "namarr-auto-")));
   db = openDatabase(":memory:");
-  setSettings(db, { roots: [tmp] });
+  setSettings(db, { folders: [{ path: tmp, name: "root", kind: "folder" }] });
   jobs = new JobService({ db, bus: new EventBus(), provider: () => new DemoProvider(), log, notify: async () => {} });
 });
 afterEach(async () => {
@@ -59,7 +59,12 @@ describe("Watch-Folder: Abgleich beim Start", () => {
   it("nimmt verpasste Dateien, lässt bekannte und alten Bestand liegen", async () => {
     const dl = path.join(tmp, "dl");
     await fs.mkdir(dl, { recursive: true });
-    const folder = createWatchFolder(db, { name: "TV", path: dl, targetRoot: path.join(tmp, "media"), stableSeconds: 1 });
+    const folder = createWatchFolder(db, {
+      name: "TV",
+      path: dl,
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      stableSeconds: 1,
+    });
     // Arrived while the server was down:
     const missed = await touch("dl/Severance.S02.German.DL.1080p.WEB-GRP/severance.s02e01.mkv");
     // Already taken by a job (e.g. hardlinked, the download stays for seeding):
@@ -78,14 +83,24 @@ describe("Watch-Folder: Abgleich beim Start", () => {
 
   it("alter Bestand vor dem Anlegen des Watch-Folders bleibt unberührt", async () => {
     await touch("dl/Old.Show.S01E01.mkv");
-    const folder = createWatchFolder(db, { name: "TV", path: path.join(tmp, "dl"), targetRoot: path.join(tmp, "media"), stableSeconds: 1 });
+    const folder = createWatchFolder(db, {
+      name: "TV",
+      path: path.join(tmp, "dl"),
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      stableSeconds: 1,
+    });
     db.$client.exec(`update watch_folders set created_at = ${Date.now() + 60_000} where id = ${folder.id}`);
     watch = new WatchService({ db, bus: new EventBus(), jobs, log }, 50);
     expect(await watch.catchUp({ ...folder, createdAt: new Date(Date.now() + 60_000) })).toEqual([]);
   });
 
   it("wartet, bis eine Datei nicht mehr wächst", async () => {
-    const folder = createWatchFolder(db, { name: "TV", path: path.join(tmp, "dl"), targetRoot: path.join(tmp, "media"), stableSeconds: 1 });
+    const folder = createWatchFolder(db, {
+      name: "TV",
+      path: path.join(tmp, "dl"),
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      stableSeconds: 1,
+    });
     const file = await touch("dl/Growing.S01E01.mkv", "a");
     watch = new WatchService({ db, bus: new EventBus(), jobs, log }, 50);
     const started = Date.now();
@@ -99,7 +114,13 @@ describe("Watch-Folder: Abgleich beim Start", () => {
   it("beim Start wird daraus ein Watch-Job", async () => {
     const dl = path.join(tmp, "dl");
     const profile = createProfile(db, { name: "Serien", action: "hardlink", preset: "plex" });
-    createWatchFolder(db, { name: "TV", path: dl, targetRoot: path.join(tmp, "media"), profileId: profile.id, stableSeconds: 1 });
+    createWatchFolder(db, {
+      name: "TV",
+      path: dl,
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      profileId: profile.id,
+      stableSeconds: 1,
+    });
     await touch("dl/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv");
     watch = new WatchService({ db, bus: new EventBus(), jobs, log }, 50);
     await watch.reload();
@@ -111,7 +132,12 @@ describe("Watch-Folder: Abgleich beim Start", () => {
   });
 
   it("stop() bricht einen laufenden Abgleich ab", async () => {
-    const folder = createWatchFolder(db, { name: "TV", path: path.join(tmp, "dl"), targetRoot: path.join(tmp, "media"), stableSeconds: 1 });
+    const folder = createWatchFolder(db, {
+      name: "TV",
+      path: path.join(tmp, "dl"),
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      stableSeconds: 1,
+    });
     await touch("dl/A.S01E01.mkv");
     watch = new WatchService({ db, bus: new EventBus(), jobs, log }, 50);
     const result = watch.catchUp(folder);
@@ -158,7 +184,11 @@ describe("Hook für Download-Clients", () => {
   it("legt einen Job an, der wie ein Watch-Job läuft", async () => {
     await touch("dl/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv");
     await touch("dl/Severance.S02.German.DL.1080p.WEB-GRP/severance.204-205.720p.mkv");
-    const profile = createProfile(db, { name: "Serien", action: "hardlink", targetRoot: path.join(tmp, "media") });
+    const profile = createProfile(db, {
+      name: "Serien",
+      action: "hardlink",
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+    });
     const job = await createHookJob(rt(), { path: "/downloads/Severance.S02.German.DL.1080p.WEB-GRP", profile: "serien" });
     expect(job).toMatchObject({
       kind: "hook",
@@ -174,13 +204,22 @@ describe("Hook für Download-Clients", () => {
 
   it("übernimmt Profil, Ziel und Schwelle eines Watch-Folders, review hält alles an", async () => {
     await touch("dl/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv");
-    createWatchFolder(db, { name: "TV", path: path.join(tmp, "dl"), targetRoot: path.join(tmp, "media"), autoThreshold: 0.95 });
+    createWatchFolder(db, {
+      name: "TV",
+      path: path.join(tmp, "dl"),
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      autoThreshold: 0.95,
+    });
     const job = await createHookJob(rt(), {
       path: path.join(tmp, "dl/Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv"),
       watchFolder: "tv",
       review: true,
     });
-    expect(job.config).toMatchObject({ targetRoot: path.join(tmp, "media"), alwaysReview: true, action: "hardlink" });
+    expect(job.config).toMatchObject({
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+      alwaysReview: true,
+      action: "hardlink",
+    });
     await jobs.idle();
     expect(listInbox(db)).toHaveLength(1);
     await expect(fs.readdir(path.join(tmp, "media")).catch(() => [])).resolves.toEqual([]);

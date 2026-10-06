@@ -98,7 +98,7 @@ describe("Benachrichtigungen und Library-Refresh", () => {
   it("Fehler werden geloggt, nie geworfen", async () => {
     const settings: Settings = {
       language: "de-DE",
-      roots: [],
+      folders: [],
       notifications: [{ kind: "webhook", url: "https://hook.example/x" }],
       libraryRefresh: [{ kind: "jellyfin", url: "http://jf:8096", token: "t" }],
     };
@@ -117,7 +117,7 @@ describe("Benachrichtigungen und Library-Refresh", () => {
   it("kein Library-Refresh, wenn nichts umbenannt wurde", async () => {
     const fetchImpl = vi.fn(async () => new Response(""));
     await afterExecution(
-      { language: "de", roots: [], notifications: [], libraryRefresh: [{ kind: "plex", url: "http://p", token: "t" }] },
+      { language: "de", folders: [], notifications: [], libraryRefresh: [{ kind: "plex", url: "http://p", token: "t" }] },
       { jobId: 1, done: 0, failed: 1, skipped: 0, source: "/x" },
       () => {},
       fetchImpl,
@@ -236,7 +236,7 @@ describe("Watch-Folder", () => {
     const dl = path.join(tmp, "dl");
     await fs.mkdir(dl, { recursive: true });
     const db: Db = openDatabase(":memory:");
-    setSettings(db, { roots: [tmp] });
+    setSettings(db, { folders: [{ path: tmp, name: "root", kind: "folder" }] });
     const bus = new EventBus();
     const detected: string[] = [];
     bus.subscribe((e) => e.type === "watch.detected" && detected.push(path.basename(e.path)));
@@ -246,7 +246,7 @@ describe("Watch-Folder", () => {
     createWatchFolder(db, {
       name: "TV",
       path: dl,
-      targetRoot: path.join(tmp, "media"),
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
       profileId: profile.id,
       stableSeconds: 1,
       autoThreshold: null,
@@ -265,7 +265,12 @@ describe("Watch-Folder", () => {
     await jobs.idle();
     const [job] = listJobs(db);
     expect(job).toMatchObject({ kind: "watch", sourcePaths: [release], profileId: profile.id });
-    expect(job!.config).toMatchObject({ action: "hardlink", preset: "plex", alwaysReview: true, targetRoot: path.join(tmp, "media") });
+    expect(job!.config).toMatchObject({
+      action: "hardlink",
+      preset: "plex",
+      alwaysReview: true,
+      targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
+    });
     expect(detected.sort()).toEqual(["severance.s02e01.mkv", "severance.s02e02.mkv"]);
   }, 15_000);
 });

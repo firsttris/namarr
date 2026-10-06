@@ -1,15 +1,19 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { ACTIONS, CONFLICT_POLICIES, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
+import { ACTIONS, CONFLICT_POLICIES, isInside, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
 import { msg } from "@namarr/core/i18n";
 import {
+  allowedRoots,
   createProfile,
   createWatchFolder,
   dashboardStats,
   deleteProfile,
   deleteWatchFolder,
+  FOLDER_KINDS,
+  type FolderKind,
   getItem,
   getSettings,
+  type LibraryFolder,
   listInbox,
   listJobs,
   listOperations,
@@ -19,6 +23,7 @@ import {
   SERIES_PROVIDERS,
   type Settings,
   setSettings,
+  type Targets,
   updateProfile,
   updateWatchFolder,
 } from "@namarr/db";
@@ -50,19 +55,42 @@ export const getDashboard = createServerFn({ method: "GET" })
     };
   });
 
+// ---------- folders ----------
+
+const targetsSchema = z.object({ movie: z.string().optional(), series: z.string().optional(), other: z.string().optional() });
+
+/** A profile's or watch folder's own targets must lie inside the allowed folders. */
+async function resolveTargetsIn(targets: Targets, roots: string[]): Promise<Targets> {
+  const out: Targets = {};
+  for (const key of ["movie", "series", "other"] as const) if (targets[key]) out[key] = await resolveInRoots(targets[key]!, roots);
+  return out;
+}
+
+/** Folders without a kind carry no default; of each kind one default at most (the first marked). */
+export function normalizeFolders(folders: LibraryFolder[]): LibraryFolder[] {
+  const seen = new Set<FolderKind>();
+  return folders.map(({ default: isDefault, ...f }) => {
+    const keep = isDefault && f.kind !== "folder" && !seen.has(f.kind);
+    if (keep) seen.add(f.kind);
+    return keep ? { ...f, default: true } : f;
+  });
+}
+
 // ---------- folder browser ----------
 
 export const browseFolder = createServerFn({ method: "GET" })
   .middleware([authed])
-  .validator(z.object({ path: z.string().optional() }))
+  // scope "all": the whole file system, folders only, for choosing the folders themselves (settings).
+  .validator(z.object({ path: z.string().optional(), scope: z.enum(["allowed", "all"]).optional() }))
   .handler(async ({ data, context: { rt } }) => {
-    const { roots } = getSettings(rt.db);
-    if (!data.path)
+    const all = data.scope === "all";
+    const roots = all ? ["/"] : allowedRoots(getSettings(rt.db));
+    if (!data.path && !all)
       return { path: null, parent: null, roots, entries: [] as { name: string; path: string; dir: boolean; video: boolean }[] };
-    const dir = await resolveInRoots(data.path, roots);
+    const dir = all ? path.resolve(data.path ?? "/") : await resolveInRoots(data.path!, roots);
     const dirents = await fs.readdir(dir, { withFileTypes: true });
     const entries = dirents
-      .filter((d) => !d.name.startsWith(".") && d.name !== "@eaDir")
+      .filter((d) => !d.name.startsWith(".") && d.name !== "@eaDir" && (!all || d.isDirectory()))
       .map((d) => ({
         name: d.name,
         path: path.join(dir, d.name),
@@ -116,7 +144,7 @@ const profileInput = z.object({
   rulesJson: rulesSchema,
   action: z.enum(ACTIONS),
   conflictPolicy: z.enum(CONFLICT_POLICIES),
-  targetRoot: z.string().nullable(),
+  targets: targetsSchema,
   provider: z.enum(SERIES_PROVIDERS).nullable().optional(),
 });
 
@@ -128,8 +156,8 @@ export const saveProfile = createServerFn({ method: "POST" })
   .middleware([authed])
   .validator(profileInput.extend({ id: id.optional() }))
   .handler(async ({ data: { id: profileId, ...values }, context: { rt } }) => {
-    if (values.targetRoot) values.targetRoot = await resolveInRoots(values.targetRoot, getSettings(rt.db).roots);
-    return profileId ? updateProfile(rt.db, profileId, values) : createProfile(rt.db, values);
+    const saved = { ...values, targets: await resolveTargetsIn(values.targets, allowedRoots(getSettings(rt.db))), targetRoot: null };
+    return profileId ? updateProfile(rt.db, profileId, saved) : createProfile(rt.db, saved);
   });
 
 export const removeProfile = createServerFn({ method: "POST" })
@@ -153,7 +181,7 @@ export const saveWatchFolder = createServerFn({ method: "POST" })
       id: id.optional(),
       name: z.string().min(1).max(100),
       path: z.string().min(1),
-      targetRoot: z.string().min(1),
+      targets: targetsSchema,
       profileId: id.nullable(),
       autoThreshold: z.number().min(0).max(1).nullable(),
       stableSeconds: z.number().int().min(1).max(3600),
@@ -161,9 +189,9 @@ export const saveWatchFolder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data: { id: folderId, ...values }, context: { rt } }) => {
-    const { roots } = getSettings(rt.db);
+    const roots = allowedRoots(getSettings(rt.db));
     values.path = await resolveInRoots(values.path, roots);
-    values.targetRoot = await resolveInRoots(values.targetRoot, roots);
+    values.targets = await resolveTargetsIn(values.targets, roots);
     const saved = folderId ? updateWatchFolder(rt.db, folderId, values) : createWatchFolder(rt.db, values);
     await rt.watch.reload();
     return saved;
@@ -213,8 +241,16 @@ export const saveSettings = createServerFn({ method: "POST" })
       seriesProvider: z.enum(SERIES_PROVIDERS).optional(),
       movieProvider: z.enum(MOVIE_PROVIDERS).optional(),
       language: z.string().max(20).optional(),
-      roots: z.array(z.string().min(1)).optional(),
-      defaultTargetRoot: z.string().optional(),
+      folders: z
+        .array(
+          z.object({
+            path: z.string().min(1),
+            name: z.string().min(1).max(100),
+            kind: z.enum(FOLDER_KINDS),
+            default: z.boolean().optional(),
+          }),
+        )
+        .optional(),
       notifications: z
         .array(z.object({ kind: z.enum(["ntfy", "gotify", "telegram", "discord", "webhook"]), url: z.url(), token: z.string().optional() }))
         .optional(),
@@ -222,11 +258,29 @@ export const saveSettings = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data, context: { rt } }) => {
-    if (data.roots) {
-      for (const r of data.roots) {
-        if (!path.isAbsolute(r)) throw new Error(msg("settings_error_rootNotAbsolute", { path: r }));
-        const st = await fs.stat(r).catch(() => undefined);
-        if (!st?.isDirectory()) throw new Error(msg("settings_error_rootMissing", { path: r }));
+    if (data.folders) {
+      for (const f of data.folders) {
+        if (!path.isAbsolute(f.path)) throw new Error(msg("settings_error_rootNotAbsolute", { path: f.path }));
+        const st = await fs.stat(f.path).catch(() => undefined);
+        if (!st?.isDirectory()) throw new Error(msg("settings_error_rootMissing", { path: f.path }));
+      }
+      data.folders = normalizeFolders(data.folders);
+      // A folder still used by a profile or watch folder cannot go: they would point nowhere.
+      const roots = allowedRoots({ folders: data.folders });
+      const outside = (p?: string) => Boolean(p) && !roots.some((r) => isInside(path.resolve(p!), path.resolve(r)));
+      const users = [
+        ...listProfiles(rt.db).flatMap((p) =>
+          Object.values(p.targets)
+            .filter(outside)
+            .map((t) => ({ name: p.name, path: t! })),
+        ),
+        ...listWatchFolders(rt.db).flatMap((w) =>
+          [w.path, ...Object.values(w.targets)].filter(outside).map((t) => ({ name: w.name, path: t! })),
+        ),
+      ];
+      if (users.length) {
+        const first = users[0]!;
+        throw new Error(msg("settings_error_folderInUse", { path: first.path, users: [...new Set(users.map((u) => u.name))].join(", ") }));
       }
     }
     // An empty secret field keeps what is stored; "-" removes it.

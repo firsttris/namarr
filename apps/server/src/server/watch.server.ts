@@ -1,7 +1,16 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { VIDEO_EXTENSIONS } from "@namarr/core";
-import { type Db, getProfile, knownSourcePaths, listWatchFolders, updateWatchFolder, type WatchFolder } from "@namarr/db";
+import {
+  type Db,
+  getProfile,
+  getSettings,
+  knownSourcePaths,
+  listWatchFolders,
+  resolveTargets,
+  updateWatchFolder,
+  type WatchFolder,
+} from "@namarr/db";
 import { type FSWatcher, watch } from "chokidar";
 import { automaticConfig } from "./automation.server.ts";
 import type { EventBus } from "./events.server.ts";
@@ -129,7 +138,11 @@ export class WatchService {
           kind: "watch",
           watchFolderId: folder.id,
           profileId: profile?.id ?? null,
-          config: automaticConfig(profile, { targetRoot: folder.targetRoot, autoThreshold: folder.autoThreshold }),
+          config: automaticConfig(profile, {
+            // The watch folder's own choice first, then the profile's, then the default library.
+            targets: resolveTargets(getSettings(this.deps.db), folder.targets, profile?.targets),
+            autoThreshold: folder.autoThreshold,
+          }),
         });
       } catch (err) {
         this.deps.log.error({ err, root }, "Watch-Job konnte nicht angelegt werden");

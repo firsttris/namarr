@@ -21,8 +21,10 @@ export type PreviewConfig = {
   template?: { movie?: string; episode?: string } | string;
   preset?: string;
   rules?: Rule[];
-  /** Absolute folder targets go under. Rule mode without it renames in place. */
+  /** One absolute folder every target goes under; wins over `targets`. Rule mode without it renames in place. */
   targetRoot?: string;
+  /** Library folders by kind for matched files (media and both modes). */
+  targets?: { movie?: string; series?: string };
   autoThreshold?: number;
   sanitize?: SanitizeOptions;
 };
@@ -101,12 +103,19 @@ export function buildPreview(inputs: PreviewInput[], config: PreviewConfig): Pre
       config.sanitize,
     );
     const decision = classify(match.confidence, config.autoThreshold);
+    const library = kind === "movie" ? config.targets?.movie : config.targets?.series;
+    // No library folder for this kind (and none chosen for the job): renamed where it is, and said so.
+    const noLibrary =
+      !config.targetRoot && !library && config.targets
+        ? [kind === "movie" ? msg("jobs_reason_noMovieLibrary") : msg("jobs_reason_noSeriesLibrary")]
+        : [];
+    const reasons = approved && decision !== "auto" ? [...match.reasons, APPROVED] : match.reasons;
     return {
       ...base,
-      target: resolveTarget(relative, file, config),
+      target: resolveTarget(relative, file, { ...config, targetRoot: config.targetRoot ?? library }),
       state: decision === "auto" || approved ? "ready" : "needs_review",
       confidence: match.confidence,
-      reasons: approved && decision !== "auto" ? [...match.reasons, APPROVED] : match.reasons,
+      reasons: [...reasons, ...noLibrary],
     };
   });
 

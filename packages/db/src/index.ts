@@ -5,6 +5,7 @@ import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import * as schema from "./schema.ts";
 
+export * from "./folders.ts";
 export * from "./repo.ts";
 export * from "./schema.ts";
 export { schema };

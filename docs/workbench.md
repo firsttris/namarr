@@ -7,7 +7,7 @@ preview, fix what is wrong, run it, and undo it if you change your mind.
 
 ## The preview
 
-1. **Pick a folder** on the server (inside the allowed root paths) and a **mode**:
+1. **Pick a folder** on the server (one of the [folders in the settings](installation.md#folders-and-libraries)) and a **mode**:
    - *Media*: match against a [metadata source](metadata.md) and name by template
    - *Rules*: rename with a rule stack, no database involved
    - *Both*: match first, then polish the result with rules
@@ -26,7 +26,11 @@ On the right:
   file
 - the **rule stack** with drag and drop and a preview per rule
 
-At the bottom: action, conflict policy, target and the button that runs the job.
+At the bottom: action, conflict policy, target and the button that runs the job. The target is
+*Library* by default in media mode: movies go to the default movie library, series to the default
+series library (or the profile's). It can be switched to *rename in place* or to one folder for every
+file. A matched file without a library for its kind stays in its folder, and the preview says so.
+The target of a single file can be set in the side panel, typed or picked with *Browse …*.
 
 ## Actions
 
