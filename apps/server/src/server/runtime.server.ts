@@ -1,7 +1,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { type MetadataProvider, probe } from "@namarr/core";
-import { type Db, failInterruptedJobs, getSettings, openDatabase, type SeriesProvider, SqliteProviderCache, setSettings } from "@namarr/db";
+import {
+  type Db,
+  failInterruptedJobs,
+  getSettings,
+  migrateProfiles,
+  openDatabase,
+  type SeriesProvider,
+  SqliteProviderCache,
+  setSettings,
+} from "@namarr/db";
 import pino from "pino";
 import { type Env, readEnv } from "./env.server.ts";
 import { EventBus } from "./events.server.ts";
@@ -53,6 +62,9 @@ export function runtime(): Runtime {
   if (interrupted) log.warn({ interrupted }, "Unterbrochene Jobs als fehlgeschlagen markiert");
 
   seedFolders(db, env.roots, log);
+  const { skippedRules } = migrateProfiles(db);
+  if (skippedRules.length)
+    log.warn({ profiles: skippedRules }, "Profile mit Regeln: Regeln nicht übernommen (Werkbank → Regeln importieren)");
 
   const bus = new EventBus();
   const cache = new SqliteProviderCache(db);

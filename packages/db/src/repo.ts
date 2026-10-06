@@ -1,7 +1,9 @@
+import { WATCH_ACTIONS, type WatchAction } from "@namarr/core/fileops";
 import { msg } from "@namarr/core/i18n";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, or, type SQL, sql } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { jobTargetRoots, type LibraryFolder, migrateFolders } from "./folders.ts";
+import { type NameFormat, newFormatId } from "./formats.ts";
 import type * as schema from "./schema.ts";
 import {
   ITEM_STATES,
@@ -49,8 +51,14 @@ export type Settings = {
   language: string;
   /** Every folder namarr may read and write; some of them are library folders for movies or series. */
   folders: LibraryFolder[];
+  /** Own naming formats; the built-in ones come from the presets. */
+  formats: NameFormat[];
+  /** The format per kind used unless a job or watch folder picks another (ids; unset: Jellyfin). */
+  defaultFormats: { movie?: string; series?: string };
   notifications: { kind: "ntfy" | "gotify" | "telegram" | "discord" | "webhook"; url: string; token?: string }[];
   libraryRefresh: { kind: "jellyfin" | "plex" | "emby"; url: string; token: string }[];
+  /** Set once profiles were taken over into formats and watch folders. */
+  profilesMigrated?: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -58,6 +66,8 @@ export const DEFAULT_SETTINGS: Settings = {
   seriesProvider: "tmdb",
   movieProvider: "tmdb",
   folders: [],
+  formats: [],
+  defaultFormats: {},
   notifications: [],
   libraryRefresh: [],
 };
@@ -91,7 +101,61 @@ export function setSettings(db: AnyDb, patch: Partial<Settings>): Settings {
   return getSettings(db);
 }
 
-// ---------- profiles ----------
+// ---------- profiles (taken over into formats and watch folders) ----------
+
+/**
+ * Profiles are gone: their own templates become naming formats (named after the profile), and
+ * watch folders that used a profile get its formats, series source, action and targets. Runs once.
+ * Returns what could not be taken over (rule stacks), for the log.
+ */
+export function migrateProfiles(db: AnyDb): { skippedRules: string[] } {
+  const skippedRules: string[] = [];
+  if (getSettings(db).profilesMigrated) return { skippedRules };
+  db.transaction((tx) => {
+    const s = getSettings(tx as unknown as AnyDb);
+    const formats = [...s.formats];
+    const byProfile = new Map<number, { movie?: string; series?: string }>();
+    for (const p of tx.select().from(profiles).all()) {
+      if (p.rulesJson.length) skippedRules.push(p.name);
+      const ids: { movie?: string; series?: string } = {};
+      for (const [kind, key] of [
+        ["movie", "movie"],
+        ["series", "episode"],
+      ] as const) {
+        const template = p.template[key]?.trim();
+        if (template) {
+          const id = newFormatId();
+          formats.push({ id, name: p.name, kind, template });
+          ids[kind] = id;
+        } else if (p.preset && p.preset !== "jellyfin") ids[kind] = p.preset;
+      }
+      byProfile.set(p.id, ids);
+      for (const w of tx.select().from(watchFolders).where(eq(watchFolders.profileId, p.id)).all()) {
+        tx.update(watchFolders)
+          .set({
+            options: {
+              ...w.options,
+              formats: ids,
+              provider: p.provider ?? undefined,
+              // Links are gone: copying leaves the download in place, like a link did.
+              action: (WATCH_ACTIONS as readonly string[]).includes(p.action) ? (p.action as WatchAction) : "copy",
+              conflictPolicy: p.conflictPolicy,
+            },
+            targets: { ...p.targets, ...w.targets },
+            profileId: null,
+          })
+          .where(eq(watchFolders.id, w.id))
+          .run();
+      }
+    }
+    tx.insert(settings)
+      .values({ key: "formats", valueJson: formats })
+      .onConflictDoUpdate({ target: settings.key, set: { valueJson: formats } })
+      .run();
+    tx.insert(settings).values({ key: "profilesMigrated", valueJson: true }).onConflictDoNothing().run();
+  });
+  return { skippedRules };
+}
 
 export const listProfiles = (db: AnyDb) => db.select().from(profiles).orderBy(asc(profiles.name)).all();
 export const getProfile = (db: AnyDb, id: number) => db.select().from(profiles).where(eq(profiles.id, id)).get();

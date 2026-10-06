@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as zlib from "node:zlib";
-import { createProfile, createWatchFolder, type Db, getSettings, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
+import { createWatchFolder, type Db, getSettings, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue } from "~/server/auth.server";
@@ -100,6 +100,8 @@ describe("Benachrichtigungen und Library-Refresh", () => {
     const settings: Settings = {
       language: "de-DE",
       folders: [],
+      formats: [],
+      defaultFormats: {},
       notifications: [{ kind: "webhook", url: "https://hook.example/x" }],
       libraryRefresh: [{ kind: "jellyfin", url: "http://jf:8096", token: "t" }],
     };
@@ -118,7 +120,14 @@ describe("Benachrichtigungen und Library-Refresh", () => {
   it("kein Library-Refresh, wenn nichts umbenannt wurde", async () => {
     const fetchImpl = vi.fn(async () => new Response(""));
     await afterExecution(
-      { language: "de", folders: [], notifications: [], libraryRefresh: [{ kind: "plex", url: "http://p", token: "t" }] },
+      {
+        language: "de",
+        folders: [],
+        formats: [],
+        defaultFormats: {},
+        notifications: [],
+        libraryRefresh: [{ kind: "plex", url: "http://p", token: "t" }],
+      },
       { jobId: 1, done: 0, failed: 1, skipped: 0, source: "/x" },
       () => {},
       fetchImpl,
@@ -243,12 +252,11 @@ describe("Watch-Folder", () => {
     bus.subscribe((e) => e.type === "watch.detected" && detected.push(path.basename(e.path)));
     const log = { info: () => {}, error: () => {} };
     const jobs = new JobService({ db, bus, provider: () => new DemoProvider(), log, notify: async () => {} });
-    const profile = createProfile(db, { name: "Serien", action: "hardlink", preset: "plex" });
-    createWatchFolder(db, {
+    const folder = createWatchFolder(db, {
       name: "TV",
       path: dl,
       targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
-      profileId: profile.id,
+      options: { formats: { series: "plex" }, action: "copy" },
       stableSeconds: 1,
       autoThreshold: null,
     });
@@ -265,10 +273,10 @@ describe("Watch-Folder", () => {
     await vi.waitFor(() => expect(listJobs(db)).toHaveLength(1), { timeout: 8000, interval: 200 });
     await jobs.idle();
     const [job] = listJobs(db);
-    expect(job).toMatchObject({ kind: "watch", sourcePaths: [release], profileId: profile.id });
+    expect(job).toMatchObject({ kind: "watch", sourcePaths: [release], watchFolderId: folder.id });
     expect(job!.config).toMatchObject({
-      action: "hardlink",
-      preset: "plex",
+      action: "copy",
+      formats: { series: "plex" },
       alwaysReview: true,
       targets: { movie: path.join(tmp, "media"), series: path.join(tmp, "media") },
     });

@@ -1,8 +1,9 @@
 import type { Action, ConflictPolicy } from "@namarr/core/fileops";
+import { PRESETS } from "@namarr/core/formatter";
 import type { MatchResult } from "@namarr/core/matcher";
 import type { Rule } from "@namarr/core/rules";
 import type { Parsed } from "@namarr/core/types";
-import { type JobItem, jobTargetRoots, type SeriesProvider } from "@namarr/db/types";
+import { formatsOf, type JobItem, jobTargetRoots, type NameFormat, newFormatId, type SeriesProvider } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,7 +16,7 @@ import { RuleStack } from "~/components/RuleStack";
 import { TemplateEditor } from "~/components/TemplateEditor";
 import { Button, cx, ErrorNote, Panel, Poster, Progress, Select } from "~/components/ui";
 import { cancelJob, createJob, executeJob, getJob, getJobItems, recomputePreview, updateJobItem } from "~/functions/jobs.functions";
-import { getProfiles, getSettingsFn } from "~/functions/library.functions";
+import { getSettingsFn, saveFormats } from "~/functions/library.functions";
 import { useLive } from "~/lib/events";
 import { num, pct } from "~/lib/format";
 import { localeOf, pickMsg, useLocalize } from "~/lib/i18n";
@@ -30,9 +31,8 @@ const searchMode = searchEnum<Mode>(["media", "rules", "both"]);
 export const Route = createFileRoute("/rename")({
   // Tens of thousands of virtualized rows: SSR brings nothing here.
   ssr: false,
-  validateSearch: (s: Search): { path?: string; profile?: number; job?: number; item?: number; mode?: Mode } => ({
+  validateSearch: (s: Search): { path?: string; job?: number; item?: number; mode?: Mode } => ({
     path: searchString(s.path),
-    profile: searchNumber(s.profile),
     job: searchNumber(s.job),
     item: searchNumber(s.item),
     mode: searchMode(s.mode),
@@ -81,16 +81,14 @@ function Breadcrumb({ path }: { path?: string }) {
   );
 }
 
-// ---------- start: choose folder, mode, profile ----------
+// ---------- start: choose folder and mode ----------
 
 function NewJob() {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>(search.mode ?? "media");
-  const [profileId, setProfileId] = useState<number | undefined>(search.profile);
-  const profiles = useQuery({ queryKey: ["profiles"], queryFn: () => getProfiles() });
   const create = useMutation({
-    mutationFn: (path: string) => createJob({ data: { paths: [path], mode, profileId } }),
+    mutationFn: (path: string) => createJob({ data: { paths: [path], mode } }),
     onSuccess: ({ jobId }) => navigate({ to: "/rename", search: { job: jobId } }),
   });
 
@@ -101,18 +99,6 @@ function NewJob() {
           <h1 className="m-0 font-display text-[28px] font-bold tracking-[-0.02em]">{m.workbench_title()}</h1>
           <div className="text-[13px] text-muted">{m.workbench_intro()}</div>
         </div>
-        <Select
-          aria-label={m.common_profile()}
-          value={profileId ?? ""}
-          onChange={(e) => setProfileId(e.target.value ? Number(e.target.value) : undefined)}
-        >
-          <option value="">{m.workbench_noProfile()}</option>
-          {profiles.data?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </Select>
         <ModeToggle value={mode} onChange={setMode} />
       </header>
       <ErrorNote error={create.error} />
@@ -149,7 +135,8 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
-type Config = { mode: Mode; preset: string; template: { movie?: string; episode?: string }; rules: Rule[] };
+/** The template per kind is always spelled out; `formats` names the format it came from, if unchanged. */
+type Config = { mode: Mode; formats: { movie?: string; series?: string }; template: { movie: string; episode: string }; rules: Rule[] };
 
 function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: number }) {
   const localize = useLocalize();
@@ -180,7 +167,14 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
   useEffect(() => {
     const c = job.data?.job.config;
     if (!c || loaded.current !== null) return;
-    const initial: Config = { mode: c.mode, preset: c.preset ?? "jellyfin", template: c.template ?? {}, rules: c.rules ?? [] };
+    // Jobs from older versions name a preset instead of formats.
+    const preset = PRESETS[c.preset ?? "jellyfin"] ?? PRESETS.jellyfin!;
+    const initial: Config = {
+      mode: c.mode,
+      formats: c.formats ?? {},
+      template: { movie: c.template?.movie ?? preset.movie, episode: c.template?.episode ?? preset.episode },
+      rules: c.rules ?? [],
+    };
     loaded.current = JSON.stringify(initial);
     setConfig(initial);
     setAction(c.action);
@@ -188,8 +182,22 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
   }, [job.data]);
 
   const recompute = useMutation({
-    mutationFn: (c: Config) => recomputePreview({ data: { jobId, mode: c.mode, preset: c.preset, template: c.template, rules: c.rules } }),
+    mutationFn: (c: Config) =>
+      recomputePreview({ data: { jobId, mode: c.mode, formats: c.formats, template: c.template, rules: c.rules } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["items", jobId] }),
+  });
+  /** The edited template as a new own format, chosen right away. */
+  const saveAsFormat = useMutation({
+    mutationFn: async (f: Omit<NameFormat, "id">) => {
+      const s = settings.data!;
+      const format = { ...f, id: newFormatId() };
+      await saveFormats({ data: { formats: [...s.formats, format], defaultFormats: s.defaultFormats } });
+      return format;
+    },
+    onSuccess: (f) => {
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      setConfig((c) => c && { ...c, formats: { ...c.formats, [f.kind]: f.id } });
+    },
   });
   // Recompute when the settings differ from what the preview was last computed with.
   const debounced = useDebounced(config, 400);
@@ -237,7 +245,7 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
         data: {
           paths: extra.paths ?? j.sourcePaths,
           mode: config?.mode,
-          preset: config?.preset,
+          formats: config?.formats,
           template: config?.template,
           rules: config?.rules,
           targetRoot: j.config.targetRoot,
@@ -285,6 +293,8 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
   const match = selected?.matchJson as MatchResult | null | undefined;
   const sample = selected && parsed ? { parsed, match, original: selected.sourcePath.split("/").at(-1)! } : undefined;
   const kind = match?.best?.kind === "movie" || parsed?.kind.value === "movie" ? "movie" : "episode";
+  const formatKind = kind === "movie" ? "movie" : "series";
+  const formatList = settings.data ? formatsOf(settings.data, formatKind) : [];
   const folders = settings.data?.folders ?? [];
   // Every allowed folder can take all files of the job; the one chosen stays listed even if no longer allowed.
   const fixedTargets = [...new Set([j?.config.targetRoot, ...folders.map((f) => f.path)].filter((t): t is string => Boolean(t)))];
@@ -491,14 +501,27 @@ function JobWorkbench({ jobId, initialItem }: { jobId: number; initialItem?: num
         <aside aria-label={m.workbench_sidebar()} className="flex min-h-0 flex-col gap-4 overflow-auto">
           {config && config.mode !== "rules" && (
             <TemplateEditor
-              preset={config.preset}
-              template={config.template}
               kind={kind}
+              value={config.template[kind]}
+              onChange={(v) => setConfig({ ...config, template: { ...config.template, [kind]: v } })}
               sample={sample}
-              onPreset={(preset) => setConfig({ ...config, preset, template: {} })}
-              onTemplate={(template) => setConfig({ ...config, template })}
+              formats={{
+                list: formatList,
+                selected: config.formats[formatKind],
+                onSelect: (f) =>
+                  setConfig({
+                    ...config,
+                    formats: { ...config.formats, [formatKind]: f.id },
+                    template: { ...config.template, [kind]: f.template },
+                  }),
+                onSaveAs: () => {
+                  const name = prompt(m.template_saveAsName());
+                  if (name?.trim()) saveAsFormat.mutate({ name: name.trim(), kind: formatKind, template: config.template[kind] });
+                },
+              }}
             />
           )}
+          <ErrorNote error={saveAsFormat.error} />
           {config && config.mode !== "media" && (
             <RuleStack
               rules={config.rules}

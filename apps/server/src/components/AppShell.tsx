@@ -16,7 +16,7 @@ const NAV = [
   { to: "/rename", key: "workbench", icon: PenIcon },
   { to: "/inbox", key: "inbox", icon: InboxIcon, badge: true },
   { to: "/history", key: "history", icon: HistoryIcon },
-  { to: "/profiles", key: "profiles", icon: ListIcon },
+  { to: "/formats", key: "formats", icon: ListIcon },
   { to: "/watch", key: "watch", icon: EyeIcon },
   { to: "/settings", key: "settings", icon: GearIcon },
 ] as const;

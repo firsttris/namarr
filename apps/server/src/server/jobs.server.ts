@@ -41,7 +41,6 @@ import {
   findDoneItemByTarget,
   getItem,
   getJob,
-  getProfile,
   getSettings,
   insertItems,
   insertOperation,
@@ -51,6 +50,7 @@ import {
   type JobKind,
   listOperations,
   listOverrides,
+  listWatchFolders,
   markUndone,
   removeFromInbox,
   resolveTargets,
@@ -87,7 +87,7 @@ export class JobError extends Error {
 type StoredMatch = MatchResult;
 
 /** Changes to a job before its preview is computed again. */
-export type TargetPatch = Partial<Pick<JobConfig, "mode" | "preset" | "template" | "rules">> & {
+export type TargetPatch = Partial<Pick<JobConfig, "mode" | "preset" | "template" | "formats" | "rules">> & {
   /** One folder for every file; null: none. */
   targetRoot?: string | null;
   /** "library": the library folders by kind; null: none (renamed in place). */
@@ -147,13 +147,7 @@ export class JobService {
   // ---------- create & analyze ----------
 
   /** Creates a job and queues scan + match. Returns immediately. */
-  async create(input: {
-    paths: string[];
-    config: JobConfig;
-    profileId?: number | null;
-    kind?: JobKind;
-    watchFolderId?: number | null;
-  }): Promise<Job> {
+  async create(input: { paths: string[]; config: JobConfig; kind?: JobKind; watchFolderId?: number | null }): Promise<Job> {
     const settings = this.settings();
     const resolved: string[] = [];
     for (const p of input.paths) resolved.push(await resolveInRoots(p, allowedRoots(settings)));
@@ -162,7 +156,6 @@ export class JobService {
     const job = createJob(this.deps.db, {
       sourcePaths: resolved,
       config: input.config,
-      profileId: input.profileId ?? null,
       kind: input.kind ?? "manual",
       watchFolderId: input.watchFolderId ?? null,
     });
@@ -363,11 +356,12 @@ export class JobService {
       const settings = this.settings();
       if (targetRoot === null) delete config.targetRoot;
       else if (targetRoot !== undefined) config.targetRoot = await resolveInRoots(targetRoot, allowedRoots(settings));
-      // "library": the library folders by kind (the profile's, else the defaults); null: none, in place.
+      // "library": the library folders by kind (the watch folder's, else the defaults); null: none, in place.
       if (targets === null) delete config.targets;
       else if (targets === "library") {
-        const profile = job.profileId ? getProfile(db, job.profileId) : undefined;
-        const { movie, series } = resolveTargets(settings, profile?.targets);
+        const watchId = job.watchFolderId;
+        const watch = watchId ? listWatchFolders(db).find((w) => w.id === watchId) : undefined;
+        const { movie, series } = resolveTargets(settings, watch?.targets);
         config.targets = await this.resolveTargetFolders({ movie, series }, allowedRoots(settings));
       }
       job = updateJob(db, jobId, { config })!;

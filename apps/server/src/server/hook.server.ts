@@ -1,5 +1,5 @@
 import * as fs from "node:fs/promises";
-import { getProfile, getSettings, type Job, listProfiles, listWatchFolders, resolveTargets } from "@namarr/db";
+import { getSettings, type Job, listWatchFolders, resolveTargets } from "@namarr/db";
 import { z } from "zod";
 import { localizeIn } from "../lib/i18n.tsx";
 import { automaticConfig } from "./automation.server.ts";
@@ -10,14 +10,14 @@ import type { Runtime } from "./runtime.server.ts";
  * folder job: sure matches are renamed right away, uncertain ones wait in the inbox.
  *
  *   path         file or folder, as the client sees it (NAMARR_PATH_MAP translates it)
- *   profile      profile id or name (optional)
- *   watchFolder  watch folder id or name: take its profile, target and threshold (optional)
- *   target       target folder (else profile, watch folder, default target)
+ *   watchFolder  watch folder id or name: take its formats, source, action, targets and threshold
+ *   target       one folder for every file (else the watch folder's or the default libraries)
  *   review       true: nothing runs without approval
  *   threshold    auto threshold 0..1 (default 0.9)
  */
 const hookSchema = z.object({
   path: z.string().min(1).max(4096),
+  /** Replaced by watchFolder; still read, to answer with a clear error. */
   profile: z.union([z.coerce.number().int().positive(), z.string().min(1)]).optional(),
   watchFolder: z.union([z.coerce.number().int().positive(), z.string().min(1)]).optional(),
   target: z.string().min(1).optional(),
@@ -72,20 +72,15 @@ const byIdOrName = <T extends { id: number; name: string }>(list: T[], key: stri
   key === undefined ? undefined : list.find((x) => (typeof key === "number" ? x.id === key : x.name.toLowerCase() === key.toLowerCase()));
 
 export async function createHookJob(rt: Runtime, input: HookInput): Promise<Job> {
+  if (input.profile !== undefined)
+    throw new HookError("Profiles were replaced: pass watchFolder (its formats, source, action and targets) instead of profile", 400);
   const settings = getSettings(rt.db);
   const watchFolder = byIdOrName(listWatchFolders(rt.db), input.watchFolder);
   if (input.watchFolder !== undefined && !watchFolder) throw new HookError(`Unknown watch folder: ${input.watchFolder}`, 404);
-  const profile =
-    input.profile !== undefined
-      ? byIdOrName(listProfiles(rt.db), input.profile)
-      : watchFolder?.profileId
-        ? getProfile(rt.db, watchFolder.profileId)
-        : undefined;
-  if (input.profile !== undefined && !profile) throw new HookError(`Unknown profile: ${input.profile}`, 404);
 
   const targetRoot = input.target ? mapPath(input.target, rt.env.pathMap) : undefined;
-  const targets = resolveTargets(settings, profile?.targets, watchFolder?.targets);
-  if (!targetRoot && (profile?.mode ?? "media") !== "rules" && !targets.movie && !targets.series)
+  const targets = resolveTargets(settings, watchFolder?.targets);
+  if (!targetRoot && !targets.movie && !targets.series)
     throw new HookError("No target folder: pass target, or add a library folder for movies or series in the settings", 400);
   const autoThreshold = input.review ? null : (input.threshold ?? watchFolder?.autoThreshold ?? 0.9);
 
@@ -96,9 +91,8 @@ export async function createHookJob(rt: Runtime, input: HookInput): Promise<Job>
     return await rt.jobs.create({
       paths: [source],
       kind: "hook",
-      profileId: profile?.id ?? null,
       watchFolderId: watchFolder?.id ?? null,
-      config: automaticConfig(profile, { targets, targetRoot, autoThreshold }),
+      config: automaticConfig(settings, watchFolder, { targets, targetRoot, autoThreshold }),
     });
   } catch (e) {
     // By name, not instanceof: the server entry and the Start bundle each carry a copy of core.

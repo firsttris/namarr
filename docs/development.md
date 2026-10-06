@@ -67,7 +67,7 @@ the initial bundle.
 | FileOps | in temporary folders: all actions, conflicts, quality comparison for *keep better*, backup on overwrite, undo refused for changed files, cancel in the middle of a job |
 | Providers | TMDB, TheTVDB, TVmaze and AniDB against responses in their documented format (no live API), cache TTL, 429 retry, login, error messages, IDs from folder names |
 | DB / server | migrations, paging, inbox, dashboard numbers; job pipeline end to end, watch folders with real files, download client hook, auth, SSE, notifications |
-| E2E | Playwright: preview, match picker, approval, hardlinks, undo, rule mode, history, hook, English and German UI |
+| E2E | Playwright: preview, match picker, approval, formats, undo, rule mode, history, hook, English and German UI |
 
 ## Parser corpus
 

@@ -1,12 +1,7 @@
 # Installation
 
-namarr is one Bun process in one container: web UI, API, job queue and watch folders. It needs two
-volumes, `/config` for its SQLite database and `/data` for your files.
-
-> [!IMPORTANT]
-> Keep your downloads and your library **in the same mount**, for example `/mnt/data/downloads` and
-> `/mnt/data/media` mounted together as `/data`. Hardlinks cannot cross file systems, and hardlinks
-> are what keep torrents seeding after a rename.
+namarr is one Bun process in one container: web UI, API, job queue and watch folders. It needs
+`/config` for its SQLite database and your files, in one mount (`/data`) or several.
 
 ## Docker Compose
 
@@ -21,7 +16,7 @@ services:
       NAMARR_TOKEN: change-me
     volumes:
       - ./config:/config
-      - /mnt/data:/data # downloads and library in the same mount, otherwise no hardlinks
+      - /mnt/data:/data # downloads and library
     restart: unless-stopped
 ```
 
@@ -82,8 +77,8 @@ Each folder has a type:
 
 Matched files go to the **default** library of their kind: a movie to the default movie library, an
 episode to the default series library. Mark one library per kind as default; the first one is it
-automatically. Profiles and watch folders can choose another library per kind (an anime profile
-with its own series folder, say), and the workbench can put a whole job into one folder or rename
+automatically. Watch folders can choose another library per kind (an anime download folder with
+its own series library, say), and the workbench can put a whole job into one folder or rename
 in place. Rule mode does not use libraries: it renames in place unless you choose a folder.
 
 Example with movies and series on separate mounts:
@@ -100,9 +95,8 @@ Volume=/mnt/tvshows:/tvshows
 | `/movies` | Library: movies | ✓ |
 | `/tvshows` | Library: series | ✓ |
 
-Separate mounts work for *move* and *copy*; **hardlinks** need source and target on the same file
-system. For hardlinks, mount one parent (`/mnt/data:/data` with `downloads/`, `movies/` and `tv/`
-inside) and add `/data/downloads`, `/data/movies` and `/data/tv` as folders.
+Within one mount, *move* is a rename and instant; across mounts namarr copies, checks the size and
+then deletes the source.
 
 Settings from earlier versions are taken over: the allowed root paths become folders, the default
 target becomes the default library for movies and series.

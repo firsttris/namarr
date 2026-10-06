@@ -14,9 +14,9 @@ Names come from a database, never from guesses. namarr knows four of them:
 Under *Settings* you choose where **series** and where **movies** come from. TVmaze and AniDB have
 no movies, so movies come from TMDB or TheTVDB. A source without its key is marked right there.
 
-A **profile** can pick its own series source, for example AniDB for an anime profile, and the
-**workbench** can switch it per job. Watch folders and the download client hook use the source of
-their profile.
+A **watch folder** can pick its own series source, for example AniDB for an anime folder, and the
+**workbench** can switch it per job. The download client hook uses the source of the watch folder
+it names.
 
 ## IDs in folder names
 

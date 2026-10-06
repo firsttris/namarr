@@ -1,12 +1,16 @@
-import type { WatchFolder } from "@namarr/db/types";
+import { WATCH_ACTIONS } from "@namarr/core/fileops";
+import { FORMAT_KINDS, formatsOf, resolveFormats, type WatchFolder } from "@namarr/db/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PathInput } from "~/components/PathInput";
 import { TargetFields } from "~/components/TargetFields";
 import { Button, Chip, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
-import { getProfiles, getSettingsFn, getWatchFolders, removeWatchFolder, saveWatchFolder } from "~/functions/library.functions";
+import { getSettingsFn, getWatchFolders, removeWatchFolder, saveWatchFolder } from "~/functions/library.functions";
 import { ago, pct } from "~/lib/format";
+import { pickMsg } from "~/lib/i18n";
+import { msgGroup } from "~/lib/msg-groups";
+import { SERIES_SOURCES } from "~/lib/providers";
 import * as m from "~/paraglide/messages";
 
 export const Route = createFileRoute("/watch")({
@@ -14,27 +18,26 @@ export const Route = createFileRoute("/watch")({
   component: Watch,
 });
 
-type Draft = Pick<WatchFolder, "name" | "path" | "targets" | "profileId" | "autoThreshold" | "stableSeconds" | "enabled"> & {
+type Draft = Pick<WatchFolder, "name" | "path" | "targets" | "options" | "autoThreshold" | "stableSeconds" | "enabled"> & {
   id?: number;
 };
-const EMPTY: Draft = { name: "", path: "", targets: {}, profileId: null, autoThreshold: 0.9, stableSeconds: 30, enabled: true };
+const EMPTY: Draft = { name: "", path: "", targets: {}, options: {}, autoThreshold: 0.9, stableSeconds: 30, enabled: true };
 
 function Watch() {
   const initial = Route.useLoaderData();
   const qc = useQueryClient();
   const { data = initial } = useQuery({ queryKey: ["watch"], queryFn: () => getWatchFolders(), initialData: initial });
-  const profiles = useQuery({ queryKey: ["profiles"], queryFn: () => getProfiles() });
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => getSettingsFn() });
   const folders = settings.data?.folders ?? [];
-  /** Where a watch folder's files go, for its card: its own folders, else the profile's, else the defaults. */
-  const targetsOf = (f: Pick<WatchFolder, "targets" | "profileId">) => {
-    const profile = profiles.data?.find((p) => p.id === f.profileId);
+  const stored = { formats: settings.data?.formats ?? [], defaultFormats: settings.data?.defaultFormats ?? {} };
+  /** Where a watch folder's files go, for its card: its own folders, else the defaults. */
+  const targetsOf = (f: Pick<WatchFolder, "targets">) => {
     const fallback = (kind: "movies" | "series") => folders.find((x) => x.kind === kind && x.default)?.path;
-    const movie = f.targets.movie ?? profile?.targets.movie ?? fallback("movies");
-    const series = f.targets.series ?? profile?.targets.series ?? fallback("series");
-    if (profile?.mode === "rules") return f.targets.other ?? profile.targets.other ?? m.targets_inPlace();
+    const movie = f.targets.movie ?? fallback("movies");
+    const series = f.targets.series ?? fallback("series");
     return movie === series ? (movie ?? "–") : `${m.targets_movies()} ${movie ?? "–"} · ${m.targets_series()} ${series ?? "–"}`;
   };
+  const setOptions = (d: Draft, options: Partial<Draft["options"]>) => setDraft({ ...d, options: { ...d.options, ...options } });
   const [draft, setDraft] = useState<Draft | null>(null);
   const done = () => {
     qc.invalidateQueries({ queryKey: ["watch"] });
@@ -70,20 +73,6 @@ function Watch() {
                 required
               />
             </Field>
-            <Field label={m.common_profile()} htmlFor="w-profile">
-              <Select
-                id="w-profile"
-                value={draft.profileId ?? ""}
-                onChange={(e) => setDraft({ ...draft, profileId: e.target.value ? Number(e.target.value) : null })}
-              >
-                <option value="">{m.watch_defaultProfile()}</option>
-                {profiles.data?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
             <Field label={m.watch_folder()} htmlFor="w-path">
               <PathInput
                 id="w-path"
@@ -96,11 +85,69 @@ function Watch() {
             </Field>
             <TargetFields
               idPrefix="w-target"
-              mode={profiles.data?.find((p) => p.id === draft.profileId)?.mode ?? "media"}
+              mode="media"
               targets={draft.targets}
               folders={folders}
               onChange={(targets) => setDraft({ ...draft, targets })}
             />
+            {FORMAT_KINDS.map((kind) => (
+              <Field key={kind} label={kind === "movie" ? m.watch_formatMovies() : m.watch_formatSeries()} htmlFor={`w-format-${kind}`}>
+                <Select
+                  id={`w-format-${kind}`}
+                  value={draft.options.formats?.[kind] ?? ""}
+                  onChange={(e) => setOptions(draft, { formats: { ...draft.options.formats, [kind]: e.target.value || undefined } })}
+                >
+                  <option value="">{m.common_fromSettings({ name: resolveFormats(stored)[kind].name })}</option>
+                  {formatsOf(stored, kind).map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ))}
+            <Field label={m.common_seriesSource()} htmlFor="w-provider">
+              <Select
+                id="w-provider"
+                value={draft.options.provider ?? ""}
+                onChange={(e) => setOptions(draft, { provider: (e.target.value || undefined) as Draft["options"]["provider"] })}
+              >
+                <option value="">
+                  {m.common_fromSettings({ name: pickMsg(msgGroup.providers, settings.data?.seriesProvider ?? "tmdb") })}
+                </option>
+                {SERIES_SOURCES.map((p) => (
+                  <option key={p} value={p}>
+                    {pickMsg(msgGroup.providers, p)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={m.common_action()} htmlFor="w-action">
+              <Select
+                id="w-action"
+                value={draft.options.action ?? "move"}
+                onChange={(e) => setOptions(draft, { action: e.target.value as Draft["options"]["action"] })}
+              >
+                {WATCH_ACTIONS.map((a) => (
+                  <option key={a} value={a}>
+                    {pickMsg(msgGroup.actions, a)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={m.common_conflicts()} htmlFor="w-conflict">
+              <Select
+                id="w-conflict"
+                value={draft.options.conflictPolicy ?? "skip"}
+                onChange={(e) => setOptions(draft, { conflictPolicy: e.target.value as Draft["options"]["conflictPolicy"] })}
+              >
+                {Object.entries(msgGroup.conflictPolicies).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v()}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             <Field label={m.watch_autoFrom()} htmlFor="w-auto">
               <Select
                 id="w-auto"
@@ -158,7 +205,13 @@ function Watch() {
             <div className="flex gap-1.5">
               <Chip>{f.autoThreshold === null ? m.watch_alwaysReview() : m.dashboard_autoFrom({ pct: pct(f.autoThreshold) })}</Chip>
               <Chip>{m.dashboard_stableSeconds({ n: f.stableSeconds })}</Chip>
-              <Chip>{profiles.data?.find((p) => p.id === f.profileId)?.name ?? m.watch_standard()}</Chip>
+              <Chip>{pickMsg(msgGroup.actions, f.options.action ?? "move")}</Chip>
+              <Chip>
+                {(() => {
+                  const fm = resolveFormats(stored, f.options.formats);
+                  return fm.movie.name === fm.series.name ? fm.movie.name : `${fm.movie.name} · ${fm.series.name}`;
+                })()}
+              </Chip>
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => setDraft({ ...f })}>

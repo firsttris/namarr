@@ -50,7 +50,7 @@ test.describe("Englischer Browser", () => {
       ["/"],
       ["/inbox"],
       ["/history"],
-      ["/profiles", () => page.getByRole("button", { name: "New profile" }).click()],
+      ["/formats", () => page.getByRole("button", { name: "+ New" }).first().click()],
       ["/watch", () => page.getByRole("button", { name: "Create watch folder" }).click()],
       ["/settings"],
       ["/jobs/1"],

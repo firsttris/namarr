@@ -10,10 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FormatsRouteImport } from './routes/formats'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as ProfilesRouteImport } from './routes/profiles'
 import { Route as RenameRouteImport } from './routes/rename'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WatchRouteImport } from './routes/watch'
@@ -26,6 +26,11 @@ import { Route as ApiJobsJobIdRouteImport } from './routes/api/jobs.$jobId'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FormatsRoute = FormatsRouteImport.update({
+  id: '/formats',
+  path: '/formats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryRoute = HistoryRouteImport.update({
@@ -41,11 +46,6 @@ const InboxRoute = InboxRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfilesRoute = ProfilesRouteImport.update({
-  id: '/profiles',
-  path: '/profiles',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RenameRoute = RenameRouteImport.update({
@@ -91,10 +91,10 @@ const ApiJobsJobIdRoute = ApiJobsJobIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/formats': typeof FormatsRoute
   '/history': typeof HistoryRoute
   '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
-  '/profiles': typeof ProfilesRoute
   '/rename': typeof RenameRoute
   '/settings': typeof SettingsRoute
   '/watch': typeof WatchRoute
@@ -106,10 +106,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/formats': typeof FormatsRoute
   '/history': typeof HistoryRoute
   '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
-  '/profiles': typeof ProfilesRoute
   '/rename': typeof RenameRoute
   '/settings': typeof SettingsRoute
   '/watch': typeof WatchRoute
@@ -122,10 +122,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/formats': typeof FormatsRoute
   '/history': typeof HistoryRoute
   '/inbox': typeof InboxRoute
   '/login': typeof LoginRoute
-  '/profiles': typeof ProfilesRoute
   '/rename': typeof RenameRoute
   '/settings': typeof SettingsRoute
   '/watch': typeof WatchRoute
@@ -139,10 +139,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/formats'
     | '/history'
     | '/inbox'
     | '/login'
-    | '/profiles'
     | '/rename'
     | '/settings'
     | '/watch'
@@ -154,10 +154,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/formats'
     | '/history'
     | '/inbox'
     | '/login'
-    | '/profiles'
     | '/rename'
     | '/settings'
     | '/watch'
@@ -169,10 +169,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/formats'
     | '/history'
     | '/inbox'
     | '/login'
-    | '/profiles'
     | '/rename'
     | '/settings'
     | '/watch'
@@ -185,10 +185,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FormatsRoute: typeof FormatsRoute
   HistoryRoute: typeof HistoryRoute
   InboxRoute: typeof InboxRoute
   LoginRoute: typeof LoginRoute
-  ProfilesRoute: typeof ProfilesRoute
   RenameRoute: typeof RenameRoute
   SettingsRoute: typeof SettingsRoute
   WatchRoute: typeof WatchRoute
@@ -205,6 +205,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/formats': {
+      id: '/formats'
+      path: '/formats'
+      fullPath: '/formats'
+      preLoaderRoute: typeof FormatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history': {
@@ -226,13 +233,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profiles': {
-      id: '/profiles'
-      path: '/profiles'
-      fullPath: '/profiles'
-      preLoaderRoute: typeof ProfilesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rename': {
@@ -307,10 +307,10 @@ const ApiJobsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FormatsRoute: FormatsRoute,
   HistoryRoute: HistoryRoute,
   InboxRoute: InboxRoute,
   LoginRoute: LoginRoute,
-  ProfilesRoute: ProfilesRoute,
   RenameRoute: RenameRoute,
   SettingsRoute: SettingsRoute,
   WatchRoute: WatchRoute,

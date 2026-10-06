@@ -1,33 +1,36 @@
-import { formatPath, PRESETS, TemplateError, TOKEN_NAMES } from "@namarr/core/formatter";
+import { formatPath, TemplateError, TOKEN_NAMES } from "@namarr/core/formatter";
 import type { MatchResult } from "@namarr/core/matcher";
 import type { Parsed } from "@namarr/core/types";
+import type { NameFormat } from "@namarr/db/types";
 import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import { pickMsg, useLocalize } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
 import * as m from "~/paraglide/messages";
-import { cx, Select } from "./ui";
+import { Button, cx, Select } from "./ui";
 
 export type Sample = { parsed: Parsed; match?: MatchResult | null; original: string };
 
 type Props = {
-  preset: string;
-  template: { movie?: string; episode?: string };
   kind: "movie" | "episode";
+  value: string;
+  onChange: (template: string) => void;
   sample?: Sample;
-  onPreset: (preset: string) => void;
-  onTemplate: (template: { movie?: string; episode?: string }) => void;
+  /** A picker for the formats of this kind; picking one replaces the template. */
+  formats?: { list: NameFormat[]; selected?: string; onSelect: (format: NameFormat) => void; onSaveAs?: () => void };
+  title?: string;
+  /** Built-in formats: shown with their example, not editable. */
+  readOnly?: boolean;
 };
 
 /** Template field with token chips, `{` autocompletion and a live example at the selected file. */
-export function TemplateEditor({ preset, template, kind, sample, onPreset, onTemplate }: Props) {
+export function TemplateEditor({ kind, value, onChange: setValue, sample, formats, title, readOnly }: Props) {
   const localize = useLocalize();
   const area = useRef<HTMLTextAreaElement>(null);
   const [suggest, setSuggest] = useState<{ query: string; at: number } | null>(null);
   const [active, setActive] = useState(0);
-  const presetValue = (PRESETS[preset] ?? PRESETS.jellyfin!)[kind];
-  const value = template[kind] ?? presetValue;
-
-  const setValue = (v: string) => onTemplate({ ...template, [kind]: v === presetValue ? undefined : v });
+  const chosen = formats?.list.find((f) => f.id === formats.selected);
+  // Edited here: no longer the chosen format, until it is saved as one.
+  const changed = Boolean(formats) && chosen?.template !== value;
 
   const example = useMemo(() => {
     if (!sample) return { text: m.template_pickFile(), error: false };
@@ -84,16 +87,27 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
     <section aria-labelledby="fmt-h" className="flex flex-col gap-3 rounded-[14px] border border-line bg-panel p-4">
       <div className="flex items-center gap-2">
         <h2 id="fmt-h" className="m-0 flex-grow text-[15px] font-semibold">
-          {m.template_format()}{" "}
+          {title ?? m.template_format()}{" "}
           <span className="text-xs font-normal text-muted">{kind === "episode" ? m.common_series() : m.common_movies()}</span>
         </h2>
-        <Select aria-label={m.template_preset()} value={preset} onChange={(e) => onPreset(e.target.value)} className="h-8 text-xs">
-          {Object.values(PRESETS).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </Select>
+        {formats && (
+          <Select
+            aria-label={m.template_preset()}
+            value={changed ? "" : (chosen?.id ?? "")}
+            onChange={(e) => {
+              const f = formats.list.find((x) => x.id === e.target.value);
+              if (f) formats.onSelect(f);
+            }}
+            className="h-8 max-w-48 text-xs"
+          >
+            {changed && <option value="">{m.template_custom()}</option>}
+            {formats.list.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
+        )}
       </div>
       <div className="relative">
         <label htmlFor="tpl" className="sr-only">
@@ -104,6 +118,7 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
           ref={area}
           rows={3}
           value={value}
+          readOnly={readOnly}
           spellCheck={false}
           onChange={(e) => onInput(e.target.value, e.target.selectionStart)}
           onKeyDown={onKeyDown}
@@ -142,7 +157,7 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
           </div>
         )}
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className={cx("flex flex-wrap gap-1.5", readOnly && "hidden")}>
         {["n", "y", "t", "s00e00", "vf", "lang", "edition"].map((t) => (
           <button
             key={t}
@@ -158,6 +173,13 @@ export function TemplateEditor({ preset, template, kind, sample, onPreset, onTem
         <div className="text-[11px] text-muted">{m.template_example()}</div>
         <div className={cx("font-mono text-xs leading-normal break-all", example.error && "text-danger")}>{example.text}</div>
       </div>
+      {changed && formats?.onSaveAs && !example.error && (
+        <div>
+          <Button size="sm" onClick={formats.onSaveAs}>
+            {m.template_saveAsFormat()}
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

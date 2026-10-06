@@ -1,16 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { VIDEO_EXTENSIONS } from "@namarr/core";
-import {
-  type Db,
-  getProfile,
-  getSettings,
-  knownSourcePaths,
-  listWatchFolders,
-  resolveTargets,
-  updateWatchFolder,
-  type WatchFolder,
-} from "@namarr/db";
+import { type Db, getSettings, knownSourcePaths, listWatchFolders, resolveTargets, updateWatchFolder, type WatchFolder } from "@namarr/db";
 import { type FSWatcher, watch } from "chokidar";
 import { automaticConfig } from "./automation.server.ts";
 import type { EventBus } from "./events.server.ts";
@@ -128,7 +119,7 @@ export class WatchService {
     clearTimeout(batch.timer);
     const folder = listWatchFolders(this.deps.db).find((f) => f.id === folderId);
     if (!folder) return;
-    const profile = folder.profileId ? getProfile(this.deps.db, folder.profileId) : undefined;
+    const settings = getSettings(this.deps.db);
     // One job per release folder (or per loose file), so folder context stays intact.
     const roots = new Set([...batch.files].map((f) => (path.dirname(f) === folder.path ? f : topFolder(folder.path, f))));
     for (const root of roots) {
@@ -137,10 +128,9 @@ export class WatchService {
           paths: [root],
           kind: "watch",
           watchFolderId: folder.id,
-          profileId: profile?.id ?? null,
-          config: automaticConfig(profile, {
-            // The watch folder's own choice first, then the profile's, then the default library.
-            targets: resolveTargets(getSettings(this.deps.db), folder.targets, profile?.targets),
+          config: automaticConfig(settings, folder, {
+            // The watch folder's own folders first, then the default libraries.
+            targets: resolveTargets(settings, folder.targets),
             autoThreshold: folder.autoThreshold,
           }),
         });
