@@ -205,3 +205,20 @@ test("Formate: eigenes Serien-Format anlegen, als Standard setzen, im Watch-Fold
   await expect(page.getByLabel("Format für Serien")).toContainText("Wie in den Einstellungen (Kurz)");
   await expect(page.getByLabel("Aktion").locator("option")).toHaveText(["Verschieben", "Kopieren"]);
 });
+
+test("Formate: Format einer bestehenden Mediathek erkennen und übernehmen", async ({ page }) => {
+  await page.goto("/formats");
+  await page.getByRole("button", { name: "Aus Mediathek erkennen" }).click();
+  await openFolder(page, "media", "tv", "Dark", "Staffel 01");
+  await page.getByRole("button", { name: "Dark - S01E01 - Geheimnisse.mkv" }).click();
+
+  const result = page.getByRole("status", { name: "Erkanntes Format" });
+  await expect(result.getByText("Erkanntes Format für Serien:")).toBeVisible();
+  await expect(result.getByText("{n}/Staffel {s00}/{n} - {s00e00}{?t} - {t}{/}")).toBeVisible();
+  await expect(result.getByText(/Passt auf 2 von 2 Dateien/)).toBeVisible();
+
+  await result.getByRole("button", { name: "Als Format übernehmen" }).click();
+  await expect(page.getByLabel("Name")).toHaveValue("Wie tv");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByRole("group", { name: "Serien" }).getByRole("link", { name: /Wie tv/ })).toBeVisible();
+});

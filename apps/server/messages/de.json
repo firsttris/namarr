@@ -566,5 +566,20 @@
   "template_saveAsFormat": "Als Format speichern",
   "template_saveAsName": "Name des neuen Formats",
   "watch_formatMovies": "Format für Filme",
-  "watch_formatSeries": "Format für Serien"
+  "watch_formatSeries": "Format für Serien",
+  "formats_infer": "Aus Mediathek erkennen",
+  "formats_inferIntro": "Wähle eine Datei aus deiner bestehenden Mediathek. namarr erkennt, wie sie benannt ist, und prüft das an weiteren Dateien derselben Mediathek.",
+  "formats_inferRunning": "Erkenne Format …",
+  "formats_inferResult": "Erkanntes Format",
+  "formats_inferBuiltin": "Deine Mediathek passt zu: {name} ({kind}).",
+  "formats_inferOwn": "Erkanntes Format für {kind}:",
+  "formats_inferPartly": "Erkanntes Format für {kind}, passt nicht auf alle Dateien:",
+  "formats_inferMatched": "Passt auf {matched} von {total} Dateien in {root}.",
+  "formats_inferOffline": "Ohne Metadaten-Quelle werden Episodentitel nicht erkannt.",
+  "formats_inferChecks": "Geprüfte Dateien",
+  "formats_inferWouldBe": "namarr würde: {path}",
+  "formats_inferUse": "Als Format übernehmen",
+  "formats_inferName": "Wie {folder}",
+  "formats_infer_notAVideo": "Bitte eine Videodatei in einem der Ordner aus den Einstellungen wählen",
+  "formats_infer_unknownKind": "Weder Film noch Episode: aus dem Namen ist das nicht zu erkennen"
 }

@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./formatter": "./src/formatter/index.ts",
+    "./formatter/infer": "./src/formatter/infer.ts",
     "./rules": "./src/rules/index.ts",
     "./parser": "./src/parser/index.ts",
     "./matcher": "./src/matcher/index.ts",

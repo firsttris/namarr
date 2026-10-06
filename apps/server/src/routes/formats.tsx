@@ -2,9 +2,10 @@ import { FORMAT_KINDS, type FormatKind, formatsOf, type NameFormat, newFormatId 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { FolderBrowser } from "~/components/FolderBrowser";
 import { TemplateEditor } from "~/components/TemplateEditor";
 import { Button, Chip, cx, ErrorNote, Field, inputClass, PageHeader, Panel } from "~/components/ui";
-import { getSettingsFn, saveFormats } from "~/functions/library.functions";
+import { getSettingsFn, inferLibraryFormat, saveFormats } from "~/functions/library.functions";
 import { SAMPLE_EPISODE, SAMPLE_MOVIE } from "~/lib/samples";
 import { type Search, searchEnum, searchString } from "~/lib/search";
 import * as m from "~/paraglide/messages";
@@ -34,9 +35,11 @@ function Formats() {
   const selected = search.kind && search.id ? formatsOf(stored, search.kind).find((f) => f.id === search.id) : undefined;
   // An unsaved new format lives only here until it is saved.
   const [draft, setDraft] = useState<NameFormat | null>(null);
+  const [detecting, setDetecting] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: only react to a different selection
   useEffect(() => {
     setDraft(selected ? { ...selected } : null);
+    setDetecting(false);
   }, [search.kind, search.id]);
 
   const store = useMutation({
@@ -75,7 +78,11 @@ function Formats() {
 
   return (
     <>
-      <PageHeader title={m.formats_title()} subtitle={m.formats_subtitle()} />
+      <PageHeader title={m.formats_title()} subtitle={m.formats_subtitle()}>
+        <Button size="lg" onClick={() => setDetecting(true)}>
+          {m.formats_infer()}
+        </Button>
+      </PageHeader>
       <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           {FORMAT_KINDS.map((kind) => (
@@ -104,7 +111,21 @@ function Formats() {
             </Panel>
           ))}
         </div>
-        {draft ? (
+        {detecting ? (
+          <Detect
+            onClose={() => setDetecting(false)}
+            onUse={(kind, template, name) => {
+              setDetecting(false);
+              setDraft({ id: newFormatId(), kind, name, template });
+            }}
+            onDefault={(f) => {
+              setDetecting(false);
+              makeDefault(f);
+            }}
+            isDefault={isDefault}
+            formats={stored}
+          />
+        ) : draft ? (
           <form
             className="flex flex-col gap-4"
             aria-label={draft.name}
@@ -165,5 +186,86 @@ function Formats() {
         )}
       </div>
     </>
+  );
+}
+
+type DetectProps = {
+  formats: Stored;
+  isDefault: (f: NameFormat) => boolean;
+  onUse: (kind: FormatKind, template: string, name: string) => void;
+  onDefault: (f: NameFormat) => void;
+  onClose: () => void;
+};
+
+/** Pick a file of an existing library; namarr works out the format that names it. */
+function Detect({ formats, isDefault, onUse, onDefault, onClose }: DetectProps) {
+  const infer = useMutation({ mutationFn: (path: string) => inferLibraryFormat({ data: { path } }) });
+  const r = infer.data;
+  // Several built-in formats can fit equally: the default among them, else the first.
+  const fitting = r ? formatsOf(formats, r.kind).filter((f) => f.builtin && r.presets.includes(f.id)) : [];
+  const builtin = fitting.find(isDefault) ?? fitting[0];
+  const allFit = r ? r.matched === r.checks.length : false;
+
+  return (
+    <section aria-labelledby="detect-h" className="flex flex-col gap-4">
+      <Panel className="flex flex-col gap-3 p-5">
+        <div className="flex items-center gap-2">
+          <h2 id="detect-h" className="m-0 flex-grow text-[15px] font-semibold">
+            {m.formats_infer()}
+          </h2>
+          <Button size="sm" onClick={onClose}>
+            {m.common_cancel()}
+          </Button>
+        </div>
+        <p className="m-0 text-[13px] text-muted">{m.formats_inferIntro()}</p>
+        <FolderBrowser onChooseFile={(p) => infer.mutate(p)} />
+      </Panel>
+      {infer.isPending && <Panel className="p-5 text-sm text-muted">{m.formats_inferRunning()}</Panel>}
+      <ErrorNote error={infer.error} />
+      {r && !infer.isPending && (
+        <Panel className="flex flex-col gap-3 p-5" role="status" aria-label={m.formats_inferResult()}>
+          <div className="text-sm font-semibold">
+            {builtin
+              ? m.formats_inferBuiltin({ name: fitting.map((f) => f.name).join(", "), kind: kindLabel(r.kind) })
+              : allFit
+                ? m.formats_inferOwn({ kind: kindLabel(r.kind) })
+                : m.formats_inferPartly({ kind: kindLabel(r.kind) })}
+          </div>
+          <code className="rounded-lg bg-panel-2 px-3 py-2.5 font-mono text-xs break-all text-ink">{r.template}</code>
+          <div className="text-[13px] text-muted">
+            {m.formats_inferMatched({ matched: r.matched, total: r.checks.length, root: r.root })}
+            {r.offline && ` ${m.formats_inferOffline()}`}
+          </div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-xs" aria-label={m.formats_inferChecks()}>
+            {r.checks.map((c) => (
+              <li key={c.path} className="flex flex-col gap-0.5">
+                <span className={cx("font-mono break-all", c.ok ? "text-soft" : "text-danger")}>
+                  {c.ok ? "✓" : "✗"} {c.path}
+                </span>
+                {!c.ok && (
+                  <span className="pl-4 font-mono break-all text-muted">{m.formats_inferWouldBe({ path: c.rendered || "–" })}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            {builtin ? (
+              !isDefault(builtin) && (
+                <Button variant="accent" onClick={() => onDefault(builtin)}>
+                  {m.formats_makeDefault({ kind: kindLabel(r.kind) })}
+                </Button>
+              )
+            ) : (
+              <Button
+                variant="accent"
+                onClick={() => onUse(r.kind, r.template, m.formats_inferName({ folder: r.root.split("/").at(-1) || r.root }))}
+              >
+                {m.formats_inferUse()}
+              </Button>
+            )}
+          </div>
+        </Panel>
+      )}
+    </section>
   );
 }
