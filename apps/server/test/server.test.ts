@@ -5,11 +5,12 @@ import * as zlib from "node:zlib";
 import { createWatchFolder, type Db, getSettings, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { localizeIn } from "~/lib/i18n";
 import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue } from "~/server/auth.server";
 import { assertSafeBinding, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
-import { afterExecution, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
+import { afterExecution, checkLibrary, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
 import { seedFolders } from "~/server/runtime.server";
 import { accepts, compressHtml, precompress, staticFiles } from "~/server/static.server";
 import { isCandidate, WatchService } from "~/server/watch.server";
@@ -303,5 +304,49 @@ describe("NAMARR_ROOTS beim ersten Start", () => {
     seedFolders(empty, ["/does/not/exist"], log);
     expect(getSettings(empty).folders).toEqual([]);
     await fs.rm(tmp, { recursive: true, force: true });
+  });
+});
+
+describe("Library-Refresh: Verbindung testen", () => {
+  const json =
+    (body: unknown, status = 200) =>
+    async () =>
+      new Response(JSON.stringify(body), { status });
+  const de = (r: Awaited<ReturnType<typeof checkLibrary>>) => (r.ok ? r : localizeIn(r.reason, "de"));
+
+  it("Jellyfin und Plex: Name und Version, ohne Refresh", async () => {
+    const fetchImpl = vi.fn(json({ ServerName: "Wohnzimmer", Version: "10.10.3" }));
+    expect(await checkLibrary({ kind: "jellyfin", url: "http://jf:8096", token: "t" }, fetchImpl)).toEqual({
+      ok: true,
+      name: "Wohnzimmer",
+      version: "10.10.3",
+    });
+    expect(fetchImpl).toHaveBeenCalledWith("http://jf:8096/System/Info", expect.objectContaining({ method: "GET" }));
+
+    const plex = vi.fn(json({ MediaContainer: { friendlyName: "NAS", version: "1.41.0" } }));
+    expect(await checkLibrary({ kind: "plex", url: "http://plex:32400", token: "p" }, plex)).toEqual({
+      ok: true,
+      name: "NAS",
+      version: "1.41.0",
+    });
+    expect(plex).toHaveBeenCalledWith("http://plex:32400/?X-Plex-Token=p", expect.anything());
+  });
+
+  it("verständliche Fehler", async () => {
+    const target = { kind: "jellyfin" as const, url: "http://jf:8096", token: "t" };
+    expect(de(await checkLibrary(target, json({}, 401)))).toBe("Der Server lehnt den Token ab (HTTP 401)");
+    expect(de(await checkLibrary(target, json({}, 500)))).toBe("Der Server antwortet mit HTTP 500");
+    expect(de(await checkLibrary(target, async () => new Response("<html>")))).toBe(
+      "Der Server antwortet, aber nicht wie ein Jellyfin-Server. Typ und Adresse prüfen.",
+    );
+    const refused = async () => {
+      throw Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } });
+    };
+    expect(de(await checkLibrary(target, refused))).toContain("jf:8096 ist nicht erreichbar (ECONNREFUSED)");
+    const bun = async () => {
+      throw Object.assign(new Error("Unable to connect"), { code: "ConnectionRefused" });
+    };
+    expect(de(await checkLibrary(target, bun))).toContain("(ConnectionRefused)");
+    expect(de(await checkLibrary({ ...target, url: "jf" }, json({})))).toBe("Ungültige URL, z. B. http://jellyfin:8096");
   });
 });

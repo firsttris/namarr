@@ -1,4 +1,4 @@
-import { type Lang, langOf } from "@namarr/core/i18n";
+import { type Lang, langOf, msg } from "@namarr/core/i18n";
 import type { Settings } from "@namarr/db";
 import * as m from "~/paraglide/messages";
 
@@ -66,6 +66,51 @@ export function refreshRequest(target: Settings["libraryRefresh"][number]): { ur
     return { url: String(url), init: { method: "GET" } };
   }
   return { url: String(new URL("/Library/Refresh", target.url)), init: { method: "POST", headers: { "X-Emby-Token": target.token } } };
+}
+
+export type LibraryCheck = { ok: true; name?: string; version?: string } | { ok: false; reason: string };
+
+/**
+ * Tests a library refresh target without refreshing: reads the server info with the token
+ * (Jellyfin/Emby `/System/Info`, Plex `/`), so a wrong URL, a wrong token or the wrong server kind
+ * show up before the first job. `reason` is a message for the UI.
+ */
+export async function checkLibrary(target: Settings["libraryRefresh"][number], fetchImpl: FetchLike = fetch): Promise<LibraryCheck> {
+  const plex = target.kind === "plex";
+  let url: URL;
+  try {
+    url = new URL(plex ? "/" : "/System/Info", target.url);
+  } catch {
+    return { ok: false, reason: msg("settings_refreshCheck_badUrl") };
+  }
+  if (plex) url.searchParams.set("X-Plex-Token", target.token);
+  let res: Response;
+  try {
+    res = await fetchImpl(String(url), {
+      method: "GET",
+      headers: plex ? { accept: "application/json" } : { "X-Emby-Token": target.token, accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (e) {
+    // Bun sets `code` on the error (ConnectionRefused), Node on its cause (ECONNREFUSED).
+    const err = e as Error & { code?: string; cause?: { code?: string } };
+    const detail = err.code ?? err.cause?.code ?? (err.name === "TimeoutError" ? "timeout" : err.message);
+    return { ok: false, reason: msg("settings_refreshCheck_unreachable", { host: url.host, detail }) };
+  }
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: msg("settings_refreshCheck_token", { status: res.status }) };
+  if (!res.ok) return { ok: false, reason: msg("settings_refreshCheck_http", { status: res.status }) };
+  const body = (await res.json().catch(() => undefined)) as
+    | { ServerName?: string; Version?: string; MediaContainer?: { friendlyName?: string; version?: string } }
+    | undefined;
+  const info = plex
+    ? body?.MediaContainer && { name: body.MediaContainer.friendlyName, version: body.MediaContainer.version }
+    : body?.Version && { name: body.ServerName, version: body.Version };
+  if (!info)
+    return {
+      ok: false,
+      reason: msg("settings_refreshCheck_wrongKind", { kind: plex ? "Plex" : target.kind === "emby" ? "Emby" : "Jellyfin" }),
+    };
+  return { ok: true, ...info };
 }
 
 /** Fire-and-forget; failures are logged, never thrown into the job. */

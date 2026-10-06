@@ -53,6 +53,17 @@ const CATALOG: Entry[] = [
   { provider: "tmdb", id: "603", kind: "movie", title: "The Matrix", year: 1999 },
 ];
 
+const IMDB: Record<string, string> = {
+  "95396": "tt11280740",
+  "2316": "tt0386676",
+  "2996": "tt0290978",
+  "70523": "tt5753856",
+  "387": "tt0082096",
+  "693134": "tt15239678",
+  "438631": "tt1160419",
+  "603": "tt0133093",
+};
+
 const words = (s: string) =>
   s
     .toLowerCase()
@@ -87,10 +98,11 @@ export class DemoProvider implements MetadataProvider {
     return found ? this.details(kind, found.id) : undefined;
   }
 
+  /** With the IMDb ID, like TMDB's details (search results come without). */
   async details(_kind: "movie" | "series", id: string) {
     const found = CATALOG.find((e) => e.id === id);
     if (!found) throw new Error(msg("providers_demo_unknownId", { id }));
     const { episodes: _, ...c } = found;
-    return c;
+    return { ...c, ids: { tmdb: c.id, ...(IMDB[c.id] ? { imdb: IMDB[c.id] } : {}) } };
   }
 }

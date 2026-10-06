@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { isInside, resolveInRoots, VIDEO_EXTENSIONS } from "@namarr/core";
 import { type InferResult, type InferSample, inferFormat } from "@namarr/core/formatter/infer";
 import { msg } from "@namarr/core/i18n";
-import { matchAll } from "@namarr/core/matcher";
+import { loadIds, type MatchResult, matchAll } from "@namarr/core/matcher";
 import { parse } from "@namarr/core/parser";
 import type { Parsed } from "@namarr/core/types";
 import { allowedRoots, getSettings } from "@namarr/db";
@@ -88,7 +88,9 @@ export async function libraryFormat(rt: Runtime, file: string): Promise<LibraryF
           provider,
           { language },
         )
-      : new Map();
+      : new Map<string, MatchResult>();
+    // `{imdb}`, `{tvdb}` in the library: the IDs come with the details of each title.
+    if (provider) await loadIds([...matches.values()], provider, { language });
     const samples: InferSample[] = files.map((f, i) => {
       const m = matches.get(String(i));
       return { path: f.rel, input: { parsed: f.parsed, match: m?.best, episodes: m?.episodes, original: path.basename(f.file) } };

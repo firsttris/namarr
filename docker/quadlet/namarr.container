@@ -1,41 +1,41 @@
-# namarr als Podman-Quadlet (systemd).
+# namarr as a Podman Quadlet (systemd).
 #
-# Rootless (empfohlen): nach ~/.config/containers/systemd/namarr.container kopieren.
-# Rootful: nach /etc/containers/systemd/namarr.container kopieren, PUID/PGID unten setzen.
+# Rootless (recommended): copy to ~/.config/containers/systemd/namarr.container.
+# Rootful: copy to /etc/containers/systemd/namarr.container and set PUID/PGID below.
 #
-#   printf 'mein-langes-token' | podman secret create namarr-token -
+#   printf 'my-long-token' | podman secret create namarr-token -
 #   mkdir -p ~/namarr/config
 #   systemctl --user daemon-reload
 #   systemctl --user start namarr
-#   loginctl enable-linger $USER   # rootless: auch ohne Login nach dem Booten starten
+#   loginctl enable-linger $USER   # rootless: start after boot without a login
 
 [Unit]
-Description=namarr – Medien-Matching und Regel-Umbenennung
+Description=namarr – media matching and rule-based renaming
 Wants=network-online.target
 After=network-online.target
 
 [Container]
 ContainerName=namarr
 Image=ghcr.io/firsttris/namarr:latest
-# `podman auto-update` zieht neue Images und startet den Dienst neu.
+# `podman auto-update` pulls new images and restarts the service.
 AutoUpdate=registry
 
 PublishPort=8420:8420
 Secret=namarr-token,type=env,target=NAMARR_TOKEN
 
-# Rootless: Container-root ist schon der eigene Host-Nutzer. Ein PUID würde auf eine
-# subuid gemappt und die Dateien gehörten auf dem Host einer fremden UID. Darum leer lassen.
-# Rootful: stattdessen z. B. PUID=1000 und PGID=1000 setzen.
+# Rootless: container root already is your host user. A PUID would map to a subuid, and the
+# files would belong to a foreign UID on the host. So leave it empty.
+# Rootful: set e.g. PUID=1000 and PGID=1000 instead.
 Environment=PUID=
 
-# %h = Home-Verzeichnis. :Z setzt das SELinux-Label (Fedora/RHEL); ohne SELinux schadet es nicht.
-# Downloads und Library im selben Mount, sonst sind keine Hardlinks möglich.
+# %h = home directory. :Z sets the SELinux label (Fedora/RHEL); harmless without SELinux.
+# One mount for downloads and library, or one per folder (Volume=/mnt/movies:/movies, …).
 Volume=%h/namarr/config:/config:Z
 Volume=/mnt/data:/data:Z
 
 [Service]
 Restart=always
-# Ein laufender Job darf beim Stoppen bis zu 10 s die aktuelle Datei fertig verarbeiten.
+# On stop, a running job gets up to 10 s to finish the current file.
 TimeoutStopSec=30
 
 [Install]

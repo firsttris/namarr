@@ -35,6 +35,7 @@ const ORDER: Record<InferKind, string[]> = {
     "t",
     "n",
     "y",
+    "rating",
     "abs",
     "absolute",
     "s00",
@@ -52,13 +53,30 @@ const ORDER: Record<InferKind, string[]> = {
     "lang",
     "edition",
     "part",
+    "imdb",
+    "tvdb",
+    "tmdb",
     "id",
   ],
-  movie: ["n", "y", "edition", "part", "vf", "vc", "ac", "af", "hdr", "source", "group", "lang", "id"],
+  movie: ["n", "y", "rating", "edition", "part", "vf", "vc", "ac", "af", "hdr", "source", "group", "lang", "imdb", "tmdb", "tvdb", "id"],
 };
 const TEXT_TOKENS = new Set(["n", "t", "edition"]);
+/**
+ * The parser names codecs one way (`DD+`, `H.264`), libraries write them in others (`EAC3`, `x264`).
+ * Each family is one way of writing them, rendered back with `replace` filters. Sources that are
+ * part of another's result come first (`AC3` before `DD+` → `E-AC3`).
+ */
+const SPELLINGS: Record<string, Record<string, string>[]> = {
+  ac: [{ "DD+": "EAC3" }, { AC3: "AC-3", "DD+": "E-AC3" }, { AC3: "DD", "DD+": "DDP" }, { "DTS-HD": "DTS-HD MA" }],
+  vc: [
+    { "H.264": "x264", "H.265": "x265" },
+    { "H.264": "H264", "H.265": "H265" },
+    { "H.264": "h264", "H.265": "h265" },
+    { "H.264": "AVC", "H.265": "HEVC" },
+  ],
+};
 /** Tokens a file may lack: their separator goes into a condition, so files without them still fit. */
-const OPTIONAL = /((?: - |[ ._-]?[[(]|[ ._-])?)\{(t|edition)((?:\|[^}]*)?)\}([\])]?)/g;
+const OPTIONAL = /((?: - |[ ._-]?[[(]|[ ._-])?)\{(t|edition|rating)((?:\|[^}]*)?)\}([\])]?)/g;
 const OPTIONAL_PART = /((?: - |[ ._-])?(?:pt|part|cd|disc)?)\{part\}/gi;
 
 type Candidate = { expr: string; text: string; rank: number; numeric: boolean };
@@ -96,6 +114,16 @@ function candidates(input: FormatInput, kind: InferKind): Candidate[] {
         [`${token}|space:'.'`, dotted],
         [`${token}|lower|space:'.'`, dotted.toLowerCase()],
       );
+    }
+    for (const family of SPELLINGS[token] ?? []) {
+      const spelled = family[value];
+      if (spelled)
+        forms.push([
+          `${token}|${Object.entries(family)
+            .map(([from, to]) => `replace:'${from}':'${to}'`)
+            .join("|")}`,
+          spelled,
+        ]);
     }
     for (const [expr, text] of forms) {
       // The library has the cleaned form ("Mr. Robot - eps1.0" for "Mr. Robot: eps1.0").
@@ -147,6 +175,44 @@ export function deriveTemplate(sample: InferSample, kind: InferKind): string | u
     .replace(OPTIONAL_PART, (_, pre: string) => `{?part}${pre}{part}{/}`);
 }
 
+// A template as parts: a conditional block, a token, an escaped brace, or one literal character.
+const PART = /\{\?[^{}]+\}(?:\\.|\{[^?/][^{}]*\}|[^{\\])*?\{\/\}|\{[^{}]+\}|\\.|[\s\S]/g;
+const tokenName = (part: string) => /^\{([a-z0-9]+)/i.exec(part)?.[1];
+const isToken = (part: string) => part.startsWith("{") && !part.startsWith("{?") && !part.startsWith("{!") && part !== "{/}";
+
+/**
+ * Two derived templates as one: what only one of them has must be a conditional block (a rating
+ * that one file lacks), the same token with filters wins over it without (`EAC3` only shows on
+ * some files). Undefined when they differ otherwise.
+ */
+export function mergeTemplates(a: string, b: string): string | undefined {
+  const x = a.match(PART) ?? [];
+  const y = b.match(PART) ?? [];
+  const same = (p: string, q: string) => p === q || (isToken(p) && isToken(q) && tokenName(p) === tokenName(q));
+  // Longest common subsequence of parts.
+  const lcs = Array.from({ length: x.length + 1 }, () => new Array<number>(y.length + 1).fill(0));
+  for (let i = x.length - 1; i >= 0; i--)
+    for (let j = y.length - 1; j >= 0; j--)
+      lcs[i]![j] = same(x[i]!, y[j]!) ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+  let out = "";
+  let i = 0;
+  let j = 0;
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && same(x[i]!, y[j]!)) {
+      out += x[i]!.length >= y[j]!.length ? x[i] : y[j];
+      i++;
+      j++;
+    } else if (i < x.length && (j >= y.length || lcs[i + 1]![j]! >= lcs[i]![j + 1]!)) {
+      if (!x[i]!.startsWith("{?")) return undefined;
+      out += x[i++];
+    } else {
+      if (!y[j]!.startsWith("{?")) return undefined;
+      out += y[j++];
+    }
+  }
+  return out;
+}
+
 /**
  * The format of a library, from a few of its files. Undefined without samples. `matched` says on
  * how many samples the template reproduces the name exactly.
@@ -157,11 +223,14 @@ export function inferFormat(samples: InferSample[], kind: InferKind): InferResul
   const derived = samples.map((s) => deriveTemplate(s, kind)).filter((t): t is string => Boolean(t));
   const votes = new Map<string, number>();
   for (const t of derived) votes.set(t, (votes.get(t) ?? 0) + 1);
+  // Each file shows only part of the format: fold the others into each derived template.
+  const unique = [...votes.keys()];
+  const merged = unique.map((start) => unique.reduce((acc, t) => mergeTemplates(acc, t) ?? acc, start));
 
   const scored = new Map<string, number>();
   let best: Omit<InferResult, "presets"> | undefined;
   let bestScore: number[] = [];
-  for (const template of new Set([...builtin, ...derived])) {
+  for (const template of new Set([...builtin, ...derived, ...merged])) {
     const checks = checkTemplate(template, samples);
     const matched = checks.filter((c) => c.ok).length;
     scored.set(template, matched);

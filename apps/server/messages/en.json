@@ -581,5 +581,17 @@
   "formats_inferUse": "Use as format",
   "formats_inferName": "Like {folder}",
   "formats_infer_notAVideo": "Pick a video file in one of the folders from the settings",
-  "formats_infer_unknownKind": "Neither a movie nor an episode: the name does not tell"
+  "formats_infer_unknownKind": "Neither a movie nor an episode: the name does not tell",
+  "settings_refreshTest": "Test connection",
+  "settings_refreshChecking": "Testing connection …",
+  "settings_refreshConnected": "✓ Connected to {name} (version {version}). The refresh runs after every job that renamed files.",
+  "settings_refreshCheck_badUrl": "Invalid URL, e.g. http://jellyfin:8096",
+  "settings_refreshCheck_unreachable": "{host} cannot be reached ({detail}). Are address and port right, and can the namarr container reach the server?",
+  "settings_refreshCheck_token": "The server rejects the token (HTTP {status})",
+  "settings_refreshCheck_http": "The server answers with HTTP {status}",
+  "settings_refreshCheck_wrongKind": "The server answers, but not like a {kind} server. Check type and address.",
+  "template_tokens_imdb": "IMDb ID",
+  "template_tokens_tmdb": "TMDB ID",
+  "template_tokens_tvdb": "TVDB ID",
+  "template_tokens_rating": "Rating"
 }

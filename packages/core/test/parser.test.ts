@@ -62,6 +62,8 @@ describe("Parser-Regeln einzeln", () => {
     expect(ctx.out.release).toMatchObject({ audioCodec: "DD+", audioChannels: "5.1" });
     expect(run(audioRule, "a.DTS-HD.MA.7.1").out.release).toMatchObject({ audioCodec: "DTS-HD", audioChannels: "7.1" });
     expect(run(audioRule, "a.AAC2.0").out.release).toMatchObject({ audioCodec: "AAC", audioChannels: "2.0" });
+    // Old SD rips: "[360p, MP3]".
+    expect(run(audioRule, "Castle S01E01 - [360p, MP3]").out.release).toMatchObject({ audioCodec: "MP3" });
   });
 
   it("edition nur im Release-Kontext", () => {

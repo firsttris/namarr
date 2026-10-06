@@ -45,7 +45,7 @@ describe("Format aus einer Mediathek erkennen", () => {
     expect(deriveTemplate(movie("The Matrix (1999)/the.matrix.1999.mkv"), "movie")).toBe("{n} ({y})/{n|lower|space:'.'}.{y}");
     const withId = movie("The Matrix (1999) {tmdb-603}/The Matrix (1999).mkv");
     const result = inferFormat([withId], "movie")!;
-    expect(result.template).toBe("{n} ({y}) \\{tmdb-{id}\\}/{n} ({y})");
+    expect(result.template).toBe("{n} ({y}) \\{tmdb-{tmdb}\\}/{n} ({y})");
     expect(result.matched).toBe(1);
   });
 
@@ -80,6 +80,51 @@ describe("Format aus einer Mediathek erkennen", () => {
     )!;
     expect(result.matched).toBe(2);
     expect(result.checks.filter((c) => !c.ok).map((c) => c.path)).toEqual(["Severance (2022)/Extras/making of.mkv"]);
+  });
+
+  it("IMDb-ID, Bewertung und Codec-Schreibweisen (Jahres-Ordner wie bei Radarr-Nutzern)", () => {
+    const film = (title: string, year: number, imdb: string, rating: number | undefined, rest: string) => {
+      const name = `${title} (${year}) [imdbid-${imdb}]${rating ? ` ${rating.toFixed(1)}` : ""}`;
+      return movie(`${year}/${name}/${name} - ${rest}`, { provider: "tmdb", id: "1", kind: "movie", title, year, rating, ids: { imdb } });
+    };
+    const samples = [
+      film("Minions & Monster", 2026, "tt32890033", undefined, "[2160p, EAC3].mkv"),
+      film("Scarface - Narbengesicht", 1932, "tt0023427", 7.5, "[480p, AC3].mkv"),
+      film("1984", 1956, "tt0048918", 6.6, "[480p, AC3].mp4"),
+      film("Krieg der Sterne", 1977, "tt0076759", 8.2, "[1080p, AC3].mkv"),
+    ];
+    expect(samples[0]!.input.parsed.release.audioCodec).toBe("DD+");
+    const result = inferFormat(samples, "movie")!;
+    expect(result.template).toBe(
+      "{y}/{n} ({y}) [imdbid-{imdb}]{?rating} {rating}{/}/{n} ({y}) [imdbid-{imdb}]{?rating} {rating}{/} - [{vf}, {ac|replace:'DD+':'EAC3'}]",
+    );
+    expect(result.matched).toBe(4);
+  });
+
+  it("Serien mit TVDB-ID im Ordner (Sonarr), MP3 und EAC3 gemischt", () => {
+    const show = (title: string, year: number, tvdb: string, ep: string, epTitle: string, rest: string) => {
+      const p = `${title} (${year}) [tvdbid-${tvdb}]/Season 1/${title} ${ep} ${epTitle} - ${rest}`;
+      const parsed = parse(p);
+      return {
+        path: p,
+        input: {
+          parsed,
+          match: { provider: "tvdb", id: tvdb, kind: "series" as const, title, year },
+          episodes: [{ season: 1, episode: 1, title: epTitle }],
+          original: p.split("/").at(-1)!,
+        },
+      };
+    };
+    const result = inferFormat(
+      [
+        show("Better Call Saul", 2015, "273181", "S01E01", "Anfänge", "[480p, AAC].mkv"),
+        show("Castle", 2009, "83462", "S01E01", "Blumen für Dein Grab", "[360p, MP3].avi"),
+        show("A Knight of the Seven Kingdoms", 2026, "433631", "S01E01", "Der Heckenritter", "[720p, EAC3].mkv"),
+      ],
+      "episode",
+    )!;
+    expect(result.template).toBe("{n} ({y}) [tvdbid-{tvdb}]/Season {s}/{n} {s00e00}{?t} {t}{/} - [{vf}, {ac|replace:'DD+':'EAC3'}]");
+    expect(result.matched).toBe(3);
   });
 
   it("ohne Proben nichts", () => {

@@ -67,7 +67,9 @@ unknown).
 
 ## After a job
 
-- **Library refresh** for Jellyfin, Emby and Plex, so new episodes show up right away.
+- **Library refresh** for Jellyfin, Emby and Plex, so new episodes show up right away. *Test
+  connection* next to each server checks address, token and server type without refreshing, and
+  shows the server's name and version.
 - **Notifications** via ntfy, Gotify, Telegram, Discord or a webhook, in the language set for titles.
 
 Both are set up under *Settings*.

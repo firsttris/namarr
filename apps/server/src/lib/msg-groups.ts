@@ -102,6 +102,10 @@ export const msgGroup = {
   },
   template_tokens: {
     n: m.template_tokens_n,
+    imdb: m.template_tokens_imdb,
+    tmdb: m.template_tokens_tmdb,
+    tvdb: m.template_tokens_tvdb,
+    rating: m.template_tokens_rating,
     y: m.template_tokens_y,
     t: m.template_tokens_t,
     s00e00: m.template_tokens_s00e00,

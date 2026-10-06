@@ -19,13 +19,25 @@ export type TmdbOptions = {
 const IMAGE_BASE = "https://image.tmdb.org/t/p/w185";
 const yearOf = (date?: string | null) => (date && /^\d{4}/.test(date) ? Number(date.slice(0, 4)) : undefined);
 
-type TmdbMovie = { id: number; title: string; original_title?: string; release_date?: string; poster_path?: string | null };
+type TmdbExternalIds = { imdb_id?: string | null; tvdb_id?: number | null };
+type TmdbMovie = {
+  id: number;
+  title: string;
+  original_title?: string;
+  release_date?: string;
+  poster_path?: string | null;
+  vote_average?: number;
+  imdb_id?: string | null;
+  external_ids?: TmdbExternalIds;
+};
 type TmdbTv = {
   id: number;
   name: string;
   original_name?: string;
   first_air_date?: string;
   poster_path?: string | null;
+  vote_average?: number;
+  external_ids?: TmdbExternalIds;
   number_of_episodes?: number;
   original_language?: string;
   seasons?: { season_number: number; episode_count: number }[];
@@ -111,6 +123,7 @@ export class TmdbProvider implements MetadataProvider {
       originalTitle: m.original_title && m.original_title !== m.title ? m.original_title : undefined,
       year: yearOf(m.release_date),
       poster: m.poster_path ? IMAGE_BASE + m.poster_path : undefined,
+      rating: m.vote_average || undefined,
     };
   }
 
@@ -124,6 +137,7 @@ export class TmdbProvider implements MetadataProvider {
       year: yearOf(t.first_air_date),
       poster: t.poster_path ? IMAGE_BASE + t.poster_path : undefined,
       episodeCount: t.number_of_episodes,
+      rating: t.vote_average || undefined,
     };
   }
 
@@ -146,10 +160,23 @@ export class TmdbProvider implements MetadataProvider {
     return res.results.slice(0, 10).map((t) => this.tv(t));
   }
 
+  /** With the IDs in other databases (`external_ids`), for `{imdb}` and `{tvdb}`. */
   async details(kind: "movie" | "series", id: string, opts?: { language?: string }) {
-    const language = this.language(opts);
-    if (kind === "movie") return this.movie(await this.get<TmdbMovie>(`/movie/${id}`, { language }, this.ttl.details));
-    return this.tv(await this.get<TmdbTv>(`/tv/${id}`, { language }, this.ttl.details));
+    const params = { language: this.language(opts), append_to_response: "external_ids" };
+    const withIds = (c: MediaCandidate, external?: TmdbExternalIds, imdb?: string | null): MediaCandidate => ({
+      ...c,
+      ids: {
+        tmdb: c.id,
+        ...((imdb ?? external?.imdb_id) ? { imdb: (imdb ?? external?.imdb_id)! } : {}),
+        ...(external?.tvdb_id ? { tvdb: String(external.tvdb_id) } : {}),
+      },
+    });
+    if (kind === "movie") {
+      const m = await this.get<TmdbMovie>(`/movie/${id}`, params, this.ttl.details);
+      return withIds(this.movie(m), m.external_ids, m.imdb_id);
+    }
+    const t = await this.get<TmdbTv>(`/tv/${id}`, params, this.ttl.details);
+    return withIds(this.tv(t), t.external_ids);
   }
 
   /** TMDB's own ID, else TVDB or IMDb IDs through `/find`. */

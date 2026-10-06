@@ -50,6 +50,13 @@ export type MediaCandidate = {
   episodeCount?: number;
   /** Every season is an entry of its own (AniDB): S02E05 is episode 5 of the season-2 entry. */
   seasonsAsEntries?: boolean;
+  /** Average user rating, 0–10. */
+  rating?: number;
+  /**
+   * IDs in other databases, for `{imdb}`, `{tmdb}`, `{tvdb}`. Set by `details()`; search results
+   * leave it out, so a missing object means "not looked up yet".
+   */
+  ids?: ExternalIds;
 };
 
 export type EpisodeInfo = {

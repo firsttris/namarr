@@ -5,8 +5,8 @@ import { useState } from "react";
 import { FolderList } from "~/components/FolderList";
 import { XIcon } from "~/components/icons";
 import { Button, cx, ErrorNote, Field, inputClass, PageHeader, Panel, Select } from "~/components/ui";
-import { getSettingsFn, saveSettings } from "~/functions/library.functions";
-import { LANGS, type Lang, pickMsg, useLang } from "~/lib/i18n";
+import { getSettingsFn, saveSettings, testLibraryRefresh } from "~/functions/library.functions";
+import { LANGS, type Lang, pickMsg, useLang, useLocalize } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
 import { MOVIE_SOURCES, SERIES_SOURCES } from "~/lib/providers";
 import * as m from "~/paraglide/messages";
@@ -32,6 +32,18 @@ function SettingsPage() {
   const [folders, setFolders] = useState<LibraryFolder[]>(initial.folders);
   const [notifications, setNotifications] = useState<Settings["notifications"]>(initial.notifications);
   const [refresh, setRefresh] = useState<Settings["libraryRefresh"]>(initial.libraryRefresh);
+  const localize = useLocalize();
+  // Connection test per server row; an edit of the row clears its result.
+  const [checks, setChecks] = useState<Record<number, Awaited<ReturnType<typeof testLibraryRefresh>> | "pending">>({});
+  const editRefresh = (i: number, patch: Partial<Settings["libraryRefresh"][number]>) => {
+    setRefresh(refresh.map((x, k) => (k === i ? { ...x, ...patch } : x)));
+    setChecks(({ [i]: _, ...rest }) => rest);
+  };
+  const testRefresh = async (i: number) => {
+    setChecks((c) => ({ ...c, [i]: "pending" }));
+    const result = await testLibraryRefresh({ data: refresh[i]! }).catch((e: Error) => ({ ok: false as const, reason: e.message }));
+    setChecks((c) => ({ ...c, [i]: result }));
+  };
 
   // A chosen source without credentials only fails at the next job: say so here already.
   const configured: Record<SeriesProvider, boolean> = {
@@ -202,34 +214,57 @@ function SettingsPage() {
         <Panel className="flex flex-col gap-3 p-5">
           <h2 className="m-0 text-base font-semibold">{m.settings_refresh()}</h2>
           {refresh.map((r, i) => (
-            <div key={i} className="flex gap-2">
-              <Select
-                aria-label={m.settings_server()}
-                value={r.kind}
-                onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, kind: e.target.value as "plex" } : x)))}
-              >
-                <option value="jellyfin">Jellyfin</option>
-                <option value="emby">Emby</option>
-                <option value="plex">Plex</option>
-              </Select>
-              <input
-                aria-label={m.settings_url()}
-                className={cx(inputClass, "flex-grow")}
-                placeholder="http://jellyfin:8096"
-                value={r.url}
-                onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, url: e.target.value } : x)))}
-              />
-              <input
-                aria-label={m.common_token()}
-                type="password"
-                className={inputClass}
-                placeholder={m.settings_apiToken()}
-                value={r.token}
-                onChange={(e) => setRefresh(refresh.map((x, k) => (k === i ? { ...x, token: e.target.value } : x)))}
-              />
-              <Button aria-label={m.common_remove()} onClick={() => setRefresh(refresh.filter((_, k) => k !== i))}>
-                <XIcon />
-              </Button>
+            <div key={i} className="flex flex-col gap-1.5">
+              <div className="flex gap-2">
+                <Select
+                  aria-label={m.settings_server()}
+                  value={r.kind}
+                  onChange={(e) => editRefresh(i, { kind: e.target.value as "plex" })}
+                >
+                  <option value="jellyfin">Jellyfin</option>
+                  <option value="emby">Emby</option>
+                  <option value="plex">Plex</option>
+                </Select>
+                <input
+                  aria-label={m.settings_url()}
+                  className={cx(inputClass, "flex-grow")}
+                  placeholder="http://jellyfin:8096"
+                  value={r.url}
+                  onChange={(e) => editRefresh(i, { url: e.target.value })}
+                />
+                <input
+                  aria-label={m.common_token()}
+                  type="password"
+                  className={inputClass}
+                  placeholder={m.settings_apiToken()}
+                  value={r.token}
+                  onChange={(e) => editRefresh(i, { token: e.target.value })}
+                />
+                <Button onClick={() => testRefresh(i)} disabled={!r.url.trim() || checks[i] === "pending"}>
+                  {m.settings_refreshTest()}
+                </Button>
+                <Button
+                  aria-label={m.common_remove()}
+                  onClick={() => {
+                    setRefresh(refresh.filter((_, k) => k !== i));
+                    setChecks({});
+                  }}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+              {checks[i] && (
+                <div
+                  role="status"
+                  className={cx("text-[13px]", checks[i] === "pending" ? "text-muted" : checks[i].ok ? "text-info" : "text-danger")}
+                >
+                  {checks[i] === "pending"
+                    ? m.settings_refreshChecking()
+                    : checks[i].ok
+                      ? m.settings_refreshConnected({ name: checks[i].name ?? r.kind, version: checks[i].version ?? "?" })
+                      : localize(checks[i].reason)}
+                </div>
+              )}
             </div>
           ))}
           <div>

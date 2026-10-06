@@ -8,5 +8,5 @@ services:
       NAMARR_TOKEN: change-me
     volumes:
       - ./config:/config
-      - /mnt/data:/data # Downloads und Library im selben Mount, sonst keine Hardlinks
+      - /mnt/data:/data # downloads and library; separate mounts work too (see docs/installation.md)
     restart: unless-stopped

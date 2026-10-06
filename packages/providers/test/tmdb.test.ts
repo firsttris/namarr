@@ -29,6 +29,7 @@ const routes = {
   "/3/tv/95396/episode_groups": "tv_95396_episode_groups",
   "/3/tv/episode_group/grp-dvd": "episode_group_grp-dvd",
   "/3/tv/95396": "tv_95396",
+  "/3/movie/603?append_to_response=external_ids": "movie_603",
   "/3/find/371980?external_source=tvdb_id&language=de-DE": "find_tvdb_371980",
   "/3/search/movie?include_adult=false&language=de-DE&query=Dune": "search_movie_dune",
   "/3/search/movie?include_adult=false&language=de-DE&query=Das": "search_movie_das_boot",
@@ -60,6 +61,17 @@ describe("TMDB-Provider", () => {
       year: 2022,
       poster: "https://image.tmdb.org/t/p/w185/pPHpeI2X1qEd1CS1SeyrdhZ4qnT.jpg",
       episodeCount: undefined,
+      rating: 8.4,
+    });
+  });
+
+  it("Details mit IMDb-ID und Bewertung, für {imdb} und {rating}", async () => {
+    const { tmdb } = provider();
+    expect(await tmdb.details("movie", "603")).toMatchObject({
+      id: "603",
+      title: "Matrix",
+      rating: 8.219,
+      ids: { tmdb: "603", imdb: "tt0133093" },
     });
   });
 

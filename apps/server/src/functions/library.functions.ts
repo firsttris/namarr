@@ -28,6 +28,7 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { libraryFormat } from "~/server/infer.server";
+import { checkLibrary } from "~/server/notify.server";
 import { authed } from "./middleware";
 
 const id = z.number().int().positive();
@@ -217,6 +218,12 @@ export const removeWatchFolder = createServerFn({ method: "POST" })
   });
 
 // ---------- settings ----------
+
+/** Tests a library refresh target as entered (not saved yet), without refreshing it. */
+export const testLibraryRefresh = createServerFn({ method: "POST" })
+  .middleware([authed])
+  .validator(z.object({ kind: z.enum(["jellyfin", "plex", "emby"]), url: z.string().max(2000), token: z.string().max(500) }))
+  .handler(async ({ data }) => checkLibrary(data));
 
 const mask = (key?: string) => (key ? `${key.slice(0, 4)}…${key.slice(-4)}` : undefined);
 
