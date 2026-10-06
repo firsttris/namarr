@@ -72,6 +72,17 @@ function Dashboard() {
           </Button>
         </Link>
       </PageHeader>
+      {data.noFolders && (
+        <Panel role="status" className="flex flex-wrap items-center gap-4 border-accent/40 p-5">
+          <div className="flex min-w-0 flex-grow flex-col gap-1">
+            <div className="text-sm font-semibold">{m.dashboard_noFoldersTitle()}</div>
+            <div className="text-[13px] text-muted">{m.dashboard_noFoldersText()}</div>
+          </div>
+          <Link to="/settings" className="no-underline">
+            <Button variant="accent">{m.dashboard_noFoldersAction()}</Button>
+          </Link>
+        </Panel>
+      )}
 
       <section aria-label={m.dashboard_stats()} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Stat label={m.dashboard_renamedToday()} value={n(stats.renamedToday)} unit={m.dashboard_files()} />

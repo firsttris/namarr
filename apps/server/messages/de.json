@@ -357,8 +357,8 @@
   "folders_choose": "Diesen Ordner wählen",
   "folders_add": "Hinzufügen",
   "folders_roots": "Ordner",
-  "folders_noRoots": "Noch keine Ordner freigegeben.",
-  "folders_setRoots": "In den Einstellungen festlegen",
+  "folders_noRoots": "Noch keine Ordner eingerichtet.",
+  "folders_setRoots": "In den Einstellungen anlegen",
   "folders_up": "Eine Ebene hoch",
   "folders_contents": "Ordnerinhalt",
   "folders_empty": "Leer.",
@@ -556,5 +556,8 @@
   "jobs_reason_noSeriesLibrary": "Kein Standard-Ziel für Serien: bleibt im Quellordner",
   "folders_pathOf": "Pfad: {field}",
   "nav_version": "namarr v{version}",
-  "nav_releaseNotes": "Was ist neu in dieser Version"
+  "nav_releaseNotes": "Was ist neu in dieser Version",
+  "dashboard_noFoldersTitle": "Noch keine Ordner eingerichtet",
+  "dashboard_noFoldersText": "Lege in den Einstellungen fest, wo namarr Dateien findet (z. B. deine Downloads) und wohin Filme und Serien gehen.",
+  "dashboard_noFoldersAction": "Ordner einrichten"
 }

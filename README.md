@@ -84,8 +84,9 @@ curl -o compose.yml https://raw.githubusercontent.com/firsttris/namarr/main/dock
 docker compose up -d
 ```
 
-Open **http://localhost:8420**, sign in with your token and add a TMDB API key under *Settings*, or
-set up one of the [other sources](docs/metadata.md).
+Open **http://localhost:8420**, sign in with your token, then under *Settings* add your
+[folders](docs/installation.md#folders-and-libraries) (`/data`, or your download, movie and series
+mounts) and a TMDB API key, or set up one of the [other sources](docs/metadata.md).
 
 <details>
 <summary><b>docker run</b></summary>

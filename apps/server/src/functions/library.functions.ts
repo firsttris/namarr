@@ -51,6 +51,8 @@ export const getDashboard = createServerFn({ method: "GET" })
         inboxCount: inbox.filter((i) => i.item.sourcePath.startsWith(f.path + path.sep)).length,
       })),
       jobs,
+      /** No folders yet: namarr can neither find files nor put them anywhere. */
+      noFolders: !getSettings(rt.db).folders.length,
       server: { host: `${rt.env.host}:${rt.env.port}`, demo: rt.env.demo },
     };
   });

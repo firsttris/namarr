@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as zlib from "node:zlib";
-import { createProfile, createWatchFolder, type Db, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
+import { createProfile, createWatchFolder, type Db, getSettings, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue } from "~/server/auth.server";
@@ -10,6 +10,7 @@ import { assertSafeBinding, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
 import { afterExecution, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
+import { seedFolders } from "~/server/runtime.server";
 import { accepts, compressHtml, precompress, staticFiles } from "~/server/static.server";
 import { isCandidate, WatchService } from "~/server/watch.server";
 
@@ -273,4 +274,26 @@ describe("Watch-Folder", () => {
     });
     expect(detected.sort()).toEqual(["severance.s02e01.mkv", "severance.s02e02.mkv"]);
   }, 15_000);
+});
+
+describe("NAMARR_ROOTS beim ersten Start", () => {
+  it("übernimmt nur vorhandene Ordner, nur solange keine eingerichtet sind", async () => {
+    const tmp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "namarr-seed-")));
+    const db = openDatabase(":memory:");
+    const log = { warn: vi.fn() };
+    seedFolders(db, [tmp, "/does/not/exist"], log);
+    expect(getSettings(db).folders).toEqual([{ path: tmp, name: path.basename(tmp), kind: "folder" }]);
+    expect(log.warn).toHaveBeenCalledWith({ missing: ["/does/not/exist"] }, expect.any(String));
+
+    // Folders set up in the settings are never touched again.
+    setSettings(db, { folders: [{ path: "/movies", name: "Filme", kind: "movies", default: true }] });
+    seedFolders(db, [tmp], log);
+    expect(getSettings(db).folders).toEqual([{ path: "/movies", name: "Filme", kind: "movies", default: true }]);
+
+    // Nothing that exists: nothing set up, the dashboard asks for folders.
+    const empty = openDatabase(":memory:");
+    seedFolders(empty, ["/does/not/exist"], log);
+    expect(getSettings(empty).folders).toEqual([]);
+    await fs.rm(tmp, { recursive: true, force: true });
+  });
 });

@@ -26,7 +26,6 @@ ENV NODE_ENV=production \
     NAMARR_HOST=0.0.0.0 \
     NAMARR_PORT=8420 \
     NAMARR_CONFIG_DIR=/config \
-    NAMARR_ROOTS=/data \
     PUID=1000 \
     PGID=1000
 

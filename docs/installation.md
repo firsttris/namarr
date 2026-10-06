@@ -26,9 +26,12 @@ services:
 ```
 
 The same file is in [`docker/compose.example.yml`](../docker/compose.example.yml). Then open
-`http://<host>:8420`, sign in with the token and add your own TMDB API key under **Settings**
-(themoviedb.org → Settings → API; a v3 key or a v4 token), or set up one of the
-[other metadata sources](metadata.md).
+`http://<host>:8420`, sign in with the token and, under **Settings**:
+
+1. add your [folders](#folders-and-libraries): `/data` from the example, or your own mounts, each
+   picked with *Browse …*; until then the dashboard asks for them;
+2. add your own TMDB API key (themoviedb.org → Settings → API; a v3 key or a v4 token), or set up
+   one of the [other metadata sources](metadata.md).
 
 ## Podman Quadlet
 
@@ -110,7 +113,7 @@ target becomes the default library for movies and series.
 |---|---|---|
 | `NAMARR_TOKEN` | – | Access token for the UI (login) and the API (`Authorization: Bearer …` or Basic auth). **Required** as soon as namarr listens on more than `127.0.0.1`, so always in the Docker image. |
 | `NAMARR_AUTH_HEADER` | – | Alternative: a header set by a trusted reverse proxy, e.g. `Remote-User`. |
-| `NAMARR_ROOTS` | `/data` (Docker) | The first folders, comma-separated, on the very first start. Afterwards the folders are managed under *Settings → Folders* (see [below](#folders-and-libraries)). |
+| `NAMARR_ROOTS` | – | Optional: folders to set up on the very first start, comma-separated, e.g. `/downloads,/movies`; only those that exist. Afterwards the folders are managed under *Settings → Folders* (see [below](#folders-and-libraries)). |
 | `NAMARR_CONFIG_DIR` | `/config` (Docker), `./config` | SQLite database (WAL). |
 | `NAMARR_HOST` / `NAMARR_PORT` | `127.0.0.1` / `8420` | Outside Docker only reachable locally by default. |
 | `PUID` / `PGID` | `1000` | The server starts as root, hands `/config` over and then runs as this user. |

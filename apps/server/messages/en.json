@@ -358,7 +358,7 @@
   "folders_add": "Add",
   "folders_roots": "Folders",
   "folders_noRoots": "No folders set up yet.",
-  "folders_setRoots": "Set them in the settings",
+  "folders_setRoots": "Add them in the settings",
   "folders_up": "Up one level",
   "folders_contents": "Folder contents",
   "folders_empty": "Empty.",
@@ -556,5 +556,8 @@
   "jobs_reason_noSeriesLibrary": "No default target for series: stays in the source folder",
   "folders_pathOf": "Path: {field}",
   "nav_version": "namarr v{version}",
-  "nav_releaseNotes": "What's new in this version"
+  "nav_releaseNotes": "What's new in this version",
+  "dashboard_noFoldersTitle": "No folders set up yet",
+  "dashboard_noFoldersText": "Tell namarr in the settings where to find files (your downloads, say) and where movies and series go.",
+  "dashboard_noFoldersAction": "Set up folders"
 }
