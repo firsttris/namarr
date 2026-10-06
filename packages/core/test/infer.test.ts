@@ -101,6 +101,32 @@ describe("Format aus einer Mediathek erkennen", () => {
     expect(result.matched).toBe(4);
   });
 
+  it("Serien mit TVDB-ID im Ordner (Sonarr), MP3 und EAC3 gemischt", () => {
+    const show = (title: string, year: number, tvdb: string, ep: string, epTitle: string, rest: string) => {
+      const p = `${title} (${year}) [tvdbid-${tvdb}]/Season 1/${title} ${ep} ${epTitle} - ${rest}`;
+      const parsed = parse(p);
+      return {
+        path: p,
+        input: {
+          parsed,
+          match: { provider: "tvdb", id: tvdb, kind: "series" as const, title, year },
+          episodes: [{ season: 1, episode: 1, title: epTitle }],
+          original: p.split("/").at(-1)!,
+        },
+      };
+    };
+    const result = inferFormat(
+      [
+        show("Better Call Saul", 2015, "273181", "S01E01", "Anfänge", "[480p, AAC].mkv"),
+        show("Castle", 2009, "83462", "S01E01", "Blumen für Dein Grab", "[360p, MP3].avi"),
+        show("A Knight of the Seven Kingdoms", 2026, "433631", "S01E01", "Der Heckenritter", "[720p, EAC3].mkv"),
+      ],
+      "episode",
+    )!;
+    expect(result.template).toBe("{n} ({y}) [tvdbid-{tvdb}]/Season {s}/{n} {s00e00}{?t} {t}{/} - [{vf}, {ac|replace:'DD+':'EAC3'}]");
+    expect(result.matched).toBe(3);
+  });
+
   it("ohne Proben nichts", () => {
     expect(inferFormat([], "movie")).toBeUndefined();
   });

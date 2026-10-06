@@ -164,6 +164,7 @@ const AUDIO: [string, string][] = [
   ["aac", "AAC"],
   ["flac", "FLAC"],
   ["opus", "Opus"],
+  ["mp3", "MP3"],
 ];
 
 export const audioRule: ParserRule = {
