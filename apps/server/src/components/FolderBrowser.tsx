@@ -8,14 +8,17 @@ import { Button, cx, ErrorNote } from "./ui";
 
 type Props = {
   initial?: string;
-  onChoose: (path: string) => void;
+  /** Choose the current folder; without it only files can be chosen (`onChooseFile`). */
+  onChoose?: (path: string) => void;
   chooseLabel?: string;
   /** "all": the whole file system, folders only (for choosing the allowed folders themselves). */
   scope?: "allowed" | "all";
+  /** Video files can be chosen too. */
+  onChooseFile?: (path: string) => void;
 };
 
 /** Server-side folder browser, limited to the allowed folders unless `scope` is "all". */
-export function FolderBrowser({ initial, onChoose, chooseLabel, scope = "allowed" }: Props) {
+export function FolderBrowser({ initial, onChoose, chooseLabel, scope = "allowed", onChooseFile }: Props) {
   const [path, setPath] = useState<string | undefined>(initial);
   const q = useQuery({
     queryKey: ["browse", scope, path ?? ""],
@@ -54,9 +57,11 @@ export function FolderBrowser({ initial, onChoose, chooseLabel, scope = "allowed
         <Button size="sm" onClick={() => setPath(data?.parent ?? undefined)} disabled={!data}>
           {data?.parent ? m.folders_up() : m.folders_roots()}
         </Button>
-        <Button size="sm" variant="accent" onClick={() => data?.path && onChoose(data.path)} disabled={!data?.path}>
-          {chooseLabel ?? m.folders_choose()}
-        </Button>
+        {onChoose && (
+          <Button size="sm" variant="accent" onClick={() => data?.path && onChoose(data.path)} disabled={!data?.path}>
+            {chooseLabel ?? m.folders_choose()}
+          </Button>
+        )}
       </div>
       <ErrorNote error={q.error} />
       <ul className="m-0 flex max-h-[420px] list-none flex-col overflow-auto p-0" aria-label={m.folders_contents()}>
@@ -64,8 +69,12 @@ export function FolderBrowser({ initial, onChoose, chooseLabel, scope = "allowed
         {data?.entries.map((e) => (
           <li key={e.path}>
             {e.dir ? (
-              <button type="button" onClick={() => setPath(e.path)} onDoubleClick={() => onChoose(e.path)} className={rowClass}>
+              <button type="button" onClick={() => setPath(e.path)} onDoubleClick={() => onChoose?.(e.path)} className={rowClass}>
                 <FolderIcon /> {e.name}
+              </button>
+            ) : onChooseFile && e.video ? (
+              <button type="button" onClick={() => onChooseFile(e.path)} className={rowClass}>
+                <FileIcon /> {e.name}
               </button>
             ) : (
               <div className={cx(rowClass, "cursor-default", !e.video && "text-faint")}>

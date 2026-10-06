@@ -103,6 +103,15 @@ A format is a named template for movies or for series. Under **Formats** (`/form
 - One **default** per kind (Jellyfin unless you choose another). New jobs, watch folders and the
   download client hook use it unless they pick another format.
 
+**Detect from library**: pick one file of a library you already have, say
+`/tvshows/Dark/Staffel 01/Dark - S01E01 - Geheimnisse.mkv`. namarr matches it like any other file,
+puts the tokens back where the values are (`{n}/Staffel {s00}/{n} - {s00e00}{?t} - {t}{/}`) and
+checks the result against up to a dozen more files of the same library, spread over its series or
+movies. It says which built-in formats fit, or offers the detected one as a new format, and lists
+every file it does not fit with the name namarr would write instead. Episode titles are compared in
+the language of the settings and in English. Without a metadata source only what the names say
+counts (no episode titles).
+
 In the workbench, the select above the template switches the format of the selected file's kind.
 Editing the template there changes only this job; *Save as format* keeps it for later. A format a
 watch folder still uses cannot be deleted.

@@ -21,6 +21,11 @@ export default function setup() {
     fs.writeFileSync(path.join(tv, f), `fake ${f}`);
   }
   fs.mkdirSync(path.join(root, "data/media/tv"), { recursive: true });
+  // An existing library in a format of its own, for detecting formats.
+  for (const f of ["Dark - S01E01 - Geheimnisse.mkv", "Dark - S01E02 - Lügen.mkv"]) {
+    fs.mkdirSync(path.join(root, "data/media/tv/Dark/Staffel 01"), { recursive: true });
+    fs.writeFileSync(path.join(root, "data/media/tv/Dark/Staffel 01", f), "dark");
+  }
   fs.mkdirSync(path.join(root, "data/media/movies"), { recursive: true });
   const photos = path.join(root, "data/photos");
   fs.mkdirSync(photos, { recursive: true });

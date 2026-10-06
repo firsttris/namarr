@@ -566,5 +566,20 @@
   "template_saveAsFormat": "Save as format",
   "template_saveAsName": "Name of the new format",
   "watch_formatMovies": "Format for movies",
-  "watch_formatSeries": "Format for series"
+  "watch_formatSeries": "Format for series",
+  "formats_infer": "Detect from library",
+  "formats_inferIntro": "Pick a file of your existing library. namarr works out how it is named and checks that against more files of the same library.",
+  "formats_inferRunning": "Detecting format …",
+  "formats_inferResult": "Detected format",
+  "formats_inferBuiltin": "Your library fits: {name} ({kind}).",
+  "formats_inferOwn": "Detected format for {kind}:",
+  "formats_inferPartly": "Detected format for {kind}, does not fit every file:",
+  "formats_inferMatched": "Fits {matched} of {total} files in {root}.",
+  "formats_inferOffline": "Without a metadata source, episode titles are not recognized.",
+  "formats_inferChecks": "Checked files",
+  "formats_inferWouldBe": "namarr would write: {path}",
+  "formats_inferUse": "Use as format",
+  "formats_inferName": "Like {folder}",
+  "formats_infer_notAVideo": "Pick a video file in one of the folders from the settings",
+  "formats_infer_unknownKind": "Neither a movie nor an episode: the name does not tell"
 }

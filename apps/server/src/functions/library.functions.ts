@@ -27,6 +27,7 @@ import {
 } from "@namarr/db";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { libraryFormat } from "~/server/infer.server";
 import { authed } from "./middleware";
 
 const id = z.number().int().positive();
@@ -165,6 +166,12 @@ export const saveFormats = createServerFn({ method: "POST" })
     setSettings(rt.db, { formats, defaultFormats });
     return { ok: true };
   });
+
+/** The format of an existing library, from one of its files (checked against more of them). */
+export const inferLibraryFormat = createServerFn({ method: "POST" })
+  .middleware([authed])
+  .validator(z.object({ path: z.string().min(1).max(4096) }))
+  .handler(async ({ data, context: { rt } }) => libraryFormat(rt, data.path));
 
 // ---------- watch folders ----------
 

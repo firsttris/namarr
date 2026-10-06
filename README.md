@@ -48,7 +48,8 @@ kinds of renaming for any folder you point it at:
   `{artist}/{album}/{track} {title}` from their tags; rule sets export and import as YAML
 - **Template language** with auto-completion and a live example: `{n} ({y})/Season {s00}/{n} - {s00e00} - {t}`,
   with filters, conditions and built-in formats for Plex, Jellyfin, Emby and Kodi
-- **Own naming formats** for movies and series: add, edit, copy, delete, one default per kind
+- **Own naming formats** for movies and series: add, edit, copy, delete, one default per kind; or let namarr
+  **detect the format of an existing library** from one of its files
 - **Move, copy or rename in place**
 - **Libraries for movies and series**: every matched file lands in the default folder of its kind,
   watch folders can pick another; every path is chosen with a folder browser
