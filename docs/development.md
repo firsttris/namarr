@@ -120,9 +120,10 @@ CI runs lint, typecheck, tests, the parser benchmark, the build and the E2E test
 - **M0 foundation, M1 core, M2 web UI and Docker**: done.
 - **M3 automation**: watch folders, inbox, learned overrides, library refresh, notifications and the
   download client hook are done.
-- **M4 rule mode**: rule engine, rule stack UI and media + rules are done; YAML export and import of
-  presets are missing.
+- **M4 rule mode**: rule engine, rule stack UI, media + rules and YAML export and import are done.
 - **M5 anime**: absolute numbers, TMDB episode groups, TheTVDB and AniDB are done; mapping AniDB
   entries onto TVDB seasons (anime lists) is open.
+- **M6 libraries and formats**: folders with movie and series libraries, naming formats instead of
+  profiles and detecting the format of an existing library are done.
 
 Still open: a license, name reservation, a desktop app.
