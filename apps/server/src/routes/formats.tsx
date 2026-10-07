@@ -245,6 +245,7 @@ function Detect({ formats, isDefault, onUse, onDefault, onClose }: DetectProps) 
                 {!c.ok && (
                   <span className="pl-4 font-mono break-all text-muted">{m.formats_inferWouldBe({ path: c.rendered || "–" })}</span>
                 )}
+                {c.ratingDiffers && <span className="pl-4 break-all text-muted">{m.formats_inferRatingDiffers({ path: c.rendered })}</span>}
               </li>
             ))}
           </ul>

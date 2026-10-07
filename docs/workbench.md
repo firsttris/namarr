@@ -111,7 +111,8 @@ puts the tokens back where the values are (`{n}/Staffel {s00}/{n} - {s00e00}{?t}
 merges what the files show (a rating only some have becomes a condition, `EAC3` a
 `replace` filter for the audio codec) and checks the result against up to a dozen more files of the same library, spread over its series or
 movies. It says which built-in formats fit, or offers the detected one as a new format, and lists
-every file it does not fit with the name namarr would write instead. Episode titles are compared in
+every file it does not fit with the name namarr would write instead. A file that differs only in its rating counts as fitting: ratings change over time, and a file
+named before its title had one has none. Episode titles are compared in
 the language of the settings and in English. Without a metadata source only what the names say
 counts (no episode titles).
 

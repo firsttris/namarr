@@ -127,6 +127,67 @@ describe("Format aus einer Mediathek erkennen", () => {
     expect(result.matched).toBe(3);
   });
 
+  it("Staffel statt absoluter Nummer, und EAC3 auch neben einem uneinheitlichen Staffelordner", () => {
+    const show = (title: string, tvdb: string, season: string, epTitle: string, rest: string) => {
+      const p = `${title} (2015) [tvdbid-${tvdb}]/${season}/${title} S01E01 ${epTitle} - ${rest}`;
+      return {
+        path: p,
+        input: {
+          parsed: parse(p),
+          match: { provider: "tvdb", id: tvdb, kind: "series" as const, title, year: 2015 },
+          // S01E01: the absolute number is 1 as well.
+          episodes: [{ season: 1, episode: 1, absolute: 1, title: epTitle }],
+          original: p.split("/").at(-1)!,
+        },
+      };
+    };
+    const result = inferFormat(
+      [
+        show("Better Call Saul", "273181", "Season 1", "Anfänge", "[480p, AAC].mkv"),
+        show("Billions", "279536", "Season 1", "Strafe muss sein", "[480p, AC3].mkv"),
+        show("Dark Matter", "292174", "Season 1", "Episode Eins", "[480p, AAC].mkv"),
+        show("A Knight", "433631", "Season 01", "Der Heckenritter", "[720p, EAC3].mkv"),
+      ],
+      "episode",
+    )!;
+    expect(result.template).toBe("{n} ({y}) [tvdbid-{tvdb}]/Season {s}/{n} {s00e00}{?t} {t}{/} - [{vf}, {ac|replace:'DD+':'EAC3'}]");
+    expect(result.matched).toBe(3);
+    // The odd one out fails over its folder only.
+    expect(result.checks.at(-1)).toMatchObject({
+      ok: false,
+      rendered: "A Knight (2015) [tvdbid-433631]/Season 1/A Knight S01E01 Der Heckenritter - [720p, EAC3].mkv",
+    });
+  });
+
+  it("Bewertungen ändern sich: passt bis auf die Bewertung, auch ohne", () => {
+    const film = (title: string, year: number, imdb: string, named: string, today: number | undefined) => {
+      const name = `${title} (${year}) [imdbid-${imdb}]${named}`;
+      return movie(`${year}/${name}/${name} - [480p, AC3].mkv`, {
+        provider: "tmdb",
+        id: "1",
+        kind: "movie",
+        title,
+        year,
+        rating: today,
+        ids: { imdb },
+      });
+    };
+    const result = inferFormat(
+      [
+        film("Der Pate", 1972, "tt0068646", " 8.7", 8.7),
+        film("Scarface - Narbengesicht", 1932, "tt0023427", " 7.5", 7.4),
+        // Named before it had a rating.
+        film("War Machine", 2026, "tt15940132", "", 7.5),
+      ],
+      "movie",
+    )!;
+    expect(result.template).toBe(
+      "{y}/{n} ({y}) [imdbid-{imdb}]{?rating} {rating}{/}/{n} ({y}) [imdbid-{imdb}]{?rating} {rating}{/} - [{vf}, {ac}]",
+    );
+    expect(result.matched).toBe(3);
+    expect(result.checks.map((c) => c.ratingDiffers ?? false)).toEqual([false, true, true]);
+  });
+
   it("ohne Proben nichts", () => {
     expect(inferFormat([], "movie")).toBeUndefined();
   });

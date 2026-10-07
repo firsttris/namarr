@@ -593,5 +593,6 @@
   "template_tokens_imdb": "IMDb ID",
   "template_tokens_tmdb": "TMDB ID",
   "template_tokens_tvdb": "TVDB ID",
-  "template_tokens_rating": "Rating"
+  "template_tokens_rating": "Rating",
+  "formats_inferRatingDiffers": "Fits, only the rating is a different one today. namarr would write: {path}"
 }

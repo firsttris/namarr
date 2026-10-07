@@ -593,5 +593,6 @@
   "template_tokens_imdb": "IMDb-ID",
   "template_tokens_tmdb": "TMDB-ID",
   "template_tokens_tvdb": "TVDB-ID",
-  "template_tokens_rating": "Bewertung"
+  "template_tokens_rating": "Bewertung",
+  "formats_inferRatingDiffers": "Passt, nur die Bewertung ist heute eine andere. namarr würde: {path}"
 }
