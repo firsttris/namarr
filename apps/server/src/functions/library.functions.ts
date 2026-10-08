@@ -29,7 +29,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { libraryFormat } from "~/server/infer.server";
 import { checkLibrary } from "~/server/notify.server";
-import { forbiddenFolder } from "~/server/paths.server";
+import { forbiddenFolder, hiddenInBrowser } from "~/server/paths.server";
 import { authed } from "./middleware";
 
 const id = z.number().int().positive();
@@ -92,7 +92,12 @@ export const browseFolder = createServerFn({ method: "GET" })
     const dir = all ? path.resolve(data.path ?? "/") : await resolveInRoots(data.path!, roots);
     const dirents = await fs.readdir(dir, { withFileTypes: true });
     const entries = dirents
-      .filter((d) => !d.name.startsWith(".") && d.name !== "@eaDir" && (!all || d.isDirectory()))
+      .filter(
+        (d) =>
+          !d.name.startsWith(".") &&
+          d.name !== "@eaDir" &&
+          (!all || (d.isDirectory() && !hiddenInBrowser(path.join(dir, d.name), rt.env.configDir))),
+      )
       .map((d) => ({
         name: d.name,
         path: path.join(dir, d.name),

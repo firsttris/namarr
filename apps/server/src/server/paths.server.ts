@@ -18,3 +18,9 @@ export function forbiddenFolder(folder: string, configDir: string): boolean {
     isInside(dir, config)
   );
 }
+
+/** Left out when browsing the whole file system: kernel and device trees, namarr's own config. */
+export function hiddenInBrowser(dir: string, configDir: string): boolean {
+  const d = path.resolve(dir);
+  return SYSTEM_DIRS.some((s) => isInside(d, s)) || isInside(d, path.resolve(configDir));
+}

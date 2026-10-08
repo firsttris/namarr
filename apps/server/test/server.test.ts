@@ -19,7 +19,7 @@ import { assertSafeBinding, isTrustedProxy, readEnv } from "~/server/env.server"
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
 import { afterExecution, checkLibrary, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
-import { forbiddenFolder } from "~/server/paths.server";
+import { forbiddenFolder, hiddenInBrowser } from "~/server/paths.server";
 import { seedFolders } from "~/server/runtime.server";
 import { accepts, compressHtml, precompress, staticFiles } from "~/server/static.server";
 import { isCandidate, WatchService } from "~/server/watch.server";
@@ -86,6 +86,10 @@ describe("Auth", () => {
     expect(forbiddenFolder("/config/sub", "/config")).toBe(true);
     expect(forbiddenFolder("/data", "/config")).toBe(false);
     expect(forbiddenFolder("/devices", "/config")).toBe(false);
+    // Browsing the whole disk: the system trees and the config are left out, its parents stay.
+    expect(hiddenInBrowser("/proc", "/srv/namarr/config")).toBe(true);
+    expect(hiddenInBrowser("/srv/namarr/config", "/srv/namarr/config")).toBe(true);
+    expect(hiddenInBrowser("/srv", "/srv/namarr/config")).toBe(false);
   });
 
   it("Login: nach 10 Fehlversuchen pro Minute und Adresse ist Pause", () => {
