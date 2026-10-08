@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- Template for the repository's social preview image (Settings → Social preview), 1280 × 640.
+     Render: bun run docs:social-preview → docs/social-preview.png -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    color: #e6e8ec;
+    background:
+      radial-gradient(55% 60% at 6% 0%, rgba(240,161,74,.22), transparent 70%),
+      radial-gradient(45% 50% at 100% 100%, rgba(90,169,255,.14), transparent 70%),
+      linear-gradient(135deg, #151820, #0d0f13);
+  }
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(#22262e 1px, transparent 1px),
+      linear-gradient(90deg, #22262e 1px, transparent 1px);
+    background-size: 32px 32px; opacity: .5;
+  }
+  .head { position: absolute; left: 64px; top: 52px; display: flex; align-items: center; gap: 22px; }
+  .head img { width: 80px; height: 80px; border-radius: 20px; box-shadow: 0 8px 30px rgba(240,161,74,.35); }
+  h1 { font-size: 64px; font-weight: 700; letter-spacing: -2px; line-height: 1; }
+  .chips { position: absolute; right: 64px; top: 76px; display: flex; gap: 10px; }
+  .chip {
+    font-size: 15px; font-weight: 600; color: #f0a14a; padding: 7px 14px; border-radius: 999px;
+    background: rgba(240,161,74,.12); border: 1px solid rgba(240,161,74,.28);
+  }
+  .sub { position: absolute; left: 64px; top: 158px; font-size: 27px; color: #b3b9c4; letter-spacing: -.2px; }
+  .sub b { color: #f3f4f6; font-weight: 600; }
+  .rename {
+    position: absolute; left: 64px; right: 64px; top: 214px; padding: 18px 26px;
+    border-radius: 14px; background: rgba(19,22,28,.92); border: 1px solid #2a2f39;
+    font-family: "DejaVu Sans Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 19px; line-height: 1.75;
+  }
+  .rename .from { color: #8c93a0; }
+  .rename .to { display: flex; align-items: center; gap: 12px; }
+  .rename .arrow { color: #5aa9ff; font-weight: 700; }
+  .rename .dir { color: #f0a14a; }
+  .shot {
+    position: absolute; left: 40px; top: 300px; width: 1200px;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 90px);
+            mask-image: linear-gradient(180deg, transparent 0, #000 90px);
+  }
+  .shot img { width: 100%; display: block; border-radius: 12px; }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="head">
+    <img src="../../apps/server/public/favicon.svg" alt="">
+    <h1>namarr</h1>
+  </div>
+  <div class="chips">
+    <span class="chip">TMDB</span><span class="chip">TheTVDB</span><span class="chip">TVmaze</span><span class="chip">AniDB</span>
+  </div>
+  <p class="sub">The self-hosted renamer for <b>movies, series and anime</b>. Preview first, undo anything.</p>
+  <div class="rename">
+    <div class="from">Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv</div>
+    <div class="to"><span class="arrow">→</span><span><span class="dir">Severance (2022)/Season 02/</span>Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv</span></div>
+  </div>
+  <div class="shot"><img src="../../docs/screenshot-workbench.png" alt=""></div>
+</body>
+</html>
