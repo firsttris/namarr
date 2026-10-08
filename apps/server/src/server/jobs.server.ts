@@ -11,6 +11,7 @@ import {
   loadIds,
   type MatchResult,
   type MetadataProvider,
+  mapLimit,
   matchAll,
   msg,
   needsMetadata,
@@ -90,6 +91,9 @@ export class JobError extends Error {
 type StoredMatch = MatchResult;
 
 /** Changes to a job before its preview is computed again. */
+/** File system calls at once over all items: 50 000 at the same time would choke NFS and SMB. */
+const FS_CONCURRENCY = 32;
+
 /**
  * Up to where emptied folders go after a move (exclusive). A folder chosen in the workbench stays; a
  * release folder from a watch folder or a download client goes too, or it would stay in the
@@ -388,7 +392,7 @@ export class JobService {
     }
     // Undone files are back at their source and can be renamed again.
     const items = allItems(db, jobId).filter((i) => i.state !== "done");
-    const inputs = await Promise.all(items.map((i) => this.toInput(i)));
+    const inputs = await mapLimit(items, FS_CONCURRENCY, (i) => this.toInput(i));
     if (job.config.mode !== "rules") await this.loadIdsFor(job.config, items, inputs);
     if (job.config.mode !== "media" && needsMetadata(job.config.rules ?? [])) await this.loadMetadata(inputs);
     const preview = buildPreview(inputs, this.previewConfig(job.config));
@@ -447,20 +451,18 @@ export class JobService {
 
   /** An existing target is a conflict unless the policy resolves it. */
   private async markExisting(items: PreviewItem[]) {
-    await Promise.all(
-      items.map(async (item) => {
-        if (!item.target || item.conflict) return;
-        try {
-          await fs.lstat(item.target);
-          if (item.target !== item.source) {
-            item.conflict = "exists";
-            item.reasons = [...item.reasons, TARGET_EXISTS];
-          }
-        } catch {
-          // free
+    await mapLimit(items, FS_CONCURRENCY, async (item) => {
+      if (!item.target || item.conflict) return;
+      try {
+        await fs.lstat(item.target);
+        if (item.target !== item.source) {
+          item.conflict = "exists";
+          item.reasons = [...item.reasons, TARGET_EXISTS];
         }
-      }),
-    );
+      } catch {
+        // free
+      }
+    });
   }
 
   // ---------- manual corrections ----------
