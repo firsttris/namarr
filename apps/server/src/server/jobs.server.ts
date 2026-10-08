@@ -602,8 +602,9 @@ export class JobService {
         if (result.status === "done") {
           this.record(jobId, item.id, result.record);
           // Companions follow their main file with the same action. Subtitles of a replaced
-          // worse file belong to it, so they are replaced too instead of compared by size.
-          const companionConflict = conflict === "keep-better" ? "overwrite" : conflict;
+          // worse file belong to it, so they are replaced too instead of compared by size; when
+          // the main file replaced nothing, an existing subtitle is not this release's to replace.
+          const companionConflict = conflict === "keep-better" ? (result.record.backup ? "overwrite" : "skip") : conflict;
           const companionErrors: string[] = [];
           for (const c of item.companions) {
             if (!c.to) continue;

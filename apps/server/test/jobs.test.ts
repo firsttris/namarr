@@ -494,6 +494,16 @@ describe("JobService: Bessere Qualität behalten", () => {
     expect(await fs.readFile(`${episode()}.de.srt`, "utf8")).toBe("alte Untertitel");
   });
 
+  it("ohne Konflikt der Hauptdatei bleibt ein vorhandener Untertitel unangetastet", async () => {
+    await touch(path.relative(tmp, `${episode()}.de.srt`), "eigene Untertitel");
+    const { job } = await analyzed({ conflictPolicy: "keep-better" });
+    await jobs.executeNow(job.id);
+    const item = severanceE01(allItems(db, job.id));
+    expect(item.state).toBe("done");
+    expect(await fs.readFile(`${episode()}.de.srt`, "utf8")).toBe("eigene Untertitel");
+    expect(item.error).toContain(".de.srt");
+  });
+
   it("lässt eine bessere vorhandene Datei liegen und sagt warum", async () => {
     await earlier("Severance.S02E01.1080p.BluRay.x264-OLD", "BluRay");
     const { job } = await analyzed({ conflictPolicy: "keep-better" });
