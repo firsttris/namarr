@@ -83,7 +83,7 @@ with it.
 ```
 
 **Tokens**: `n` name, `y` year, `s`/`e`, `s00`, `e00`, `s00e00` (double episodes: `S02E04-E05`),
-`sxe`, `t` episode title, `absolute`, `d` date, `vf` resolution, `vc` video codec, `ac`/`af` audio,
+`sxe`, `t` episode title, `absolute` (`abs`: two digits, `07`), `d` date, `vf` resolution, `vc` video codec, `ac`/`af` audio,
 `hdr`, `source`, `group`, `lang`, `edition`, `part`, `id`, `provider`, `orig`, `ext`, `imdb`, `tmdb`,
 `tvdb` (IDs in those databases, from the folder name or the source: `[imdbid-{imdb}]`), `rating`
 (average rating with one decimal, `7.5`).
