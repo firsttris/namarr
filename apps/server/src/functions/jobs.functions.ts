@@ -148,7 +148,7 @@ export const executeJob = createServerFn({ method: "POST" })
         conflictPolicy: data.conflictPolicy,
         itemIds: data.itemIds,
       })
-      .catch((err) => rt.log.error({ err }, "Ausführung fehlgeschlagen"));
+      .catch((err) => rt.log.error({ err }, "Execution failed"));
     return { queued: true };
   });
 

@@ -15,7 +15,7 @@ const env = readEnv();
 assertSafeBinding(env);
 const ids = dropPrivileges(env.configDir);
 const rt = runtime();
-if (ids) rt.log.info(ids, "Läuft als PUID/PGID");
+if (ids) rt.log.info(ids, "Running as PUID/PGID");
 
 // Next to the sources (bun run server.ts) or bundled into dist/ (Docker).
 const dist = existsSync(path.join(import.meta.dir, "server/server.js")) ? import.meta.dir : path.join(import.meta.dir, "dist");
@@ -57,15 +57,15 @@ const server = Bun.serve({
     return compressHtml(req, await handler.fetch(req));
   },
   error(err) {
-    rt.log.error({ err }, "Unbehandelter Fehler");
-    return new Response("Interner Fehler", { status: 500 });
+    rt.log.error({ err }, "Unhandled error");
+    return new Response("Internal error", { status: 500 });
   },
 });
 
-rt.log.info({ url: `http://${server.hostname}:${server.port}` }, "namarr läuft");
+rt.log.info({ url: `http://${server.hostname}:${server.port}` }, "namarr running");
 
 async function shutdown(signal: string) {
-  rt.log.info({ signal }, "Beende namarr");
+  rt.log.info({ signal }, "Stopping namarr");
   await rt.watch.stop();
   // Let a running file operation finish; the queue stops between files.
   await Promise.race([rt.jobs.idle(), new Promise((r) => setTimeout(r, 10_000))]);

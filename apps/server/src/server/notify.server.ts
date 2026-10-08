@@ -128,9 +128,9 @@ export async function afterExecution(
     requests.map(async ({ url, init }) => {
       try {
         const res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(10_000) });
-        if (!res.ok) log(`Benachrichtigung fehlgeschlagen: ${new URL(url).host} HTTP ${res.status}`);
+        if (!res.ok) log(`Notification failed: ${new URL(url).host} HTTP ${res.status}`);
       } catch (e) {
-        log(`Benachrichtigung fehlgeschlagen: ${new URL(url).host}`, e);
+        log(`Notification failed: ${new URL(url).host}`, e);
       }
     }),
   );

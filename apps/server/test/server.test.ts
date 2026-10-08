@@ -196,7 +196,7 @@ describe("Benachrichtigungen und Library-Refresh", () => {
     await afterExecution(settings, { jobId: 1, done: 1, failed: 0, skipped: 0, source: "/x" }, log, fetchImpl);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(log.mock.calls.map((c) => c[0])).toEqual(
-      expect.arrayContaining(["Benachrichtigung fehlgeschlagen: jf:8096", "Benachrichtigung fehlgeschlagen: hook.example HTTP 500"]),
+      expect.arrayContaining(["Notification failed: jf:8096", "Notification failed: hook.example HTTP 500"]),
     );
   });
 

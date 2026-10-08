@@ -133,7 +133,7 @@ export class JobService {
   /** Everything that touches files runs here, one after another. */
   private serial<T>(work: () => Promise<T>): Promise<T> {
     const run = this.queue.then(work);
-    this.queue = run.catch((e) => this.deps.log.error({ err: e }, "Job fehlgeschlagen"));
+    this.queue = run.catch((e) => this.deps.log.error({ err: e }, "Job failed"));
     return run;
   }
 
@@ -247,7 +247,7 @@ export class JobService {
       await this.computePreview(jobId);
       const counts = countItemsByState(db, jobId);
       this.progress(job, "ready", files.length, files.length);
-      this.deps.log.info({ jobId, files: files.length, counts }, "Job analysiert");
+      this.deps.log.info({ jobId, files: files.length, counts }, "Job analysed");
 
       // Watch folders and download-client hooks run on their own: sure matches go through.
       if (job.kind !== "manual") await this.autoProcess(jobId);
