@@ -21,6 +21,10 @@ export type HttpOptions = {
 };
 
 /** Rate limit, response cache and 429 retries, shared by the providers. */
+const MISSING = { namarrMissing: true } as const;
+const MISSING_TTL_S = 3600;
+const isMissing = (v: unknown) => typeof v === "object" && v !== null && (v as { namarrMissing?: boolean }).namarrMissing === true;
+
 export class ProviderHttp {
   private readonly limiter: Bottleneck;
   readonly cache: ProviderCache;
@@ -36,11 +40,17 @@ export class ProviderHttp {
   }
 
   /** Returns the cached value for `key` or loads, caches and returns it. Undefined is not cached. */
+  /**
+   * `load` answering undefined (404: no such translation, no such ID) is remembered too, for at most
+   * an hour, so a missing translation is not asked for on every run.
+   */
   async cached<T>(key: string, ttlSeconds: number, load: () => Promise<T>): Promise<T> {
     const hit = await this.cache.get(this.provider, key);
+    if (isMissing(hit)) return undefined as T;
     if (hit !== undefined) return hit as T;
     const value = await load();
     if (value !== undefined) await this.cache.set(this.provider, key, value, ttlSeconds);
+    else await this.cache.set(this.provider, key, MISSING, Math.min(ttlSeconds, MISSING_TTL_S));
     return value;
   }
 
