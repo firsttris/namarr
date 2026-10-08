@@ -229,6 +229,20 @@ describe("JobService: Aufräumen nach dem Verschieben", () => {
   });
 });
 
+describe("JobService: Watch-Jobs auf denselben Release-Ordner", () => {
+  it("der zweite Job nimmt nur, was noch kein Job kennt", async () => {
+    const release = path.join(tv(), "Severance.S02.German.DL.1080p.WEB-GRP");
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E03.German.DL.1080p.WEB.h264-GRP.mkv");
+    await jobs.create({ paths: [release], config: config({ action: "copy", autoThreshold: 0.5 }), kind: "watch" });
+    await jobs.idle();
+    // The next file of the pack finishes later; with copy the first one is still there.
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E04.German.DL.1080p.WEB.h264-GRP.mkv");
+    const second = await jobs.create({ paths: [release], config: config({ action: "copy", autoThreshold: 0.5 }), kind: "watch" });
+    await jobs.idle();
+    expect(allItems(db, second.id).map((i) => path.basename(i.sourcePath))).toEqual(["Severance.S02E04.German.DL.1080p.WEB.h264-GRP.mkv"]);
+  });
+});
+
 describe("JobService: Vorschau neu berechnen ohne neues Matching", () => {
   it("Template, Regeln und Ziel ändern", async () => {
     const { job, by } = await analyzed();

@@ -50,6 +50,7 @@ import {
   type JobConfig,
   type JobItem,
   type JobKind,
+  knownSourcePaths,
   listOperations,
   listOverrides,
   listWatchFolders,
@@ -189,7 +190,11 @@ export class JobService {
       for (const root of job.sourcePaths) {
         const result = await scan(root, { mode: mode === "rules" ? "all" : "media", recursive: job.config.recursive ?? true, signal });
         const rootIsFile = (await fs.stat(root)).isFile();
+        // A watch folder can flush a release folder twice while its files finish one by one: the
+        // second job takes only what no job has yet (with copy the first files are still there).
+        const known = job.kind === "watch" && !rootIsFile ? knownSourcePaths(db, root) : undefined;
         for (const f of result.files) {
+          if (known?.has(f.path)) continue;
           files.push(f);
           // The source folder's own name is context too: "Severance.S02.German.DL-GRP/204.mkv".
           parsed.push(
