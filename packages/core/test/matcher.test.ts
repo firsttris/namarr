@@ -79,6 +79,31 @@ describe("Bewertung", () => {
 });
 
 describe("Gruppierung und matchAll", () => {
+  it("mehrere Titel gleichzeitig, höchstens vier", async () => {
+    let active = 0;
+    let most = 0;
+    const provider = new FakeProvider({ series: [severance], episodes: { "95396": severanceEpisodes } });
+    const search = provider.searchSeries.bind(provider);
+    provider.searchSeries = async (query: string) => {
+      most = Math.max(most, ++active);
+      await new Promise((r) => setTimeout(r, 10));
+      active--;
+      return search(query);
+    };
+    const titles = ["Severance", "Andor", "Dark", "Slow Horses", "Shogun", "Fallout"];
+    const progress: number[] = [];
+    const results = await matchAll(
+      titles.map((t, i) => ({ key: String(i), parsed: parse(`${t}.S01E01.mkv`) })),
+      provider,
+      { onProgress: (done) => progress.push(done) },
+    );
+    expect(results.size).toBe(6);
+    expect(results.get("0")!.best?.title).toBe("Severance");
+    expect(most).toBeGreaterThan(1);
+    expect(most).toBeLessThanOrEqual(4);
+    expect(progress).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
   it("ein bestätigter Treffer hebt den Parser-Abzug auf", async () => {
     const dune: MediaCandidate = { provider: "tmdb", id: "438631", kind: "movie", title: "Dune", year: 2021 };
     const provider = new FakeProvider({ movies: [dune], series: [severance], episodes: { "95396": severanceEpisodes } });

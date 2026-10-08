@@ -1,3 +1,4 @@
+import { mapLimit } from "../concurrency.ts";
 import { msg } from "../i18n.ts";
 import type { EpisodeInfo, EpisodeOrder, MediaCandidate, MetadataProvider, Parsed } from "../types.ts";
 import { normalizeTitle, titleSimilarity } from "./similarity.ts";
@@ -116,6 +117,9 @@ export function withParserConfidence(confidence: number, parsed: Parsed, confirm
   return confidence * (0.4 + 0.6 * Math.max(parsed.kind.confidence, 0.5));
 }
 
+/** Titles looked up at the same time by matchAll. */
+const GROUP_CONCURRENCY = 4;
+
 /** Below this, a file's structure stays doubtful even when its episode exists ("severance.203"). */
 const SURE_STRUCTURE = 0.75;
 
@@ -200,7 +204,8 @@ export async function matchAll(
   };
 
   let done = 0;
-  for (const group of groups) {
+  // A few titles at once: each source's own limiter keeps its rate (AniDB one at a time).
+  await mapLimit(groups, GROUP_CONCURRENCY, async (group) => {
     const first = group.items[0]!.parsed;
     const override = findOverride(first, options.overrides, provider.nameFor?.(group.kind) ?? provider.name);
     const ids = group.items.find((i) => i.parsed.ids)?.parsed.ids;
@@ -272,7 +277,7 @@ export async function matchAll(
       results.set(item.key, result);
     }
     options.onProgress?.(++done, groups.length);
-  }
+  });
   return results;
 }
 

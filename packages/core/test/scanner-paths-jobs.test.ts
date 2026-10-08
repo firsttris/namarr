@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mapLimit } from "../src/concurrency.ts";
 import { msg } from "../src/i18n.ts";
 import { buildPreview, canTransition, type PreviewInput, summarize } from "../src/jobs/index.ts";
 import { matchAll, NO_MATCH } from "../src/matcher/index.ts";
@@ -281,5 +282,21 @@ describe("ffprobe", () => {
     expect(await probeFile("/b.mkv")).toBeUndefined();
     expect(available).toHaveBeenCalledTimes(1);
     expect(await hasFfprobe("ffprobe-does-not-exist")).toBe(false);
+  });
+});
+
+describe("mapLimit", () => {
+  it("Reihenfolge bleibt, höchstens limit gleichzeitig", async () => {
+    let active = 0;
+    let most = 0;
+    const out = await mapLimit([5, 1, 4, 2, 3], 2, async (n) => {
+      most = Math.max(most, ++active);
+      await new Promise((r) => setTimeout(r, n));
+      active--;
+      return n * 10;
+    });
+    expect(out).toEqual([50, 10, 40, 20, 30]);
+    expect(most).toBe(2);
+    expect(await mapLimit([], 3, async () => 1)).toEqual([]);
   });
 });
