@@ -24,8 +24,6 @@ import {
 
 type AnyDb = BunSQLiteDatabase<typeof schema>;
 
-export type Profile = typeof profiles.$inferSelect;
-export type NewProfile = typeof profiles.$inferInsert;
 export type WatchFolder = typeof watchFolders.$inferSelect;
 export type NewWatchFolder = typeof watchFolders.$inferInsert;
 export type Job = typeof jobs.$inferSelect;
@@ -158,13 +156,6 @@ export function migrateProfiles(db: AnyDb): { skippedRules: string[] } {
   });
   return { skippedRules };
 }
-
-export const listProfiles = (db: AnyDb) => db.select().from(profiles).orderBy(asc(profiles.name)).all();
-export const getProfile = (db: AnyDb, id: number) => db.select().from(profiles).where(eq(profiles.id, id)).get();
-export const createProfile = (db: AnyDb, values: NewProfile) => db.insert(profiles).values(values).returning().get();
-export const updateProfile = (db: AnyDb, id: number, values: Partial<NewProfile>) =>
-  db.update(profiles).set(values).where(eq(profiles.id, id)).returning().get();
-export const deleteProfile = (db: AnyDb, id: number) => db.delete(profiles).where(eq(profiles.id, id)).run();
 
 // ---------- watch folders ----------
 

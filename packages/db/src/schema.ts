@@ -29,7 +29,11 @@ export type WatchOptions = {
   conflictPolicy?: ConflictPolicy;
 };
 
-/** Replaced by naming formats and watch folder options; read once to take them over (migrateProfiles). */
+/**
+ * Replaced by naming formats and watch folder options; read once to take them over
+ * (migrateProfiles). It stays until no installation from before 0.1.4 can still need that: SQL
+ * migrations run before migrateProfiles, so dropping it would lose profiles not taken over yet.
+ */
 export const profiles = sqliteTable("profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),

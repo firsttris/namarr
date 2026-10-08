@@ -6,7 +6,6 @@ import {
   allowedRoots,
   countItemsByState,
   createJob,
-  createProfile,
   createWatchFolder,
   dashboardStats,
   defaultFolder,
@@ -24,7 +23,6 @@ import {
   listItems,
   listOperations,
   listOverrides,
-  listProfiles,
   listWatchFolders,
   markUndone,
   migrateProfiles,
@@ -40,6 +38,10 @@ import {
 } from "../src/index.ts";
 
 const config: JobConfig = { mode: "media", action: "test", conflictPolicy: "skip" };
+// Profiles are gone; their table stays until every installation took them over (migrateProfiles).
+const createLegacyProfile = (db: ReturnType<typeof openDatabase>, values: typeof schema.profiles.$inferInsert) =>
+  db.insert(schema.profiles).values(values).returning().get();
+const listLegacyProfiles = (db: ReturnType<typeof openDatabase>) => db.select().from(schema.profiles).orderBy(schema.profiles.name).all();
 const fresh = () => openDatabase(":memory:");
 
 describe("Migrationen", () => {
@@ -131,7 +133,7 @@ describe("Ordner", () => {
     db.$client.run("INSERT INTO watch_folders (name, path, target_root) VALUES ('TV', '/dl/tv', '/media/tv')");
     const sql = readFileSync(new URL("../drizzle/0003_targets.sql", import.meta.url), "utf8");
     for (const statement of sql.split("--> statement-breakpoint").filter((s) => s.includes("UPDATE"))) db.$client.run(statement);
-    expect(listProfiles(db).map((p) => [p.name, p.targets, p.targetRoot])).toEqual([
+    expect(listLegacyProfiles(db).map((p) => [p.name, p.targets, p.targetRoot])).toEqual([
       ["Fotos", { other: "/photos" }, null],
       ["Leer", {}, null],
       ["Medien", { movie: "/media", series: "/media" }, null],
@@ -160,14 +162,19 @@ describe("Formate", () => {
 
   it("Profile werden einmalig zu Formaten und Watch-Folder-Optionen", () => {
     const db = fresh();
-    const custom = createProfile(db, {
+    const custom = createLegacyProfile(db, {
       name: "Anime",
       template: { episode: "{n}/{absolute}" },
       provider: "anidb",
       action: "hardlink",
       targets: { series: "/anime" },
     });
-    const plex = createProfile(db, { name: "Plex", preset: "plex", action: "move", rulesJson: [{ type: "case", mode: "lower" }] as never });
+    const plex = createLegacyProfile(db, {
+      name: "Plex",
+      preset: "plex",
+      action: "move",
+      rulesJson: [{ type: "case", mode: "lower" }] as never,
+    });
     const a = createWatchFolder(db, { name: "Anime", path: "/dl/anime", profileId: custom.id, targets: { movie: "/movies" } });
     const b = createWatchFolder(db, { name: "Rest", path: "/dl/rest", profileId: plex.id });
 

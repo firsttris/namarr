@@ -2,5 +2,5 @@
 
 export * from "./folders.ts";
 export * from "./formats.ts";
-export type { DashboardStats, ItemStateName, Job, JobItem, MatchOverrideRow, Operation, Profile, Settings, WatchFolder } from "./repo.ts";
+export type { DashboardStats, ItemStateName, Job, JobItem, MatchOverrideRow, Operation, Settings, WatchFolder } from "./repo.ts";
 export type { JobConfig, MovieProvider, SeriesProvider, Targets } from "./schema.ts";
