@@ -274,6 +274,19 @@ export function knownSourcePaths(db: AnyDb, dir: string): Set<string> {
   return new Set(rows.map((r) => r.path));
 }
 
+/** Inbox entries for files below `dir` (a watch folder), counted in the database. */
+export function inboxCountUnder(db: AnyDb, dir: string): number {
+  const base = dir.replace(/\/+$/, "");
+  return (
+    db
+      .select({ n: count() })
+      .from(inbox)
+      .innerJoin(jobItems, eq(inbox.jobItemId, jobItems.id))
+      .where(and(gte(jobItems.sourcePath, `${base}/`), lt(jobItems.sourcePath, `${base}0`)))
+      .get()?.n ?? 0
+  );
+}
+
 /** The item whose file now lives at `targetPath`: its parsed name still knows source and quality. */
 export function findDoneItemByTarget(db: AnyDb, targetPath: string): JobItem | undefined {
   return db

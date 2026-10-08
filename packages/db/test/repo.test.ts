@@ -15,6 +15,7 @@ import {
   getJob,
   getSettings,
   getWatchFolder,
+  inboxCountUnder,
   insertItems,
   insertOperation,
   type JobConfig,
@@ -359,6 +360,20 @@ describe("Dashboard", () => {
     insertOperation(db, { jobId: job.id, action: "hardlink", fromPath: "/a/2.mkv", toPath: "/b/2.mkv", size: 1, inode: 2 });
     addToInbox(db, items[2]!.id, "x");
     expect(dashboardStats(db)).toEqual({ renamedToday: 2, inboxOpen: 1, autoRate: 2 / 3, undoable: 2 });
+  });
+
+  it("Inbox pro Watch-Folder, auch über eine Seite hinaus", () => {
+    const db = fresh();
+    const job = createJob(db, { sourcePaths: ["/dl/tv"], config });
+    const items = insertItems(
+      db,
+      Array.from({ length: 60 }, (_, i) => ({ jobId: job.id, sourcePath: `/dl/tv/${i}.mkv`, state: "needs_review" as const })),
+    );
+    const other = insertItems(db, [{ jobId: job.id, sourcePath: "/dl/tvx/a.mkv", state: "needs_review" as const }]);
+    for (const it of [...items, ...other]) addToInbox(db, it.id, "x");
+    expect(inboxCountUnder(db, "/dl/tv")).toBe(60);
+    expect(inboxCountUnder(db, "/dl/tv/")).toBe(60);
+    expect(inboxCountUnder(db, "/dl")).toBe(61);
   });
 
   it("Auto-Quote nach der Schwelle des Jobs", () => {

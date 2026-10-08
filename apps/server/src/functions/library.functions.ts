@@ -13,6 +13,7 @@ import {
   findFormat,
   getItem,
   getSettings,
+  inboxCountUnder,
   type LibraryFolder,
   listInbox,
   listJobs,
@@ -39,17 +40,15 @@ const id = z.number().int().positive();
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([authed])
   .handler(async ({ context: { rt } }) => {
-    const inbox = listInbox(rt.db, 50);
+    const stats = dashboardStats(rt.db);
     const folders = listWatchFolders(rt.db);
     const jobs = listJobs(rt.db, 5);
     return {
-      stats: dashboardStats(rt.db),
-      inbox: inbox.slice(0, 4),
-      inboxTotal: inbox.length,
-      watchFolders: folders.map((f) => ({
-        ...f,
-        inboxCount: inbox.filter((i) => i.item.sourcePath.startsWith(f.path + path.sep)).length,
-      })),
+      stats,
+      inbox: listInbox(rt.db, 4),
+      inboxTotal: stats.inboxOpen,
+      // Counted in the database: right with more than a page of entries too.
+      watchFolders: folders.map((f) => ({ ...f, inboxCount: inboxCountUnder(rt.db, f.path) })),
       jobs,
       /** No folders yet: namarr can neither find files nor put them anywhere. */
       noFolders: !getSettings(rt.db).folders.length,
