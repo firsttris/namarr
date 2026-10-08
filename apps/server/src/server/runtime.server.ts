@@ -62,6 +62,7 @@ export function runtime(): Runtime {
   const interrupted = failInterruptedJobs(db);
   if (interrupted) log.warn({ interrupted }, "Unterbrochene Jobs als fehlgeschlagen markiert");
 
+  for (const warning of env.warnings) log.warn(warning);
   seedFolders(db, env.roots, log);
   setSessionsValidAfter(getSettings(db).sessionsValidAfter ?? 0);
   const { skippedRules } = migrateProfiles(db);

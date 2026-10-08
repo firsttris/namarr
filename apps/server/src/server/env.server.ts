@@ -17,9 +17,24 @@ export type Env = {
   pathMap: [from: string, to: string][];
   demo: boolean;
   logLevel: string;
+  /** Settings that were ignored, logged at startup. */
+  warnings: string[];
 };
 
 export function readEnv(env: Record<string, string | undefined> = process.env): Env {
+  const warnings: string[] = [];
+  const pathMap: [string, string][] = [];
+  for (const entry of (env.NAMARR_PATH_MAP ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean)) {
+    // At the first colon: the target may contain one, the source rarely does.
+    const colon = entry.indexOf(":");
+    const from = colon > 0 ? entry.slice(0, colon).replace(/\/+$/, "") : "";
+    const to = colon > 0 ? entry.slice(colon + 1).replace(/\/+$/, "") : "";
+    if (from && to) pathMap.push([from, to]);
+    else warnings.push(`NAMARR_PATH_MAP: "${entry}" ignored, expected /from:/to`);
+  }
   return {
     configDir: path.resolve(env.NAMARR_CONFIG_DIR ?? "./config"),
     host: env.NAMARR_HOST ?? "127.0.0.1",
@@ -30,17 +45,14 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
       .split(",")
       .map((p) => p.trim())
       .filter(Boolean),
-    pathMap: (env.NAMARR_PATH_MAP ?? "")
-      .split(",")
-      .map((pair) => pair.trim().split(":"))
-      .filter((p): p is [string, string] => p.length === 2 && Boolean(p[0]) && Boolean(p[1]))
-      .map(([from, to]) => [from.replace(/\/+$/, ""), to.replace(/\/+$/, "")]),
+    pathMap,
     roots: (env.NAMARR_ROOTS ?? "")
       .split(",")
       .map((r) => r.trim())
       .filter(Boolean),
     demo: env.NAMARR_DEMO === "1" || env.NAMARR_DEMO === "true",
     logLevel: env.NAMARR_LOG_LEVEL ?? "info",
+    warnings,
   };
 }
 
@@ -71,6 +83,9 @@ export function isTrustedProxy(address: string | undefined, trusted: string[]): 
 
 /** Outside loopback a token is mandatory: the server can move and delete files. */
 export function assertSafeBinding(env: Env): void {
+  if (!Number.isInteger(env.port) || env.port < 1 || env.port > 65535) {
+    throw new Error(`NAMARR_PORT must be a port number from 1 to 65535 (got: ${env.port})`);
+  }
   if (!LOOPBACK.has(env.host) && !env.token && !env.authHeader) {
     throw new Error(
       `NAMARR_TOKEN is required: without a token namarr only listens on 127.0.0.1 (requested: ${env.host}). / NAMARR_TOKEN fehlt: Ohne Token lauscht namarr nur auf 127.0.0.1.`,

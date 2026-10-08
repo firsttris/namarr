@@ -36,6 +36,20 @@ describe("Umgebung und Bindung", () => {
     expect(() => assertSafeBinding(readEnv({ NAMARR_HOST: "0.0.0.0", NAMARR_AUTH_HEADER: "Remote-User" }))).not.toThrow();
     expect(() => assertSafeBinding(readEnv({}))).not.toThrow();
   });
+
+  it("Pfad-Zuordnung am ersten Doppelpunkt, Unbrauchbares wird gemeldet; Port wird geprüft", () => {
+    const env = readEnv({ NAMARR_PATH_MAP: "/downloads/:/data/downloads, /a:/b:c, kaputt, :/x" });
+    expect(env.pathMap).toEqual([
+      ["/downloads", "/data/downloads"],
+      ["/a", "/b:c"],
+    ]);
+    expect(env.warnings).toEqual([
+      'NAMARR_PATH_MAP: "kaputt" ignored, expected /from:/to',
+      'NAMARR_PATH_MAP: ":/x" ignored, expected /from:/to',
+    ]);
+    expect(() => assertSafeBinding(readEnv({ NAMARR_PORT: "achtzig" }))).toThrow(/NAMARR_PORT/);
+    expect(() => assertSafeBinding(readEnv({ NAMARR_PORT: "70000" }))).toThrow(/NAMARR_PORT/);
+  });
 });
 
 describe("Auth", () => {
