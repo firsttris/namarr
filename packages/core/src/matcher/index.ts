@@ -194,13 +194,25 @@ export async function matchAll(
   }
   const groups = groupInputs(inputs);
   const episodeCache = new Map<string, Promise<EpisodeInfo[]>>();
-  const loadEpisodes = (id: string) => {
-    let promise = episodeCache.get(id);
+  const loadSeason = (id: string, season?: number) => {
+    const key = season === undefined ? id : `${id}|${season}`;
+    let promise = episodeCache.get(key);
     if (!promise) {
-      promise = provider.episodes(id, { language: options.language, order: options.order });
-      episodeCache.set(id, promise);
+      promise = provider.episodes(id, { language: options.language, order: options.order, season });
+      episodeCache.set(key, promise);
     }
     return promise;
+  };
+  /** Only the seasons the files name (a 30-season show is 30 requests otherwise); all when unsure. */
+  const loadEpisodes = async (id: string, seasons?: Set<number>) => {
+    if (!seasons) return loadSeason(id);
+    const lists = await Promise.all([...seasons].map((n) => loadSeason(id, n)));
+    // A source that ignores `season` returns everything each time: once is enough.
+    const seen = new Set<string>();
+    return lists.flat().filter((e) => {
+      const key = `${e.season}x${e.episode}`;
+      return !seen.has(key) && Boolean(seen.add(key));
+    });
   };
 
   let done = 0;
@@ -233,7 +245,15 @@ export async function matchAll(
       reasons = ranked.reasons;
     }
 
-    const episodes = best && group.kind === "series" ? await loadEpisodes(best.id) : [];
+    // Files without a season (absolute numbers, dates), a learned season offset or one entry per
+    // season (AniDB) need every season.
+    const seasons =
+      override?.seasonOffset ||
+      best?.seasonsAsEntries ||
+      group.items.some((i) => i.parsed.season === undefined || i.parsed.absolute !== undefined)
+        ? undefined
+        : new Set(group.items.map((i) => i.parsed.season!));
+    const episodes = best && group.kind === "series" ? await loadEpisodes(best.id, seasons) : [];
     for (const item of group.items) {
       const movieConfirmed =
         group.kind === "movie" && item.parsed.year !== undefined && best?.year === item.parsed.year && confidence >= 0.95;

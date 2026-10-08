@@ -247,9 +247,16 @@ export class TmdbProvider implements MetadataProvider {
       seasons.map((n) => this.get<{ episodes: TmdbEpisode[] }>(`/tv/${seriesId}/season/${n}`, { language }, this.ttl.details)),
     );
     const all = lists.flatMap((l) => l.episodes).map((e) => this.episode(e));
-    // Absolute numbers count through the regular seasons in aired order.
+    // Absolute numbers count through the regular seasons in aired order. With only some seasons
+    // loaded, each starts after the episodes of the seasons before it (from the show's counts).
+    const regular = (show.seasons ?? []).filter((x) => x.season_number > 0);
+    const partial = seasons.filter((n) => n > 0).length < regular.length;
+    const before = (n: number) => regular.filter((x) => x.season_number < n).reduce((sum, x) => sum + (x.episode_count ?? 0), 0);
     let abs = 0;
+    let season: number | undefined;
     for (const e of all.filter((x) => x.season > 0).sort((a, b) => a.season - b.season || a.episode - b.episode)) {
+      if (partial && e.season !== season) abs = before(e.season);
+      season = e.season;
       e.absolute = ++abs;
     }
     return all;

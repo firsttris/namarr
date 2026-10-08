@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   classify,
   DOUBLE_EPISODE,
@@ -79,6 +79,20 @@ describe("Bewertung", () => {
 });
 
 describe("Gruppierung und matchAll", () => {
+  it("lädt nur die Staffeln, die die Dateien nennen", async () => {
+    const provider = new FakeProvider({ series: [severance], episodes: { "95396": severanceEpisodes } });
+    const episodes = vi.spyOn(provider, "episodes");
+    const files = ["Severance.S02E01.mkv", "Severance.S02E02.mkv"].map((f) => ({ key: f, parsed: parse(f) }));
+    const results = await matchAll(files, provider);
+    expect(episodes).toHaveBeenCalledTimes(1);
+    expect(episodes.mock.calls[0]![1]).toMatchObject({ season: 2 });
+    expect(results.get("Severance.S02E02.mkv")!.episodes).toEqual([severanceEpisodes.find((e) => e.season === 2 && e.episode === 2)]);
+    // Without a season every season is needed.
+    episodes.mockClear();
+    await matchAll([{ key: "a", parsed: parse("Severance - 10.mkv") }], provider);
+    expect(episodes.mock.calls[0]![1]).toMatchObject({ season: undefined });
+  });
+
   it("mehrere Titel gleichzeitig, höchstens vier", async () => {
     let active = 0;
     let most = 0;

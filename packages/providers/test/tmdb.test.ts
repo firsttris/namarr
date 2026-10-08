@@ -95,6 +95,15 @@ describe("TMDB-Provider", () => {
     });
   });
 
+  it("nur eine Staffel: ein Request, absolute Nummern zählen trotzdem durch", async () => {
+    const { tmdb, calls } = provider();
+    const eps = await tmdb.episodes("95396", { season: 2 });
+    expect(eps.map((e) => e.season)).toEqual([2, 2, 2]);
+    expect(calls.filter((c) => c.includes("/season/"))).toEqual([expect.stringContaining("/season/2")]);
+    // Season 1 has 9 episodes (show details): season 2 starts at 10.
+    expect(eps.find((e) => e.episode === 1)!.absolute).toBe(10);
+  });
+
   it("unübersetzte Episodentitel kommen aus der Originalsprache, dann aus Englisch", async () => {
     const r = recorded({
       "/3/tv/95396/season/2?language=de-DE": "tv_95396_season_2_untranslated",
