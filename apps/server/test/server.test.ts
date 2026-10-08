@@ -11,6 +11,7 @@ import { assertSafeBinding, isTrustedProxy, readEnv } from "~/server/env.server"
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
 import { afterExecution, checkLibrary, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
+import { forbiddenFolder } from "~/server/paths.server";
 import { seedFolders } from "~/server/runtime.server";
 import { accepts, compressHtml, precompress, staticFiles } from "~/server/static.server";
 import { isCandidate, WatchService } from "~/server/watch.server";
@@ -66,6 +67,17 @@ describe("Auth", () => {
     } finally {
       setSessionsValidAfter(0);
     }
+  });
+
+  it("Ordner: nicht das ganze Dateisystem, keine Systemordner, nicht die eigene Datenbank", () => {
+    expect(forbiddenFolder("/", "/config")).toBe(true);
+    expect(forbiddenFolder("/proc/self", "/config")).toBe(true);
+    expect(forbiddenFolder("/dev", "/config")).toBe(true);
+    expect(forbiddenFolder("/config", "/config")).toBe(true);
+    expect(forbiddenFolder("/srv", "/srv/namarr/config")).toBe(true);
+    expect(forbiddenFolder("/config/sub", "/config")).toBe(true);
+    expect(forbiddenFolder("/data", "/config")).toBe(false);
+    expect(forbiddenFolder("/devices", "/config")).toBe(false);
   });
 
   it("Proxy-Header nur von vertrauenswürdigen Adressen", () => {
