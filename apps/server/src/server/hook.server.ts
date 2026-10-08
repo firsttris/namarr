@@ -1,5 +1,7 @@
 import * as fs from "node:fs/promises";
-import { getSettings, type Job, listWatchFolders, resolveTargets } from "@namarr/db";
+import * as path from "node:path";
+import { isInside } from "@namarr/core";
+import { allowedRoots, getSettings, type Job, listWatchFolders, resolveTargets } from "@namarr/db";
 import { z } from "zod";
 import { localizeIn } from "../lib/i18n.tsx";
 import { automaticConfig } from "./automation.server.ts";
@@ -85,6 +87,11 @@ export async function createHookJob(rt: Runtime, input: HookInput): Promise<Job>
   const autoThreshold = input.review ? null : (input.threshold ?? watchFolder?.autoThreshold ?? 0.9);
 
   const source = mapPath(input.path, rt.env.pathMap);
+  // Outside the folders first: a 404 there would tell whether a path exists anywhere on the disk.
+  // jobs.create checks again after following symlinks.
+  if (!allowedRoots(settings).some((r) => isInside(path.resolve(source), path.resolve(r)))) {
+    throw new HookError(`Path is outside the folders set up in namarr: ${source}`, 403);
+  }
   if (!(await fs.stat(source).catch(() => undefined))) throw new HookError(`Path not found: ${source}`, 404);
 
   try {
