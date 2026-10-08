@@ -31,7 +31,7 @@ export class FakeProvider implements MetadataProvider {
     return this.search(this.data.series, query);
   }
 
-  async episodes(seriesId: string) {
+  async episodes(seriesId: string, _opts?: { season?: number }) {
     this.calls.episodes++;
     return this.data.episodes?.[seriesId] ?? [];
   }
