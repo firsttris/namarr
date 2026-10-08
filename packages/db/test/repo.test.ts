@@ -340,4 +340,17 @@ describe("Dashboard", () => {
     addToInbox(db, items[2]!.id, "x");
     expect(dashboardStats(db)).toEqual({ renamedToday: 2, inboxOpen: 1, autoRate: 2 / 3, undoable: 2 });
   });
+
+  it("Auto-Quote nach der Schwelle des Jobs", () => {
+    const db = fresh();
+    const lenient = createJob(db, { sourcePaths: ["/a"], config: { ...config, autoThreshold: 0.8 } });
+    const strict = createJob(db, { sourcePaths: ["/b"], config: { ...config, autoThreshold: 0.95 } });
+    insertItems(db, [
+      { jobId: lenient.id, sourcePath: "/a/1.mkv", state: "done", confidence: 0.85 },
+      { jobId: lenient.id, sourcePath: "/a/2.mkv", state: "done", confidence: 0.82 },
+      { jobId: strict.id, sourcePath: "/b/1.mkv", state: "needs_review", confidence: 0.92 },
+    ]);
+    // Sure by 0.8, but not by 0.9; the 0.92 is not sure by 0.95.
+    expect(dashboardStats(db).autoRate).toBe(2 / 3);
+  });
 });

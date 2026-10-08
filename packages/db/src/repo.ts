@@ -420,7 +420,11 @@ export function dashboardStats(db: AnyDb, now = new Date()): DashboardStats {
   const inboxOpen = db.select({ n: count() }).from(inbox).get()?.n ?? 0;
   const undoable = db.select({ n: count() }).from(operations).where(isNull(operations.undoneAt)).get()?.n ?? 0;
   const recent = db
-    .select({ auto: sql<number>`sum(case when ${jobItems.confidence} >= 0.9 then 1 else 0 end)`, n: count() })
+    // Sure by the job's own threshold (a watch folder can set 0.8 or 0.95), 0.9 where it has none.
+    .select({
+      auto: sql<number>`sum(case when ${jobItems.confidence} >= coalesce(json_extract(${jobs.config}, '$.autoThreshold'), 0.9) then 1 else 0 end)`,
+      n: count(),
+    })
     .from(jobItems)
     .innerJoin(jobs, eq(jobItems.jobId, jobs.id))
     .where(and(gte(jobs.createdAt, weekAgo), inArray(jobItems.state, ["done", "ready", "needs_review"])))
