@@ -53,12 +53,35 @@ Images are published to `ghcr.io/firsttris/namarr` and `tristanteu/namarr` for `
 
 | Tag | Content |
 |---|---|
-| `latest`, `x.y.z` | releases |
+| `latest`, `x.y`, `x.y.z` | releases; `x.y` follows the patch releases of one minor version |
 | `edge` | the current state of `main` |
 
 A new version is published by pushing a tag `vX.Y.Z` (see [Releases](development.md#releases));
 `edge` is built by hand with the *Release* workflow on `main`. The image contains a static `ffprobe`, so
 resolution and codecs are read even from files whose names say nothing about them.
+
+## Updates and backup
+
+namarr migrates its database on start, so an update is a new image and a restart:
+
+```bash
+docker compose pull && docker compose up -d        # Docker Compose
+docker pull tristanteu/namarr:latest               # docker run: pull, then remove and
+                                                   # start the container with the same options
+```
+
+Podman Quadlet updates itself with `podman auto-update`, see above. To stay on one minor version,
+pin a tag such as `0.1` instead of `latest`.
+
+Everything namarr keeps (settings, API keys, watch folders, rules and the history that undo works
+from) is the SQLite database in `/config`. A file replaced by *Overwrite* or *keep better* stays next
+to its target as `*.namarr-bak-*` until you undo, so it is part of your media backup, not of
+`/config`. Back up `/config` with the container stopped: the database runs in WAL mode, and a copy
+taken while it writes can miss the last changes.
+
+```bash
+docker compose stop && tar czf namarr-config-$(date +%F).tar.gz config && docker compose start
+```
 
 ## Folders and libraries
 
