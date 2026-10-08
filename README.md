@@ -122,6 +122,8 @@ Environment variables, image tags, updates and the API are in the
 
 ## 📚 Documentation
 
+Also as a website with search: **https://firsttris.github.io/namarr/**
+
 | | |
 |---|---|
 | [Installation](docs/installation.md) | Compose, docker run, Quadlet, Unraid, environment variables, image tags, health and events |

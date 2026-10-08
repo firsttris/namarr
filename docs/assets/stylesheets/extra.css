@@ -1,0 +1,17 @@
+/* Colours of the app icon (favicon.svg): amber on near-black */
+:root {
+  --md-primary-fg-color: #d9862e;
+  --md-primary-fg-color--light: #f0a14a;
+  --md-primary-fg-color--dark: #b86d1e;
+  --md-accent-fg-color: #b86d1e;
+}
+[data-md-color-scheme="slate"] {
+  --md-accent-fg-color: #f0a14a;
+}
+/* Screenshots: rounded corners and a shadow, never wider than the text */
+.md-typeset img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}

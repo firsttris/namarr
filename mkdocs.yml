@@ -1,0 +1,107 @@
+# Documentation as a website: https://firsttris.github.io/namarr/
+# Source is docs/, built with MkDocs Material (.github/workflows/docs.yml).
+# Locally: pip install -r requirements-docs.txt && mkdocs serve
+site_name: namarr
+site_description: >-
+  The self-hosted renamer for movies, series and anime: FileBot-style media matching
+  and ReNamer-style rules in one web UI. Every change starts as a preview and can be undone.
+site_url: https://firsttris.github.io/namarr/
+repo_url: https://github.com/firsttris/namarr
+repo_name: firsttris/namarr
+edit_uri: edit/main/docs/
+copyright: >-
+  License MIT · Metadata from TMDB, TheTVDB, TVmaze and AniDB.
+  This project is not affiliated with any of them.
+
+docs_dir: docs
+# Pages as workbench.html instead of workbench/: this keeps the relative image paths
+# working, which also have to work on GitHub
+use_directory_urls: false
+exclude_docs: |
+  banner.svg
+
+nav:
+  - Overview: README.md
+  - Installation: installation.md
+  - Workbench: workbench.md
+  - Automation: automation.md
+  - Metadata sources: metadata.md
+  - Development: development.md
+
+theme:
+  name: material
+  language: en
+  logo: assets/icon.svg
+  favicon: assets/icon.svg
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Follows the system setting, switchable like in the app
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+    - content.tabs.link
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      type: date
+      fallback_to_build_date: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Link to this section
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/firsttris/namarr
+      name: Source code on GitHub
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/tristanteu/namarr
+      name: Image on Docker Hub

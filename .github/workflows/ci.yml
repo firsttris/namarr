@@ -7,12 +7,16 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
       - "LICENSE"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
       - "LICENSE"
   # The release workflow runs the same checks before it tags anything.
   workflow_call:

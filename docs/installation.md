@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 ```
 
-The same file is in [`docker/compose.example.yml`](../docker/compose.example.yml). Then open
+The same file is in [`docker/compose.example.yml`](https://github.com/firsttris/namarr/blob/main/docker/compose.example.yml). Then open
 `http://<host>:8420`, sign in with the token and, under **Settings**:
 
 1. add your [folders](#folders-and-libraries): `/data` from the example, or your own mounts, each
@@ -44,7 +44,7 @@ Updates: `podman auto-update` (the unit sets `AutoUpdate=registry`).
 
 ## Unraid
 
-A template is in [`docker/unraid/namarr.xml`](../docker/unraid/namarr.xml).
+A template is in [`docker/unraid/namarr.xml`](https://github.com/firsttris/namarr/blob/main/docker/unraid/namarr.xml).
 
 ## Images and tags
 

@@ -10,6 +10,8 @@ dist
 *.sqlite-*
 coverage
 test-results
+# MkDocs output (mkdocs build)
+site
 playwright-report
 **/e2e/.tmp
 
