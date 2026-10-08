@@ -55,8 +55,7 @@ default formats and moves the files. The answer is
 `{"error"}` with 400 (invalid, or no target at all), 401 (token), 403 (outside the folders) or 404 (path or watch folder
 unknown).
 
-> [!NOTE]
-> Profiles are gone. A call that still sends `profile` gets a 400 that says to send `watchFolder`
+> **Note:** Profiles are gone. A call that still sends `profile` gets a 400 that says to send `watchFolder`
 > instead; the watch folders that used a profile took over its settings.
 
 - **qBittorrent** → Options → Downloads → *Run external program on torrent finished*:

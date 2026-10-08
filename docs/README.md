@@ -1,5 +1,9 @@
 # namarr documentation
 
+Everything about namarr in detail: installing it, the workbench, automation, where the metadata
+comes from and how it is built. The quick overview is the
+[README on GitHub](https://github.com/firsttris/namarr#readme).
+
 | | |
 |---|---|
 | [Installation](installation.md) | Docker Compose, docker run, Podman Quadlet, Unraid, environment variables, image tags, health and events |
