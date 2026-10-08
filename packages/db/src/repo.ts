@@ -264,8 +264,13 @@ export function allItems(db: AnyDb, jobId: number): JobItem[] {
 
 /** Source paths below `dir` that some job already took (renamed, skipped or still pending). */
 export function knownSourcePaths(db: AnyDb, dir: string): Set<string> {
-  const prefix = `${dir.replace(/\/+$/, "").replace(/[%_\\]/g, "\\$&")}/%`;
-  const rows = db.select({ path: jobItems.sourcePath }).from(jobItems).where(sql`${jobItems.sourcePath} LIKE ${prefix} ESCAPE '\\'`).all();
+  // A range instead of LIKE 'dir/%', so the index on source_path is used: "0" follows "/".
+  const base = dir.replace(/\/+$/, "");
+  const rows = db
+    .select({ path: jobItems.sourcePath })
+    .from(jobItems)
+    .where(and(gte(jobItems.sourcePath, `${base}/`), lt(jobItems.sourcePath, `${base}0`)))
+    .all();
   return new Set(rows.map((r) => r.path));
 }
 

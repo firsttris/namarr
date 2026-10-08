@@ -271,6 +271,20 @@ describe("Bekannte Quellpfade", () => {
     expect([...knownSourcePaths(db, "/dl")].sort()).toEqual(["/dl/100%_done/a.mkv", "/dl/b.mkv"]);
     expect([...knownSourcePaths(db, "/dl/100%_done/")]).toEqual(["/dl/100%_done/a.mkv"]);
     expect([...knownSourcePaths(db, "/dl_")]).toEqual([]);
+    // A neighbour like "/dl.old" stays outside the range.
+    insertItems(db, [{ jobId: job.id, sourcePath: "/dl.old/e.mkv" }]);
+    expect([...knownSourcePaths(db, "/dl")].sort()).toEqual(["/dl/100%_done/a.mkv", "/dl/b.mkv"]);
+  });
+
+  it("Indizes für die häufigen Abfragen", () => {
+    const db = fresh();
+    const plan = (q: string) => (db.$client.query(`EXPLAIN QUERY PLAN ${q}`).all() as { detail: string }[]).map((r) => r.detail).join(" ");
+    expect(plan("SELECT source_path FROM job_items WHERE source_path >= '/dl/' AND source_path < '/dl0'")).toContain(
+      "job_items_source_idx",
+    );
+    expect(plan("SELECT * FROM job_items WHERE target_path = '/x'")).toContain("job_items_target_idx");
+    expect(plan("SELECT * FROM operations WHERE undone_at IS NULL")).toContain("operations_undone_idx");
+    expect(plan("SELECT * FROM inbox ORDER BY created_at")).toContain("inbox_created_idx");
   });
 });
 
