@@ -10,7 +10,7 @@ repo_url: https://github.com/firsttris/namarr
 repo_name: firsttris/namarr
 edit_uri: edit/main/docs/
 copyright: >-
-  License MIT · Metadata from TMDB, TheTVDB, TVmaze and AniDB.
+  License AGPL-3.0 · Metadata from TMDB, TheTVDB, TVmaze and AniDB.
   This project is not affiliated with any of them.
 
 docs_dir: docs
