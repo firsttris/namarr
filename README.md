@@ -13,12 +13,13 @@ Every change starts as a preview, and every change can be undone.
 [![Image Size](https://img.shields.io/docker/image-size/tristanteu/namarr/latest?logo=docker&logoColor=white&label=image)](https://hub.docker.com/r/tristanteu/namarr)
 [![Platforms](https://img.shields.io/badge/platform-amd64%20%7C%20arm64-lightgrey)](https://hub.docker.com/r/tristanteu/namarr/tags)
 [![Bun](https://img.shields.io/badge/built%20with-Bun-fbf0df?logo=bun&logoColor=black)](https://bun.sh/)
+[![Docs](https://img.shields.io/badge/docs-firsttris.github.io%2Fnamarr-d9862e?logo=materialformkdocs&logoColor=white)](https://firsttris.github.io/namarr/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
 [Features](#-features) •
 [Metadata](#-metadata-sources) •
 [Quick start](#-quick-start) •
-[Documentation](docs/README.md) •
+[Documentation](https://firsttris.github.io/namarr/) •
 [Contributing](#-contributing)
 
 <img src="docs/screenshot-workbench.png" alt="namarr workbench: eight Severance files with their new names, the template editor and the selected episode" width="900">
@@ -125,15 +126,16 @@ Environment variables, image tags, updates and the API are in the
 
 ## 📚 Documentation
 
-Also as a website with search: **https://firsttris.github.io/namarr/**
+The full documentation is a website with search: **[firsttris.github.io/namarr](https://firsttris.github.io/namarr/)**.
+The same pages are in [`docs/`](docs/README.md) here on GitHub.
 
 | | |
 |---|---|
-| [Installation](docs/installation.md) | Compose, docker run, Quadlet, Unraid, environment variables, image tags, health and events |
-| [Workbench](docs/workbench.md) | preview, actions, conflicts and *keep better*, template language, rules |
-| [Automation](docs/automation.md) | watch folders, inbox, download client hook, library refresh, notifications |
-| [Metadata sources](docs/metadata.md) | TMDB, TheTVDB, TVmaze, AniDB, IDs in folder names, languages |
-| [Development](docs/development.md) | setup, checks, architecture, tests, parser corpus, roadmap |
+| [Installation](https://firsttris.github.io/namarr/installation.html) | Compose, docker run, Quadlet, Unraid, folders, environment variables, image tags, updates and backup, health and events |
+| [Workbench](https://firsttris.github.io/namarr/workbench.html) | preview, actions, conflicts and *keep better*, undo, template language, naming formats and detecting them from a library, rules |
+| [Automation](https://firsttris.github.io/namarr/automation.html) | watch folders, inbox, download client hook, library refresh, notifications |
+| [Metadata sources](https://firsttris.github.io/namarr/metadata.html) | TMDB, TheTVDB, TVmaze, AniDB, IDs in folder names, languages, episode order |
+| [Development](https://firsttris.github.io/namarr/development.html) | setup, checks, architecture, tests, parser corpus, roadmap |
 
 ## 🛠️ Development
 
