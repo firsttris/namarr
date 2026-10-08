@@ -595,5 +595,6 @@
   "template_tokens_tvdb": "TVDB ID",
   "template_tokens_rating": "Rating",
   "formats_inferRatingDiffers": "Fits, only the rating is a different one today. namarr would write: {path}",
-  "settings_error_folderForbidden": "{path} cannot be a folder: the whole file system, a system folder or namarr's own database"
+  "settings_error_folderForbidden": "{path} cannot be a folder: the whole file system, a system folder or namarr's own database",
+  "auth_error_tooManyAttempts": "Too many failed attempts. Please wait a minute."
 }

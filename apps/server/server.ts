@@ -5,6 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import * as path from "node:path";
+import { PEER_HEADER } from "./src/server/auth.server.ts";
 import { assertSafeBinding, isTrustedProxy, readEnv } from "./src/server/env.server.ts";
 import { dropPrivileges } from "./src/server/privileges.server.ts";
 import { runtime } from "./src/server/runtime.server.ts";
@@ -30,6 +31,10 @@ const server = Bun.serve({
   // SSE connections stay open; Bun's default idle timeout would cut them.
   idleTimeout: 0,
   async fetch(req, srv) {
+    // Who is asking, for the login throttle; never what the client claims.
+    const tagged = new Headers(req.headers);
+    tagged.set(PEER_HEADER, srv.requestIP(req)?.address ?? "unknown");
+    req = new Request(req, { headers: tagged });
     // The proxy's user header counts only from the proxy: whoever reaches the port directly could
     // set it themselves.
     if (env.authHeader && req.headers.has(env.authHeader)) {

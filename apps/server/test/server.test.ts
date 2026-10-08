@@ -6,7 +6,15 @@ import { createWatchFolder, type Db, getSettings, listJobs, openDatabase, type S
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { localizeIn } from "~/lib/i18n";
-import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue, setSessionsValidAfter } from "~/server/auth.server";
+import {
+  isAuthenticated,
+  isPublicPath,
+  loginThrottle,
+  SESSION_COOKIE,
+  sessionCookie,
+  sessionValue,
+  setSessionsValidAfter,
+} from "~/server/auth.server";
 import { assertSafeBinding, isTrustedProxy, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
@@ -78,6 +86,18 @@ describe("Auth", () => {
     expect(forbiddenFolder("/config/sub", "/config")).toBe(true);
     expect(forbiddenFolder("/data", "/config")).toBe(false);
     expect(forbiddenFolder("/devices", "/config")).toBe(false);
+  });
+
+  it("Login: nach 10 Fehlversuchen pro Minute und Adresse ist Pause", () => {
+    const t = 1_000_000;
+    for (let i = 0; i < 10; i++) loginThrottle.failed("10.0.0.9", t + i);
+    expect(loginThrottle.blocked("10.0.0.9", t + 20)).toBe(true);
+    // Other addresses are not affected; after a minute it is over.
+    expect(loginThrottle.blocked("10.0.0.8", t + 20)).toBe(false);
+    expect(loginThrottle.blocked("10.0.0.9", t + 61_000)).toBe(false);
+    loginThrottle.failed("10.0.0.7", t);
+    loginThrottle.succeeded("10.0.0.7");
+    expect(loginThrottle.blocked("10.0.0.7", t)).toBe(false);
   });
 
   it("Proxy-Header nur von vertrauenswürdigen Adressen", () => {

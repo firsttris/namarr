@@ -73,6 +73,32 @@ export function sessionCookie(token: string, secure: boolean, issuedAt = Date.no
   return `${SESSION_COOKIE}=${sessionValue(token, issuedAt)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_S}${secure ? "; Secure" : ""}`;
 }
 
+/** Set by the production server to the peer address; a client's own value is replaced. */
+export const PEER_HEADER = "x-namarr-peer";
+
+const LOGIN_WINDOW_MS = 60_000;
+const LOGIN_MAX_FAILURES = 10;
+const failures = new Map<string, number[]>();
+
+/**
+ * Failed logins per address: after 10 within a minute, the next attempts are refused at once.
+ * The delay on a wrong token alone does not stop parallel guessing.
+ */
+export const loginThrottle = {
+  blocked(peer: string, now = Date.now()): boolean {
+    const recent = (failures.get(peer) ?? []).filter((t) => now - t < LOGIN_WINDOW_MS);
+    if (recent.length) failures.set(peer, recent);
+    else failures.delete(peer);
+    return recent.length >= LOGIN_MAX_FAILURES;
+  },
+  failed(peer: string, now = Date.now()) {
+    failures.set(peer, [...(failures.get(peer) ?? []), now]);
+  },
+  succeeded(peer: string) {
+    failures.delete(peer);
+  },
+};
+
 /** Paths reachable without login. Server functions check auth themselves (middleware). */
 export function isPublicPath(pathname: string): boolean {
   return (

@@ -595,5 +595,6 @@
   "template_tokens_tvdb": "TVDB-ID",
   "template_tokens_rating": "Bewertung",
   "formats_inferRatingDiffers": "Passt, nur die Bewertung ist heute eine andere. namarr würde: {path}",
-  "settings_error_folderForbidden": "{path} geht nicht als Ordner: das ganze Dateisystem, Systemordner oder namarrs eigene Datenbank"
+  "settings_error_folderForbidden": "{path} geht nicht als Ordner: das ganze Dateisystem, Systemordner oder namarrs eigene Datenbank",
+  "auth_error_tooManyAttempts": "Zu viele Fehlversuche. Bitte eine Minute warten."
 }
