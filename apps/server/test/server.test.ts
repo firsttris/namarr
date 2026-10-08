@@ -6,7 +6,7 @@ import { createWatchFolder, type Db, getSettings, listJobs, openDatabase, type S
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { localizeIn } from "~/lib/i18n";
-import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue } from "~/server/auth.server";
+import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue, setSessionsValidAfter } from "~/server/auth.server";
 import { assertSafeBinding, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
@@ -45,6 +45,27 @@ describe("Auth", () => {
     expect(isAuthenticated(env, h({ authorization: "Bearer nein" }))).toBe(false);
     expect(isAuthenticated(env, h({ authorization: `Basic ${btoa("user:geheim")}` }))).toBe(true);
     expect(isAuthenticated(env, h({ authorization: `Basic ${btoa("user:nein")}` }))).toBe(false);
+  });
+
+  it("Sessions: jede anders, laufen ab, Logout beendet alle", () => {
+    const now = Date.now();
+    const cookie = (v: string) => h({ cookie: `${SESSION_COOKIE}=${v}` });
+    const first = sessionValue("geheim", now - 1000);
+    expect(sessionValue("geheim", now)).not.toBe(first);
+    expect(isAuthenticated(env, cookie(first), now)).toBe(true);
+    // Expired on the server, whatever the browser keeps.
+    expect(isAuthenticated(env, cookie(sessionValue("geheim", now - 31 * 24 * 3600 * 1000)), now)).toBe(false);
+    // Tampered timestamp: the signature no longer fits.
+    expect(isAuthenticated(env, cookie(`${now}.${first.split(".")[1]}`), now)).toBe(false);
+    expect(isAuthenticated(env, cookie("kaputt"), now)).toBe(false);
+    // Logout: every session issued so far is void, a new login works.
+    setSessionsValidAfter(now);
+    try {
+      expect(isAuthenticated(env, cookie(first), now)).toBe(false);
+      expect(isAuthenticated(env, cookie(sessionValue("geheim", now + 1)), now + 2)).toBe(true);
+    } finally {
+      setSessionsValidAfter(0);
+    }
   });
 
   it("Reverse-Proxy-Header", () => {

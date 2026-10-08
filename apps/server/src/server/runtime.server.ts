@@ -12,6 +12,7 @@ import {
   setSettings,
 } from "@namarr/db";
 import pino from "pino";
+import { setSessionsValidAfter } from "./auth.server.ts";
 import { type Env, readEnv } from "./env.server.ts";
 import { EventBus } from "./events.server.ts";
 import { JobService } from "./jobs.server.ts";
@@ -62,6 +63,7 @@ export function runtime(): Runtime {
   if (interrupted) log.warn({ interrupted }, "Unterbrochene Jobs als fehlgeschlagen markiert");
 
   seedFolders(db, env.roots, log);
+  setSessionsValidAfter(getSettings(db).sessionsValidAfter ?? 0);
   const { skippedRules } = migrateProfiles(db);
   if (skippedRules.length)
     log.warn({ profiles: skippedRules }, "Profile mit Regeln: Regeln nicht übernommen (Werkbank → Regeln importieren)");

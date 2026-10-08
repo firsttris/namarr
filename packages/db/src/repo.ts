@@ -59,6 +59,8 @@ export type Settings = {
   libraryRefresh: { kind: "jellyfin" | "plex" | "emby"; url: string; token: string }[];
   /** Set once profiles were taken over into formats and watch folders. */
   profilesMigrated?: boolean;
+  /** Logins issued before this (ms) are void: set by logout. */
+  sessionsValidAfter?: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
