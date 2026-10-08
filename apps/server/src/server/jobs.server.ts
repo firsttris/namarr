@@ -569,7 +569,13 @@ export class JobService {
         },
       });
     }
-    return this.enqueue(jobId, (signal) => this.execute(jobId, signal, options.itemIds));
+    // Busy from the click on: while it waits behind another job, the preview must not change
+    // under it (a late recompute or an edited target would run instead of what was shown).
+    this.progress(job, "executing", 0, 0);
+    return this.enqueue(jobId, (signal) => this.execute(jobId, signal, options.itemIds)).catch((err) => {
+      if (getJob(db, jobId)?.status === "executing") this.progress(job, "ready", 0, 0);
+      throw err;
+    });
   }
 
   private async execute(jobId: number, signal: AbortSignal, onlyItems?: number[]) {

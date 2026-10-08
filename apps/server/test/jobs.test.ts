@@ -229,6 +229,19 @@ describe("JobService: Aufräumen nach dem Verschieben", () => {
   });
 });
 
+describe("JobService: Ausführen in der Warteschlange", () => {
+  it("ab dem Klick ist der Job belegt, auch wenn er noch hinter einem anderen wartet", async () => {
+    const { job } = await analyzed();
+    // Another job keeps the queue busy.
+    await jobs.create({ paths: [tv()], config: config() });
+    const run = jobs.executeNow(job.id, { action: "test" });
+    expect(getJob(db, job.id)!.status).toBe("executing");
+    await expect(jobs.recompute(job.id, { template: { episode: "{n}" } })).rejects.toThrow();
+    await run;
+    expect(getJob(db, job.id)!.status).toBe("ready");
+  });
+});
+
 describe("JobService: Watch-Jobs auf denselben Release-Ordner", () => {
   it("der zweite Job nimmt nur, was noch kein Job kennt", async () => {
     const release = path.join(tv(), "Severance.S02.German.DL.1080p.WEB-GRP");
