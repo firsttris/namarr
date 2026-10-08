@@ -201,7 +201,10 @@ export async function hasFfprobe(ffprobe = "ffprobe"): Promise<boolean> {
  */
 export function prober(ffprobe = "ffprobe", available: () => Promise<boolean> = () => hasFfprobe(ffprobe)) {
   let installed: Promise<boolean> | undefined;
-  return async (file: string): Promise<ProbeInfo | undefined> => ((await (installed ??= available())) ? probe(file, ffprobe) : undefined);
+  return async (file: string): Promise<ProbeInfo | undefined> => {
+    installed ??= available();
+    return (await installed) ? probe(file, ffprobe) : undefined;
+  };
 }
 
 /** Reads container metadata with ffprobe. Returns undefined when ffprobe is not installed. */
