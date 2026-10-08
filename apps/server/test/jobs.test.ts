@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { APPROVED, DOUBLE_EPISODE } from "@namarr/core";
+import { APPROVED, DOUBLE_EPISODE, type Parsed } from "@namarr/core";
 import {
   allItems,
   createWatchFolder,
@@ -503,16 +503,14 @@ describe("JobService: ffprobe", () => {
     expect(by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").targetPath).toBe(path.join(media(), "Severance S02E01 1080p H.264.mkv"));
   });
 
-  it("ohne ffprobe wird nach dem ersten Versuch abgebrochen", async () => {
-    const probe = vi.fn(async () => undefined);
+  it("eine unlesbare erste Datei hält die anderen nicht auf", async () => {
+    let calls = 0;
+    const probe = vi.fn(async () => (calls++ === 0 ? undefined : { resolution: "2160p", videoCodec: "H.265", audio: [] }));
     jobs = new JobService({ db, bus, provider: () => new DemoProvider(), log, notify, probe });
-    await touch("downloads/tv/a.s01e01.mkv");
-    await touch("downloads/tv/b.s01e01.mkv");
-    await touch("downloads/tv/c.s01e01.mkv");
-    await touch("downloads/tv/d.s01e01.mkv");
-    await touch("downloads/tv/e.s01e01.mkv");
-    await analyzed();
-    expect(probe).toHaveBeenCalledTimes(4);
+    const { items } = await analyzed();
+    expect(probe).toHaveBeenCalledTimes(2);
+    // The second file still gets what ffprobe read.
+    expect(items.filter((i) => (i.parsedJson as Parsed).release.videoCodec === "H.265")).toHaveLength(1);
   });
 });
 

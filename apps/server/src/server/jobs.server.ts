@@ -253,8 +253,9 @@ export class JobService {
   private async probeMissing(files: ScannedFile[], parsed: Parsed[]) {
     const todo = files.map((f, i) => ({ f, p: parsed[i]! })).filter(({ p }) => !p.release.resolution || !p.release.videoCodec);
     for (let i = 0; i < todo.length; i += 4) {
+      // Without ffprobe `probe` answers at once (see `prober`): an unreadable first file no longer
+      // stops the rest.
       const infos = await Promise.all(todo.slice(i, i + 4).map(({ f }) => this.deps.probe?.(f.path)));
-      if (i === 0 && infos[0] === undefined) return; // no ffprobe: don't try the rest
       infos.forEach((info, k) => {
         const { p } = todo[i + k]!;
         if (!info) return;

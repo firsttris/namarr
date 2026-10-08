@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type MetadataProvider, probe } from "@namarr/core";
+import { type MetadataProvider, prober } from "@namarr/core";
 import {
   type Db,
   failInterruptedJobs,
@@ -70,7 +70,7 @@ export function runtime(): Runtime {
   const cache = new SqliteProviderCache(db);
   // One client per source and key, so rate limits hold across jobs and manual searches.
   const provider = providerFactory(cache, env.demo);
-  const jobs = new JobService({ db, bus, provider, log, probe: (file) => probe(file) });
+  const jobs = new JobService({ db, bus, provider, log, probe: prober() });
   const watch = new WatchService({ db, bus, jobs, log });
   const rt: Runtime = { env, db, bus, jobs, watch, provider: (choice) => provider(getSettings(db), choice), log, startedAt: new Date() };
   holder[KEY] = rt;
