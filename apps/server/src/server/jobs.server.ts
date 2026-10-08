@@ -171,11 +171,13 @@ export class JobService {
     const settings = this.settings();
     const resolved: string[] = [];
     for (const p of input.paths) resolved.push(await resolveInRoots(p, allowedRoots(settings)));
-    if (input.config.targetRoot) input.config.targetRoot = await resolveInRoots(input.config.targetRoot, allowedRoots(settings));
-    input.config.targets = await this.resolveTargetFolders(input.config.targets, allowedRoots(settings));
+    // A copy: the caller's config object stays as it was.
+    const config: JobConfig = { ...input.config };
+    if (config.targetRoot) config.targetRoot = await resolveInRoots(config.targetRoot, allowedRoots(settings));
+    config.targets = await this.resolveTargetFolders(config.targets, allowedRoots(settings));
     const job = createJob(this.deps.db, {
       sourcePaths: resolved,
-      config: input.config,
+      config,
       kind: input.kind ?? "manual",
       watchFolderId: input.watchFolderId ?? null,
     });

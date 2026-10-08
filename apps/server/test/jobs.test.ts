@@ -229,6 +229,16 @@ describe("JobService: Aufräumen nach dem Verschieben", () => {
   });
 });
 
+describe("JobService: create", () => {
+  it("lässt die Config des Aufrufers unverändert", async () => {
+    const input = config({ targetRoot: `${tmp}/media/../media/tv`, targets: { movie: media() } });
+    const copy = structuredClone(input);
+    await jobs.create({ paths: [tv()], config: input });
+    await jobs.idle();
+    expect(input).toStrictEqual(copy);
+  });
+});
+
 describe("JobService: Ausführen in der Warteschlange", () => {
   it("ab dem Klick ist der Job belegt, auch wenn er noch hinter einem anderen wartet", async () => {
     const { job } = await analyzed();
