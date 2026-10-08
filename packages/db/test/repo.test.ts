@@ -276,6 +276,12 @@ describe("Bekannte Quellpfade", () => {
     expect([...knownSourcePaths(db, "/dl")].sort()).toEqual(["/dl/100%_done/a.mkv", "/dl/b.mkv"]);
   });
 
+  it("Pragmas für WAL", () => {
+    const pragma = (name: string) => Object.values(fresh().$client.query(`PRAGMA ${name}`).get() as object)[0];
+    expect(pragma("synchronous")).toBe(1); // NORMAL
+    expect(pragma("temp_store")).toBe(2); // MEMORY
+  });
+
   it("Indizes für die häufigen Abfragen", () => {
     const db = fresh();
     const plan = (q: string) => (db.$client.query(`EXPLAIN QUERY PLAN ${q}`).all() as { detail: string }[]).map((r) => r.detail).join(" ");
