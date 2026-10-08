@@ -80,6 +80,18 @@ describe("Bewertung", () => {
 });
 
 describe("Gruppierung und matchAll", () => {
+  it("Serien mit verschiedenen Jahren sind verschiedene Gruppen", () => {
+    const groups = (files: string[]) =>
+      groupInputs(files.map((f) => ({ key: f, parsed: parse(f) }))).map((g) => [g.title, g.year, g.items.map((i) => i.key)]);
+    expect(groups(["The.Office.2005.S01E01.mkv", "The.Office.2001.S01E01.mkv"])).toHaveLength(2);
+    // Without a year: joins the only dated group of the show.
+    expect(groups(["Severance.2022.S02E01.mkv", "Severance.S02E02.mkv"])).toEqual([
+      ["Severance", 2022, ["Severance.2022.S02E01.mkv", "Severance.S02E02.mkv"]],
+    ]);
+    // But not a show whose name only starts the same.
+    expect(groups(["Dark.S01E01.mkv", "Dark.Matter.2015.S01E01.mkv"])).toHaveLength(2);
+  });
+
   it("lädt nur die Staffeln, die die Dateien nennen", async () => {
     const provider = new FakeProvider({ series: [severance], episodes: { "95396": severanceEpisodes } });
     const episodes = vi.spyOn(provider, "episodes");

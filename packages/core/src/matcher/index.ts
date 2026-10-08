@@ -132,7 +132,8 @@ export function groupInputs(inputs: MatchInput[]): Group[] {
     const { parsed } = input;
     if (!parsed.title || parsed.kind.value === "unknown") continue;
     const kind = parsed.kind.value === "episode" ? "series" : "movie";
-    const key = `${kind}|${normalizeTitle(parsed.title)}|${kind === "movie" ? (parsed.year ?? "") : ""}`;
+    // Series with different years are different shows ("The.Office.2005" and "The.Office.2001").
+    const key = `${kind}|${normalizeTitle(parsed.title)}|${parsed.year ?? ""}`;
     let group = groups.get(key);
     if (!group) {
       group = { kind, title: parsed.title, year: parsed.year, items: [] };
@@ -140,6 +141,16 @@ export function groupInputs(inputs: MatchInput[]): Group[] {
     }
     group.year ??= parsed.year;
     group.items.push(input);
+  }
+  // Episodes without a year join their show when only one year of it is in the job.
+  for (const [key, group] of groups) {
+    if (group.kind !== "series" || group.year !== undefined) continue;
+    // The key ends with "|" here: "series|dark|" must not take "series|dark matter|2015".
+    const dated = [...groups.entries()].filter(([k, g]) => k !== key && k.startsWith(key) && g.kind === "series");
+    if (dated.length === 1) {
+      dated[0]![1].items.push(...group.items);
+      groups.delete(key);
+    }
   }
   return [...groups.values()];
 }
