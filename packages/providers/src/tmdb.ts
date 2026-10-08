@@ -1,8 +1,7 @@
 import type { EpisodeInfo, EpisodeOrder, ExternalIds, MediaCandidate, MetadataProvider } from "@namarr/core";
 import { msg } from "@namarr/core/i18n";
-import Bottleneck from "bottleneck";
-import { MemoryCache, type ProviderCache } from "./cache.ts";
-import { ProviderError } from "./http.ts";
+import type { ProviderCache } from "./cache.ts";
+import { ProviderError, ProviderHttp } from "./http.ts";
 
 export type TmdbOptions = {
   /** v3 API key or v4 read access token. Every user brings their own. */
@@ -63,17 +62,18 @@ const GROUP_TYPE: Record<Exclude<EpisodeOrder, "aired">, number> = { absolute: 2
 
 export class TmdbProvider implements MetadataProvider {
   readonly name = "tmdb";
-  private readonly limiter: Bottleneck;
-  private readonly cache: ProviderCache;
-  private readonly fetchImpl: typeof fetch;
+  private readonly http: ProviderHttp;
   private readonly baseUrl: string;
   private readonly ttl: { search: number; details: number };
 
   constructor(private readonly options: TmdbOptions) {
     const rate = options.rateLimit ?? 40;
-    this.limiter = new Bottleneck({ maxConcurrent: 8, minTime: Math.ceil(1000 / rate) });
-    this.cache = options.cache ?? new MemoryCache();
-    this.fetchImpl = options.fetch ?? fetch;
+    this.http = new ProviderHttp(this.name, {
+      cache: options.cache,
+      fetch: options.fetch,
+      minTime: Math.ceil(1000 / rate),
+      maxConcurrent: 8,
+    });
     this.baseUrl = options.baseUrl ?? "https://api.themoviedb.org/3";
     this.ttl = options.ttlSeconds ?? { search: 24 * 3600, details: 7 * 24 * 3600 };
   }
@@ -84,30 +84,16 @@ export class TmdbProvider implements MetadataProvider {
       if (v !== undefined && v !== "") query.set(k, String(v));
     }
     const key = `${path}?${query}`;
-    const cached = await this.cache.get(this.name, key);
-    if (cached !== undefined) return cached as T;
-
-    const bearer = this.options.apiKey.startsWith("eyJ");
-    if (!bearer) query.set("api_key", this.options.apiKey);
-    const url = `${this.baseUrl}${path}?${query}`;
-    const headers: Record<string, string> = { accept: "application/json" };
-    if (bearer) headers.authorization = `Bearer ${this.options.apiKey}`;
-
-    const body = await this.limiter.schedule(() => this.request(url, headers));
-    await this.cache.set(this.name, key, body, ttl);
-    return body as T;
-  }
-
-  private async request(url: string, headers: Record<string, string>, attempt = 0): Promise<unknown> {
-    const res = await this.fetchImpl(url, { headers });
-    if (res.status === 429 && attempt < 3) {
-      const wait = Number(res.headers.get("retry-after") ?? 1) * 1000;
-      await new Promise((r) => setTimeout(r, Math.min(wait, 10_000)));
-      return this.request(url, headers, attempt + 1);
-    }
-    if (res.status === 401) throw new ProviderError(msg("providers_tmdb_invalidKey"), 401);
-    if (!res.ok) throw new ProviderError(`TMDB: HTTP ${res.status}`, res.status);
-    return res.json();
+    return this.http.cached(key, ttl, async () => {
+      const bearer = this.options.apiKey.startsWith("eyJ");
+      if (!bearer) query.set("api_key", this.options.apiKey);
+      const headers: Record<string, string> = { accept: "application/json" };
+      if (bearer) headers.authorization = `Bearer ${this.options.apiKey}`;
+      const res = await this.http.request(`${this.baseUrl}${path}?${query}`, { headers });
+      if (res.status === 401) throw new ProviderError(msg("providers_tmdb_invalidKey"), 401);
+      if (!res.ok) throw new ProviderError(`TMDB: HTTP ${res.status}`, res.status);
+      return (await res.json()) as T;
+    });
   }
 
   private language(opts?: { language?: string }) {

@@ -20,11 +20,11 @@ export type HttpOptions = {
   maxConcurrent?: number;
 };
 
-/** Rate limit, response cache and 429 retries, shared by the providers. */
 const MISSING = { namarrMissing: true } as const;
 const MISSING_TTL_S = 3600;
 const isMissing = (v: unknown) => typeof v === "object" && v !== null && (v as { namarrMissing?: boolean }).namarrMissing === true;
 
+/** Rate limit, response cache and 429 retries, shared by the providers. */
 export class ProviderHttp {
   private readonly limiter: Bottleneck;
   readonly cache: ProviderCache;
