@@ -397,20 +397,33 @@ export class JobService {
     if (job.config.mode !== "media" && needsMetadata(job.config.rules ?? [])) await this.loadMetadata(inputs);
     const preview = buildPreview(inputs, this.previewConfig(job.config));
     await this.markExisting(preview);
+    const changed: number[] = [];
     db.transaction(() => {
       preview.forEach((p, i) => {
         const item = items[i]!;
-        updateItem(db, item.id, {
+        const next = {
           targetPath: p.target ?? null,
-          state: p.state === "parsed" ? "needs_review" : p.state,
+          state: p.state === "parsed" ? ("needs_review" as const) : p.state,
           confidence: p.confidence,
           reasons: p.reasons,
           conflict: p.conflict ?? null,
           companions: p.companions.map((c, k) => ({ ...c, suffix: item.companions[k]?.suffix })),
-        });
+        };
+        // Every template keystroke in the workbench recomputes: write and announce only what moved.
+        const before = {
+          targetPath: item.targetPath,
+          state: item.state,
+          confidence: item.confidence,
+          reasons: item.reasons,
+          conflict: item.conflict,
+          companions: item.companions,
+        };
+        if (JSON.stringify(next) === JSON.stringify(before)) return;
+        updateItem(db, item.id, next);
+        changed.push(item.id);
       });
     });
-    this.deps.bus.emit({ type: "item.updated", jobId, itemIds: items.map((i) => i.id) });
+    if (changed.length) this.deps.bus.emit({ type: "item.updated", jobId, itemIds: changed });
     return countItemsByState(db, jobId);
   }
 

@@ -257,6 +257,18 @@ describe("JobService: Watch-Jobs auf denselben Release-Ordner", () => {
 });
 
 describe("JobService: Vorschau neu berechnen ohne neues Matching", () => {
+  it("schreibt und meldet nur Items, die sich ändern", async () => {
+    const { job } = await analyzed();
+    const updates = () => events.filter((e) => e.type === "item.updated");
+    await jobs.recompute(job.id, { template: { episode: "{n}/{s00e00}" } });
+    const before = updates().length;
+    // Same again: nothing moves, nothing is written or announced.
+    await jobs.recompute(job.id, { template: { episode: "{n}/{s00e00}" } });
+    expect(updates().length).toBe(before);
+    await jobs.recompute(job.id, { template: { episode: "{n} - {s00e00}" } });
+    expect(updates().length).toBe(before + 1);
+  });
+
   it("Template, Regeln und Ziel ändern", async () => {
     const { job, by } = await analyzed();
     await jobs.recompute(job.id, {
