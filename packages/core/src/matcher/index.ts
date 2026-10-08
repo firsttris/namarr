@@ -106,10 +106,18 @@ export function rank(parsed: Parsed, candidates: MediaCandidate[]): { ranked: Sc
   return { ranked, confidence: Math.min(1, confidence), reasons };
 }
 
-/** How sure the parser is about a file's structure weighs into its match confidence. */
-export function withParserConfidence(confidence: number, parsed: Parsed): number {
+/**
+ * How sure the parser is about a file's structure weighs into its match confidence, unless the
+ * match settles it (`confirmed`): a movie whose exact year and title the source knows, an episode
+ * that is in the list of its season. Otherwise "Dune (2021).mkv" could never run on its own.
+ */
+export function withParserConfidence(confidence: number, parsed: Parsed, confirmed = false): number {
+  if (confirmed) return confidence;
   return confidence * (0.4 + 0.6 * Math.max(parsed.kind.confidence, 0.5));
 }
+
+/** Below this, a file's structure stays doubtful even when its episode exists ("severance.203"). */
+const SURE_STRUCTURE = 0.75;
 
 type Group = { kind: "movie" | "series"; title: string; year?: number; season?: number; items: MatchInput[] };
 
@@ -222,11 +230,13 @@ export async function matchAll(
 
     const episodes = best && group.kind === "series" ? await loadEpisodes(best.id) : [];
     for (const item of group.items) {
+      const movieConfirmed =
+        group.kind === "movie" && item.parsed.year !== undefined && best?.year === item.parsed.year && confidence >= 0.95;
       const result: MatchResult = {
         best,
         episodes: [],
         alternatives,
-        confidence: override || byId ? confidence : withParserConfidence(confidence, item.parsed),
+        confidence: override || byId ? confidence : withParserConfidence(confidence, item.parsed, movieConfirmed),
         reasons: [...reasons],
         overridden: Boolean(override),
       };
@@ -238,6 +248,16 @@ export async function matchAll(
           if (!override && !byId) result.confidence = Math.min(result.confidence, 0.7);
         }
         const wanted = item.parsed.date ? 1 : Math.max(1, item.parsed.episodes.length);
+        // The episode is in the list of its season: the match confirms what the parser read.
+        if (
+          !override &&
+          !byId &&
+          parsed === item.parsed &&
+          item.parsed.kind.confidence >= SURE_STRUCTURE &&
+          result.episodes.length >= wanted
+        ) {
+          result.confidence = withParserConfidence(confidence, item.parsed, true);
+        }
         if (result.episodes.length < wanted) {
           result.confidence *= item.parsed.episodes.length === 0 && !item.parsed.date ? 0.5 : 0.7;
           result.reasons.push(item.parsed.episodes.length === 0 ? msg("matcher_reason_noEpisode") : msg("matcher_reason_episodeNotFound"));

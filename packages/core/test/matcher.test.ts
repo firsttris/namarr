@@ -79,6 +79,18 @@ describe("Bewertung", () => {
 });
 
 describe("Gruppierung und matchAll", () => {
+  it("ein bestätigter Treffer hebt den Parser-Abzug auf", async () => {
+    const dune: MediaCandidate = { provider: "tmdb", id: "438631", kind: "movie", title: "Dune", year: 2021 };
+    const provider = new FakeProvider({ movies: [dune], series: [severance], episodes: { "95396": severanceEpisodes } });
+    const conf = async (file: string) => (await matchAll([{ key: "x", parsed: parse(file) }], provider)).get("x")!.confidence;
+    // Clean title and year the source knows exactly: sure enough to run on its own.
+    expect(await conf("Dune (2021).mkv")).toBeGreaterThanOrEqual(0.9);
+    // Season folder and an episode that exists in it.
+    expect(await conf("Severance/Staffel 2/03.mkv")).toBeGreaterThanOrEqual(0.9);
+    // "203" could be an absolute number: stays below the threshold.
+    expect(await conf("severance.203.mkv")).toBeLessThan(0.9);
+  });
+
   const files = [
     "Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv",
     "Severance.S02E02.German.DL.1080p.WEB.h264-GRP.mkv",
