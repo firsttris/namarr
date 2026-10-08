@@ -160,6 +160,12 @@ run `bun run lint`, `bun run typecheck` and `bun run test` before opening one.
 ---
 
 <div align="center">
-<sub>namarr is not affiliated with TMDB, TheTVDB, TVmaze or AniDB.
+
+⭐ Like namarr? A [star on GitHub](https://github.com/firsttris/namarr) helps others find it.<br>
+🐛 [Report a bug](https://github.com/firsttris/namarr/issues/new) · 💡 [Request a feature](https://github.com/firsttris/namarr/issues/new)
+
+<sub>License: <a href="LICENSE">MIT</a> · © Tristan Teufel and contributors<br>
+namarr is not affiliated with TMDB, TheTVDB, TVmaze or AniDB.<br>
 This product uses the TMDB API but is not endorsed or certified by TMDB.</sub>
+
 </div>
