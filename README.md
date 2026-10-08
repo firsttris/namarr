@@ -164,7 +164,8 @@ run `bun run lint`, `bun run typecheck` and `bun run test` before opening one.
 ⭐ Like namarr? A [star on GitHub](https://github.com/firsttris/namarr) helps others find it.<br>
 🐛 [Report a bug](https://github.com/firsttris/namarr/issues/new) · 💡 [Request a feature](https://github.com/firsttris/namarr/issues/new)
 
-<sub>License: <a href="LICENSE">MIT</a> · © Tristan Teufel and contributors<br>
+<sub>License: <a href="LICENSE">AGPL-3.0</a> · © Tristan Teufel and contributors<br>
+Changed versions you pass on or run for others must offer their source code under the AGPL; a commercial license without these obligations is available via <a href="https://teufel-it.de">teufel-it.de</a>.<br>
 namarr is not affiliated with TMDB, TheTVDB, TVmaze or AniDB.<br>
 This product uses the TMDB API but is not endorsed or certified by TMDB.</sub>
 
