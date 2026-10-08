@@ -17,6 +17,8 @@ A watch folder renames new downloads on its own:
   series (else the default format), the series source, the action and the conflict policy.
 - The action is **move** unless the folder says **copy**. Copy leaves the download where it is, for
   a torrent client that still seeds it.
+- After a move, the release folder goes too once it is empty (or holds only leftovers such as
+  `.sfv`, `.nzb` or `Thumbs.db`); the watch folder itself always stays.
 - **At startup** it catches up on what arrived while namarr was down: video files that no job knows
   yet and that appeared after the watch folder was created. An old backlog is left alone; that is
   what the workbench is for.

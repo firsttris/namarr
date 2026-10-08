@@ -89,6 +89,18 @@ export class JobError extends Error {
 type StoredMatch = MatchResult;
 
 /** Changes to a job before its preview is computed again. */
+/**
+ * Up to where emptied folders go after a move (exclusive). A folder chosen in the workbench stays; a
+ * release folder from a watch folder or a download client goes too, or it would stay in the
+ * downloads forever. A folder from the settings never goes. Per file: a job can have several sources.
+ */
+export function cleanupStop(job: Pick<Job, "kind" | "sourcePaths">, file: string, settings: Pick<Settings, "folders">): string {
+  const source = job.sourcePaths.find((p) => file === p || file.startsWith(p + path.sep));
+  if (!source || source === file) return path.dirname(file);
+  if (job.kind === "manual" || allowedRoots(settings).some((r) => path.resolve(r) === path.resolve(source))) return source;
+  return path.dirname(source);
+}
+
 export type TargetPatch = Partial<Pick<JobConfig, "mode" | "preset" | "template" | "formats" | "rules">> & {
   /** One folder for every file; null: none. */
   targetRoot?: string | null;
@@ -599,7 +611,8 @@ export class JobService {
           });
           removeFromInbox(db, item.id);
           summary.done++;
-          if (action === "move") await cleanupEmptyDirs(path.dirname(item.sourcePath), job.sourcePaths[0] ?? "/").catch(() => []);
+          if (action === "move")
+            await cleanupEmptyDirs(path.dirname(item.sourcePath), cleanupStop(job, item.sourcePath, settings)).catch(() => []);
         } else if (result.status === "tested") {
           updateItem(db, item.id, {
             reasons: [...item.reasons, result.conflict ? msg("jobs_test_targetExists") : msg("jobs_test_ok")],

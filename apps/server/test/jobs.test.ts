@@ -19,7 +19,7 @@ import { DemoProvider } from "@namarr/providers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localizeIn } from "~/lib/i18n";
 import { EventBus, type NamarrEvent } from "~/server/events.server";
-import { JobService } from "~/server/jobs.server";
+import { cleanupStop, JobService } from "~/server/jobs.server";
 import type { JobSummary } from "~/server/notify.server";
 
 let tmp: string;
@@ -198,6 +198,34 @@ describe("JobService: Regeln mit Daten aus der Datei", () => {
     await jobs.undo({ jobId: job.id });
     expect(await exists(path.join(dir, "track03.mp3"))).toBe(true);
     expect(await exists(path.join(dir, "Queen"))).toBe(false);
+  });
+});
+
+describe("JobService: Aufräumen nach dem Verschieben", () => {
+  it("bis wohin leere Ordner verschwinden", () => {
+    const settings = { folders: [{ path: "/dl", name: "dl", kind: "folder" as const }] };
+    // The folder chosen in the workbench stays.
+    expect(cleanupStop({ kind: "manual", sourcePaths: ["/dl/tv"] }, "/dl/tv/a/x.mkv", settings)).toBe("/dl/tv");
+    // A release folder from a watch folder or a download client goes too.
+    expect(cleanupStop({ kind: "watch", sourcePaths: ["/dl/tv/Rel"] }, "/dl/tv/Rel/x.mkv", settings)).toBe("/dl/tv");
+    // A single file: its folder stays.
+    expect(cleanupStop({ kind: "hook", sourcePaths: ["/dl/x.mkv"] }, "/dl/x.mkv", settings)).toBe("/dl");
+    // A folder from the settings never goes.
+    expect(cleanupStop({ kind: "hook", sourcePaths: ["/dl"] }, "/dl/Rel/x.mkv", settings)).toBe("/dl");
+    // Several sources: the one the file comes from.
+    expect(cleanupStop({ kind: "manual", sourcePaths: ["/a", "/b"] }, "/b/c/x.mkv", settings)).toBe("/b");
+  });
+
+  it("Watch-Job: der Release-Ordner verschwindet mit dem Verschieben", async () => {
+    const release = path.join(tv(), "Severance.S02.German.DL.1080p.WEB-GRP");
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E03.German.DL.1080p.WEB.h264-GRP.mkv");
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/release.sfv");
+    // Sure matches run on their own in a watch job.
+    await jobs.create({ paths: [release], config: config({ action: "move", autoThreshold: 0.5 }), kind: "watch" });
+    await jobs.idle();
+    expect(await exists(path.join(media(), "Severance (2022)/Season 02/Severance (2022) - S02E03 - Wer ist lebendig.mkv"))).toBe(true);
+    expect(await exists(release)).toBe(false);
+    expect(await exists(tv())).toBe(true);
   });
 });
 
