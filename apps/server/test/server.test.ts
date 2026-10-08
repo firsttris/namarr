@@ -7,7 +7,7 @@ import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { localizeIn } from "~/lib/i18n";
 import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue, setSessionsValidAfter } from "~/server/auth.server";
-import { assertSafeBinding, readEnv } from "~/server/env.server";
+import { assertSafeBinding, isTrustedProxy, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
 import { afterExecution, checkLibrary, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
@@ -66,6 +66,17 @@ describe("Auth", () => {
     } finally {
       setSessionsValidAfter(0);
     }
+  });
+
+  it("Proxy-Header nur von vertrauenswürdigen Adressen", () => {
+    expect(readEnv({}).trustedProxies).toEqual(["127.0.0.1", "::1"]);
+    const trusted = readEnv({ NAMARR_TRUSTED_PROXIES: "10.88.0.5, 172.16.0.0/12" }).trustedProxies;
+    expect(isTrustedProxy("10.88.0.5", trusted)).toBe(true);
+    expect(isTrustedProxy("::ffff:10.88.0.5", trusted)).toBe(true);
+    expect(isTrustedProxy("172.20.1.2", trusted)).toBe(true);
+    expect(isTrustedProxy("10.88.0.6", trusted)).toBe(false);
+    expect(isTrustedProxy("192.168.1.10", trusted)).toBe(false);
+    expect(isTrustedProxy(undefined, trusted)).toBe(false);
   });
 
   it("Reverse-Proxy-Header", () => {

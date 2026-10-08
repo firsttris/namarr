@@ -106,7 +106,8 @@ target becomes the default library for movies and series.
 | Variable | Default | Meaning |
 |---|---|---|
 | `NAMARR_TOKEN` | – | Access token for the UI (login) and the API (`Authorization: Bearer …` or Basic auth). **Required** as soon as namarr listens on more than `127.0.0.1`, so always in the Docker image. |
-| `NAMARR_AUTH_HEADER` | – | Alternative: a header set by a trusted reverse proxy, e.g. `Remote-User`. |
+| `NAMARR_AUTH_HEADER` | – | Alternative: a header set by a trusted reverse proxy, e.g. `Remote-User`. It counts only from the addresses in `NAMARR_TRUSTED_PROXIES`; from anywhere else it is dropped, since whoever reaches the port could set it themselves. |
+| `NAMARR_TRUSTED_PROXIES` | `127.0.0.1,::1` | Where `NAMARR_AUTH_HEADER` may come from: IPs or IPv4 ranges, e.g. `10.88.0.5` or `10.88.0.0/16`. A proxy in another container has that container's address. |
 | `NAMARR_ROOTS` | – | Optional: folders to set up on the very first start, comma-separated, e.g. `/downloads,/movies`; only those that exist. Afterwards the folders are managed under *Settings → Folders* (see [below](#folders-and-libraries)). |
 | `NAMARR_CONFIG_DIR` | `/config` (Docker), `./config` | SQLite database (WAL). |
 | `NAMARR_HOST` / `NAMARR_PORT` | `127.0.0.1` / `8420` | Outside Docker only reachable locally by default. |

@@ -5,7 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import * as path from "node:path";
-import { assertSafeBinding, readEnv } from "./src/server/env.server.ts";
+import { assertSafeBinding, isTrustedProxy, readEnv } from "./src/server/env.server.ts";
 import { dropPrivileges } from "./src/server/privileges.server.ts";
 import { runtime } from "./src/server/runtime.server.ts";
 import { compressHtml, staticFiles } from "./src/server/static.server.ts";
@@ -22,13 +22,28 @@ const { default: handler } = (await import(path.join(dist, "server/server.js")))
   default: { fetch: (req: Request) => Promise<Response> };
 };
 const serveStatic = staticFiles(path.join(dist, "client"));
+const warnedPeers = new Set<string>();
 
 const server = Bun.serve({
   hostname: env.host,
   port: env.port,
   // SSE connections stay open; Bun's default idle timeout would cut them.
   idleTimeout: 0,
-  async fetch(req) {
+  async fetch(req, srv) {
+    // The proxy's user header counts only from the proxy: whoever reaches the port directly could
+    // set it themselves.
+    if (env.authHeader && req.headers.has(env.authHeader)) {
+      const peer = srv.requestIP(req)?.address;
+      if (!isTrustedProxy(peer, env.trustedProxies)) {
+        const headers = new Headers(req.headers);
+        headers.delete(env.authHeader);
+        req = new Request(req, { headers });
+        if (peer && !warnedPeers.has(peer)) {
+          warnedPeers.add(peer);
+          rt.log.warn({ peer, header: env.authHeader }, "Proxy header from an untrusted address ignored (NAMARR_TRUSTED_PROXIES)");
+        }
+      }
+    }
     const url = new URL(req.url);
     if (req.method === "GET" || req.method === "HEAD") {
       const asset = serveStatic(req, decodeURIComponent(url.pathname));
