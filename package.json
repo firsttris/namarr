@@ -15,6 +15,7 @@
     "test:watch": "bun --bun vitest",
     "typecheck": "bun run i18n && tsc -p packages/core && tsc -p packages/providers && tsc -p packages/db && tsc -p apps/server",
     "corpus": "bun scripts/corpus.ts --verbose",
+    "docs:social-preview": "bun scripts/social-preview/render.ts",
     "lint": "biome check .",
     "format": "biome check --write .",
     "e2e": "bun run --cwd apps/server build && bun run --cwd apps/server e2e",
