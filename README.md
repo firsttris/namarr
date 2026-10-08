@@ -1,9 +1,11 @@
+<h1 align="center">namarr</h1>
+
 <div align="center">
 
 <img src="docs/banner.png" alt="namarr: Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv becomes Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv" width="900">
 
-**The self-hosted renamer for movies, series and anime.**<br>
-FileBot-style media matching and ReNamer-style rules in one web UI.
+**The self-hosted renamer for movies, series and anime: a FileBot alternative for your home server.**<br>
+FileBot-style media matching and ReNamer-style rules in one web UI, in a Docker container.
 Every change starts as a preview, and every change can be undone.
 
 [![CI](https://github.com/firsttris/namarr/actions/workflows/ci.yml/badge.svg)](https://github.com/firsttris/namarr/actions/workflows/ci.yml)
@@ -31,7 +33,8 @@ Every change starts as a preview, and every change can be undone.
 3. **Rename**, and undo it any time, per file or per job.
 
 One container for your home server: FileBot-style matching for movies, series and anime,
-ReNamer-style rules for everything else.
+ReNamer-style rules for everything else. Names come out in the format Plex, Jellyfin, Emby or Kodi
+expect, or in your own.
 
 ## ✨ Features
 
