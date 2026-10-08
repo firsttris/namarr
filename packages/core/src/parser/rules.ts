@@ -386,7 +386,8 @@ export const compactEpisodeRule: ParserRule = {
   name: "compactEpisode",
   apply(ctx) {
     if (hasEpisode(ctx) || ctx.out.year !== undefined) return;
-    scan(ctx, re("([1-9])(\\d{2})(?:-([1-9])?(\\d{2}))?"), (m) => {
+    // Episode 00 does not exist: "Show.100" stays a title.
+    scan(ctx, re("([1-9])(0[1-9]|[1-9]\\d)(?:-([1-9])?(0[1-9]|[1-9]\\d))?"), (m) => {
       if (m.index === 0) return; // a number at the start is the title (300, 911)
       const season = Number(m[1]);
       if (m[3] && Number(m[3]) !== season) return;

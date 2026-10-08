@@ -118,6 +118,10 @@ describe("Parser-Regeln einzeln", () => {
   it("compactEpisode: nicht am Anfang, nicht mit Jahr", () => {
     expect(run(compactEpisodeRule, "severance.204-205.720p").out).toMatchObject({ season: 2, episodes: [4, 5] });
     expect(run(compactEpisodeRule, "300.mkv").out.episodes).toEqual([]);
+    // Episode 00 does not exist.
+    expect(run(compactEpisodeRule, "Show.100").out.episodes).toEqual([]);
+    expect(parse("Show.100.mkv")).toMatchObject({ title: "Show 100", episodes: [] });
+    expect(run(compactEpisodeRule, "show.110").out).toMatchObject({ season: 1, episodes: [10] });
   });
 });
 
