@@ -131,7 +131,7 @@ export function MatchPicker({ item, onClose, onPick }: Props) {
         </ul>
         <label className="flex items-center gap-2 text-[13px] text-soft">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4" />
-          {m.picker_remember({ title: parsed?.title ?? m.picker_thisTitle() })}
+          {m.picker_remember({ title: parsed?.title ? `${parsed.title}${parsed.year ? ` (${parsed.year})` : ""}` : m.picker_thisTitle() })}
         </label>
       </div>
     </dialog>

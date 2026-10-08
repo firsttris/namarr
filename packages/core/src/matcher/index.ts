@@ -144,16 +144,29 @@ export function groupInputs(inputs: MatchInput[]): Group[] {
   return [...groups.values()];
 }
 
+/** What a learned decision is remembered by: the title, and its year when the name has one. */
+export function overridePattern(parsed: Parsed): string | undefined {
+  if (!parsed.title) return undefined;
+  return parsed.year ? `${parsed.title} (${parsed.year})` : parsed.title;
+}
+
+/**
+ * A learned decision for this file. "Doctor Who (2005)" applies to files of 2005 or without a year,
+ * never to "Doctor.Who.1963"; an exact year wins over one learned without a year.
+ */
 function findOverride(parsed: Parsed, overrides: MatchOverride[] | undefined, provider: string) {
   if (!overrides?.length || !parsed.title) return undefined;
   const title = normalizeTitle(parsed.title);
   const group = parsed.release.group?.toLowerCase();
-  return overrides.find((o) => {
+  const fitting = overrides.filter((o) => {
     if (o.provider !== provider) return false;
     const pattern = o.pattern.toLowerCase();
     if (pattern.startsWith("group:")) return group === pattern.slice(6).trim();
-    return normalizeTitle(o.pattern) === title;
+    const withYear = /^(.*) \((\d{4})\)$/.exec(o.pattern);
+    if (!withYear) return normalizeTitle(o.pattern) === title;
+    return normalizeTitle(withYear[1]!) === title && (parsed.year === undefined || parsed.year === Number(withYear[2]));
   });
+  return fitting.find((o) => parsed.year !== undefined && o.pattern.endsWith(`(${parsed.year})`)) ?? fitting[0];
 }
 
 /** AniDB and co.: the entry is the season, so S02E05 is episode 5 of whatever entry was chosen. */

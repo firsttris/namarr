@@ -7,6 +7,7 @@ import {
   matchAll,
   NO_MATCH,
   normalizeTitle,
+  overridePattern,
   rank,
   resolveEpisodes,
   scoreCandidate,
@@ -171,6 +172,25 @@ describe("Gruppierung und matchAll", () => {
     const result = (await matchAll(input, provider)).get("x")!;
     expect(result.reasons.map((r) => text(r, "de"))).toContain("Episode nicht beim Anbieter gefunden");
     expect(classify(result.confidence)).not.toBe("auto");
+  });
+
+  it("gelernte Entscheidung mit Jahr: Doctor Who 1963 und 2005 bleiben getrennt", async () => {
+    const classic: MediaCandidate = { provider: "tmdb", id: "121", kind: "series", title: "Doctor Who", year: 1963 };
+    const modern: MediaCandidate = { provider: "tmdb", id: "57243", kind: "series", title: "Doctor Who", year: 2005 };
+    const provider = new FakeProvider({ series: [classic, modern] });
+    const pattern = (file: string) => overridePattern(parse(file))!;
+    expect(pattern("Doctor.Who.2005.S01E01.mkv")).toBe("Doctor Who (2005)");
+    const overrides = [
+      { pattern: "Doctor Who (1963)", provider: "tmdb", externalId: "121" },
+      { pattern: "Doctor Who (2005)", provider: "tmdb", externalId: "57243" },
+    ];
+    const best = async (file: string) => (await matchAll([{ key: "x", parsed: parse(file) }], provider, { overrides })).get("x")!.best?.id;
+    expect(await best("Doctor.Who.2005.S01E01.mkv")).toBe("57243");
+    expect(await best("Doctor.Who.1963.S01E01.mkv")).toBe("121");
+    // A year no decision names: searched, not overridden.
+    expect(
+      (await matchAll([{ key: "x", parsed: parse("Doctor.Who.2023.S01E01.mkv") }], provider, { overrides })).get("x")!.overridden,
+    ).toBe(false);
   });
 
   it("gespeicherte Entscheidung (Override) gewinnt", async () => {

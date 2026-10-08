@@ -16,6 +16,7 @@ import {
   msg,
   needsMetadata,
   type OperationRecord,
+  overridePattern,
   type Parsed,
   type PreviewConfig,
   type PreviewInput,
@@ -522,8 +523,9 @@ export class JobService {
         overridden: true,
       };
       values.matchJson = match;
-      if (change.remember && parsed.title) {
-        saveOverride(db, { pattern: parsed.title, provider: best.provider, externalId: best.id, seasonOffset: 0 });
+      const pattern = overridePattern(parsed);
+      if (change.remember && pattern) {
+        saveOverride(db, { pattern, provider: best.provider, externalId: best.id, seasonOffset: 0 });
       }
     }
     if (change.targetPath !== undefined) {
