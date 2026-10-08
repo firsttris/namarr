@@ -13,6 +13,7 @@ import {
   findFormat,
   getItem,
   getSettings,
+  inboxCountUnder,
   type LibraryFolder,
   listInbox,
   listJobs,
@@ -29,6 +30,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { libraryFormat } from "~/server/infer.server";
 import { checkLibrary } from "~/server/notify.server";
+import { forbiddenFolder, hiddenInBrowser } from "~/server/paths.server";
 import { authed } from "./middleware";
 
 const id = z.number().int().positive();
@@ -38,17 +40,15 @@ const id = z.number().int().positive();
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([authed])
   .handler(async ({ context: { rt } }) => {
-    const inbox = listInbox(rt.db, 50);
+    const stats = dashboardStats(rt.db);
     const folders = listWatchFolders(rt.db);
     const jobs = listJobs(rt.db, 5);
     return {
-      stats: dashboardStats(rt.db),
-      inbox: inbox.slice(0, 4),
-      inboxTotal: inbox.length,
-      watchFolders: folders.map((f) => ({
-        ...f,
-        inboxCount: inbox.filter((i) => i.item.sourcePath.startsWith(f.path + path.sep)).length,
-      })),
+      stats,
+      inbox: listInbox(rt.db, 4),
+      inboxTotal: stats.inboxOpen,
+      // Counted in the database: right with more than a page of entries too.
+      watchFolders: folders.map((f) => ({ ...f, inboxCount: inboxCountUnder(rt.db, f.path) })),
       jobs,
       /** No folders yet: namarr can neither find files nor put them anywhere. */
       noFolders: !getSettings(rt.db).folders.length,
@@ -91,7 +91,12 @@ export const browseFolder = createServerFn({ method: "GET" })
     const dir = all ? path.resolve(data.path ?? "/") : await resolveInRoots(data.path!, roots);
     const dirents = await fs.readdir(dir, { withFileTypes: true });
     const entries = dirents
-      .filter((d) => !d.name.startsWith(".") && d.name !== "@eaDir" && (!all || d.isDirectory()))
+      .filter(
+        (d) =>
+          !d.name.startsWith(".") &&
+          d.name !== "@eaDir" &&
+          (!all || (d.isDirectory() && !hiddenInBrowser(path.join(dir, d.name), rt.env.configDir))),
+      )
       .map((d) => ({
         name: d.name,
         path: path.join(dir, d.name),
@@ -280,6 +285,7 @@ export const saveSettings = createServerFn({ method: "POST" })
         if (!path.isAbsolute(f.path)) throw new Error(msg("settings_error_rootNotAbsolute", { path: f.path }));
         const st = await fs.stat(f.path).catch(() => undefined);
         if (!st?.isDirectory()) throw new Error(msg("settings_error_rootMissing", { path: f.path }));
+        if (forbiddenFolder(f.path, rt.env.configDir)) throw new Error(msg("settings_error_folderForbidden", { path: f.path }));
       }
       data.folders = normalizeFolders(data.folders);
       // A folder still used by a watch folder cannot go: it would point nowhere.

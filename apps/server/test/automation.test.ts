@@ -242,6 +242,11 @@ describe("Hook für Download-Clients", () => {
       403,
       expect.stringContaining("outside"),
     ]);
+    // Missing or not: outside the folders it is always 403, never "not found".
+    expect(await err(createHookJob(rt(), { path: "/etc/does-not-exist", target: path.join(tmp, "media") }))).toEqual([
+      403,
+      expect.stringContaining("outside"),
+    ]);
     expect(await err(createHookJob(rt(), { path: path.join(tmp, "dl/missing.mkv"), target: path.join(tmp, "media") }))).toEqual([
       404,
       expect.stringContaining("not found"),

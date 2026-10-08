@@ -27,6 +27,11 @@ function defaultMigrations(): string {
 export function openDatabase(file: string, options: { migrationsFolder?: string } = {}): Db {
   const sqlite = new Database(file, { create: true });
   sqlite.exec("PRAGMA journal_mode = WAL;");
+  // With WAL, NORMAL stays consistent after a crash and saves an fsync per write (a preview
+  // writes thousands of items); 64 MB page cache, temporary tables in memory.
+  sqlite.exec("PRAGMA synchronous = NORMAL;");
+  sqlite.exec("PRAGMA cache_size = -64000;");
+  sqlite.exec("PRAGMA temp_store = MEMORY;");
   sqlite.exec("PRAGMA foreign_keys = ON;");
   sqlite.exec("PRAGMA busy_timeout = 5000;");
   const db = drizzle({ client: sqlite, schema }) as Db;

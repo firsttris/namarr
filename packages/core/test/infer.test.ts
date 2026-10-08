@@ -146,12 +146,14 @@ describe("Format aus einer Mediathek erkennen", () => {
         show("Better Call Saul", "273181", "Season 1", "Anfänge", "[480p, AAC].mkv"),
         show("Billions", "279536", "Season 1", "Strafe muss sein", "[480p, AC3].mkv"),
         show("Dark Matter", "292174", "Season 1", "Episode Eins", "[480p, AAC].mkv"),
+        // The episode is named like the series: must not spoil the merge.
+        show("Boardwalk Empire", "84947", "Season 1", "Boardwalk Empire", "[360p, MP3].avi"),
         show("A Knight", "433631", "Season 01", "Der Heckenritter", "[720p, EAC3].mkv"),
       ],
       "episode",
     )!;
     expect(result.template).toBe("{n} ({y}) [tvdbid-{tvdb}]/Season {s}/{n} {s00e00}{?t} {t}{/} - [{vf}, {ac|replace:'DD+':'EAC3'}]");
-    expect(result.matched).toBe(3);
+    expect(result.matched).toBe(4);
     // The odd one out fails over its folder only.
     expect(result.checks.at(-1)).toMatchObject({
       ok: false,

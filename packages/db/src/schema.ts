@@ -29,7 +29,11 @@ export type WatchOptions = {
   conflictPolicy?: ConflictPolicy;
 };
 
-/** Replaced by naming formats and watch folder options; read once to take them over (migrateProfiles). */
+/**
+ * Replaced by naming formats and watch folder options; read once to take them over
+ * (migrateProfiles). It stays until no installation from before 0.1.4 can still need that: SQL
+ * migrations run before migrateProfiles, so dropping it would lose profiles not taken over yet.
+ */
 export const profiles = sqliteTable("profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -145,7 +149,12 @@ export const jobItems = sqliteTable(
     conflict: text("conflict"),
     error: text("error"),
   },
-  (t) => [index("job_items_job_idx").on(t.jobId, t.state)],
+  (t) => [
+    index("job_items_job_idx").on(t.jobId, t.state),
+    // Catch-up of watch folders (knownSourcePaths) and keep-better (findDoneItemByTarget).
+    index("job_items_source_idx").on(t.sourcePath),
+    index("job_items_target_idx").on(t.targetPath),
+  ],
 );
 
 /** History, basis for undo. One row per file touched, companions included. */
@@ -165,17 +174,26 @@ export const operations = sqliteTable(
     executedAt: integer("executed_at", { mode: "timestamp_ms" }).notNull().default(now),
     undoneAt: integer("undone_at", { mode: "timestamp_ms" }),
   },
-  (t) => [index("operations_executed_idx").on(t.executedAt), index("operations_job_idx").on(t.jobId)],
+  (t) => [
+    index("operations_executed_idx").on(t.executedAt),
+    index("operations_job_idx").on(t.jobId),
+    // Nearly every history query asks for "not undone".
+    index("operations_undone_idx").on(t.undoneAt),
+  ],
 );
 
 /** Uncertain matches waiting for approval. */
-export const inbox = sqliteTable("inbox", {
-  jobItemId: integer("job_item_id")
-    .primaryKey()
-    .references(() => jobItems.id, { onDelete: "cascade" }),
-  reason: text("reason").notNull(),
-  createdAt: createdAt(),
-});
+export const inbox = sqliteTable(
+  "inbox",
+  {
+    jobItemId: integer("job_item_id")
+      .primaryKey()
+      .references(() => jobItems.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("inbox_created_idx").on(t.createdAt)],
+);
 
 /** Learned manual decisions. */
 export const matchOverrides = sqliteTable("match_overrides", {

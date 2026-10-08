@@ -189,6 +189,24 @@ function probeTags(format: Record<string, string> | undefined, streams: FfprobeS
   return Object.keys(out).length ? out : undefined;
 }
 
+/** Whether ffprobe runs at all (`ffprobe -version`). */
+export async function hasFfprobe(ffprobe = "ffprobe"): Promise<boolean> {
+  const { execFile } = await import("node:child_process");
+  return new Promise((resolve) => execFile(ffprobe, ["-version"], { timeout: 10_000 }, (err) => resolve(!err)));
+}
+
+/**
+ * `probe` that asks once whether ffprobe is there at all: without it every file is skipped right
+ * away, with it a damaged or locked file costs only itself, not the files after it.
+ */
+export function prober(ffprobe = "ffprobe", available: () => Promise<boolean> = () => hasFfprobe(ffprobe)) {
+  let installed: Promise<boolean> | undefined;
+  return async (file: string): Promise<ProbeInfo | undefined> => {
+    installed ??= available();
+    return (await installed) ? probe(file, ffprobe) : undefined;
+  };
+}
+
 /** Reads container metadata with ffprobe. Returns undefined when ffprobe is not installed. */
 export async function probe(file: string, ffprobe = "ffprobe"): Promise<ProbeInfo | undefined> {
   const { execFile } = await import("node:child_process");

@@ -11,10 +11,12 @@ import {
   loadIds,
   type MatchResult,
   type MetadataProvider,
+  mapLimit,
   matchAll,
   msg,
   needsMetadata,
   type OperationRecord,
+  overridePattern,
   type Parsed,
   type PreviewConfig,
   type PreviewInput,
@@ -50,6 +52,7 @@ import {
   type JobConfig,
   type JobItem,
   type JobKind,
+  knownSourcePaths,
   listOperations,
   listOverrides,
   listWatchFolders,
@@ -89,6 +92,21 @@ export class JobError extends Error {
 type StoredMatch = MatchResult;
 
 /** Changes to a job before its preview is computed again. */
+/** File system calls at once over all items: 50 000 at the same time would choke NFS and SMB. */
+const FS_CONCURRENCY = 32;
+
+/**
+ * Up to where emptied folders go after a move (exclusive). A folder chosen in the workbench stays; a
+ * release folder from a watch folder or a download client goes too, or it would stay in the
+ * downloads forever. A folder from the settings never goes. Per file: a job can have several sources.
+ */
+export function cleanupStop(job: Pick<Job, "kind" | "sourcePaths">, file: string, settings: Pick<Settings, "folders">): string {
+  const source = job.sourcePaths.find((p) => file === p || file.startsWith(p + path.sep));
+  if (!source || source === file) return path.dirname(file);
+  if (job.kind === "manual" || allowedRoots(settings).some((r) => path.resolve(r) === path.resolve(source))) return source;
+  return path.dirname(source);
+}
+
 export type TargetPatch = Partial<Pick<JobConfig, "mode" | "preset" | "template" | "formats" | "rules">> & {
   /** One folder for every file; null: none. */
   targetRoot?: string | null;
@@ -115,7 +133,7 @@ export class JobService {
   /** Everything that touches files runs here, one after another. */
   private serial<T>(work: () => Promise<T>): Promise<T> {
     const run = this.queue.then(work);
-    this.queue = run.catch((e) => this.deps.log.error({ err: e }, "Job fehlgeschlagen"));
+    this.queue = run.catch((e) => this.deps.log.error({ err: e }, "Job failed"));
     return run;
   }
 
@@ -153,11 +171,13 @@ export class JobService {
     const settings = this.settings();
     const resolved: string[] = [];
     for (const p of input.paths) resolved.push(await resolveInRoots(p, allowedRoots(settings)));
-    if (input.config.targetRoot) input.config.targetRoot = await resolveInRoots(input.config.targetRoot, allowedRoots(settings));
-    input.config.targets = await this.resolveTargetFolders(input.config.targets, allowedRoots(settings));
+    // A copy: the caller's config object stays as it was.
+    const config: JobConfig = { ...input.config };
+    if (config.targetRoot) config.targetRoot = await resolveInRoots(config.targetRoot, allowedRoots(settings));
+    config.targets = await this.resolveTargetFolders(config.targets, allowedRoots(settings));
     const job = createJob(this.deps.db, {
       sourcePaths: resolved,
-      config: input.config,
+      config,
       kind: input.kind ?? "manual",
       watchFolderId: input.watchFolderId ?? null,
     });
@@ -177,7 +197,11 @@ export class JobService {
       for (const root of job.sourcePaths) {
         const result = await scan(root, { mode: mode === "rules" ? "all" : "media", recursive: job.config.recursive ?? true, signal });
         const rootIsFile = (await fs.stat(root)).isFile();
+        // A watch folder can flush a release folder twice while its files finish one by one: the
+        // second job takes only what no job has yet (with copy the first files are still there).
+        const known = job.kind === "watch" && !rootIsFile ? knownSourcePaths(db, root) : undefined;
         for (const f of result.files) {
+          if (known?.has(f.path)) continue;
           files.push(f);
           // The source folder's own name is context too: "Severance.S02.German.DL-GRP/204.mkv".
           parsed.push(
@@ -223,7 +247,7 @@ export class JobService {
       await this.computePreview(jobId);
       const counts = countItemsByState(db, jobId);
       this.progress(job, "ready", files.length, files.length);
-      this.deps.log.info({ jobId, files: files.length, counts }, "Job analysiert");
+      this.deps.log.info({ jobId, files: files.length, counts }, "Job analysed");
 
       // Watch folders and download-client hooks run on their own: sure matches go through.
       if (job.kind !== "manual") await this.autoProcess(jobId);
@@ -241,8 +265,9 @@ export class JobService {
   private async probeMissing(files: ScannedFile[], parsed: Parsed[]) {
     const todo = files.map((f, i) => ({ f, p: parsed[i]! })).filter(({ p }) => !p.release.resolution || !p.release.videoCodec);
     for (let i = 0; i < todo.length; i += 4) {
+      // Without ffprobe `probe` answers at once (see `prober`): an unreadable first file no longer
+      // stops the rest.
       const infos = await Promise.all(todo.slice(i, i + 4).map(({ f }) => this.deps.probe?.(f.path)));
-      if (i === 0 && infos[0] === undefined) return; // no ffprobe: don't try the rest
       infos.forEach((info, k) => {
         const { p } = todo[i + k]!;
         if (!info) return;
@@ -370,25 +395,38 @@ export class JobService {
     }
     // Undone files are back at their source and can be renamed again.
     const items = allItems(db, jobId).filter((i) => i.state !== "done");
-    const inputs = await Promise.all(items.map((i) => this.toInput(i)));
+    const inputs = await mapLimit(items, FS_CONCURRENCY, (i) => this.toInput(i));
     if (job.config.mode !== "rules") await this.loadIdsFor(job.config, items, inputs);
     if (job.config.mode !== "media" && needsMetadata(job.config.rules ?? [])) await this.loadMetadata(inputs);
     const preview = buildPreview(inputs, this.previewConfig(job.config));
     await this.markExisting(preview);
+    const changed: number[] = [];
     db.transaction(() => {
       preview.forEach((p, i) => {
         const item = items[i]!;
-        updateItem(db, item.id, {
+        const next = {
           targetPath: p.target ?? null,
-          state: p.state === "parsed" ? "needs_review" : p.state,
+          state: p.state === "parsed" ? ("needs_review" as const) : p.state,
           confidence: p.confidence,
           reasons: p.reasons,
           conflict: p.conflict ?? null,
           companions: p.companions.map((c, k) => ({ ...c, suffix: item.companions[k]?.suffix })),
-        });
+        };
+        // Every template keystroke in the workbench recomputes: write and announce only what moved.
+        const before = {
+          targetPath: item.targetPath,
+          state: item.state,
+          confidence: item.confidence,
+          reasons: item.reasons,
+          conflict: item.conflict,
+          companions: item.companions,
+        };
+        if (JSON.stringify(next) === JSON.stringify(before)) return;
+        updateItem(db, item.id, next);
+        changed.push(item.id);
       });
     });
-    this.deps.bus.emit({ type: "item.updated", jobId, itemIds: items.map((i) => i.id) });
+    if (changed.length) this.deps.bus.emit({ type: "item.updated", jobId, itemIds: changed });
     return countItemsByState(db, jobId);
   }
 
@@ -429,20 +467,18 @@ export class JobService {
 
   /** An existing target is a conflict unless the policy resolves it. */
   private async markExisting(items: PreviewItem[]) {
-    await Promise.all(
-      items.map(async (item) => {
-        if (!item.target || item.conflict) return;
-        try {
-          await fs.lstat(item.target);
-          if (item.target !== item.source) {
-            item.conflict = "exists";
-            item.reasons = [...item.reasons, TARGET_EXISTS];
-          }
-        } catch {
-          // free
+    await mapLimit(items, FS_CONCURRENCY, async (item) => {
+      if (!item.target || item.conflict) return;
+      try {
+        await fs.lstat(item.target);
+        if (item.target !== item.source) {
+          item.conflict = "exists";
+          item.reasons = [...item.reasons, TARGET_EXISTS];
         }
-      }),
-    );
+      } catch {
+        // free
+      }
+    });
   }
 
   // ---------- manual corrections ----------
@@ -489,8 +525,9 @@ export class JobService {
         overridden: true,
       };
       values.matchJson = match;
-      if (change.remember && parsed.title) {
-        saveOverride(db, { pattern: parsed.title, provider: best.provider, externalId: best.id, seasonOffset: 0 });
+      const pattern = overridePattern(parsed);
+      if (change.remember && pattern) {
+        saveOverride(db, { pattern, provider: best.provider, externalId: best.id, seasonOffset: 0 });
       }
     }
     if (change.targetPath !== undefined) {
@@ -551,7 +588,13 @@ export class JobService {
         },
       });
     }
-    return this.enqueue(jobId, (signal) => this.execute(jobId, signal, options.itemIds));
+    // Busy from the click on: while it waits behind another job, the preview must not change
+    // under it (a late recompute or an edited target would run instead of what was shown).
+    this.progress(job, "executing", 0, 0);
+    return this.enqueue(jobId, (signal) => this.execute(jobId, signal, options.itemIds)).catch((err) => {
+      if (getJob(db, jobId)?.status === "executing") this.progress(job, "ready", 0, 0);
+      throw err;
+    });
   }
 
   private async execute(jobId: number, signal: AbortSignal, onlyItems?: number[]) {
@@ -578,8 +621,9 @@ export class JobService {
         if (result.status === "done") {
           this.record(jobId, item.id, result.record);
           // Companions follow their main file with the same action. Subtitles of a replaced
-          // worse file belong to it, so they are replaced too instead of compared by size.
-          const companionConflict = conflict === "keep-better" ? "overwrite" : conflict;
+          // worse file belong to it, so they are replaced too instead of compared by size; when
+          // the main file replaced nothing, an existing subtitle is not this release's to replace.
+          const companionConflict = conflict === "keep-better" ? (result.record.backup ? "overwrite" : "skip") : conflict;
           const companionErrors: string[] = [];
           for (const c of item.companions) {
             if (!c.to) continue;
@@ -599,7 +643,8 @@ export class JobService {
           });
           removeFromInbox(db, item.id);
           summary.done++;
-          if (action === "move") await cleanupEmptyDirs(path.dirname(item.sourcePath), job.sourcePaths[0] ?? "/").catch(() => []);
+          if (action === "move")
+            await cleanupEmptyDirs(path.dirname(item.sourcePath), cleanupStop(job, item.sourcePath, settings)).catch(() => []);
         } else if (result.status === "tested") {
           updateItem(db, item.id, {
             reasons: [...item.reasons, result.conflict ? msg("jobs_test_targetExists") : msg("jobs_test_ok")],

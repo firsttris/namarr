@@ -1,3 +1,4 @@
+export * from "./concurrency.ts";
 export * from "./fileops/index.ts";
 export * from "./fileops/quality.ts";
 export * from "./formatter/index.ts";

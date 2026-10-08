@@ -55,10 +55,10 @@ export class WatchService {
       depth: 10,
     });
     watcher.on("add", (file) => this.detected(folder, file));
-    watcher.on("error", (err) => this.deps.log.error({ err, folder: folder.path }, "Watch-Folder-Fehler"));
+    watcher.on("error", (err) => this.deps.log.error({ err, folder: folder.path }, "Watch folder error"));
     this.watchers.set(folder.id, watcher);
-    this.deps.log.info({ folder: folder.path }, "Watch-Folder aktiv");
-    void this.catchUp(folder, this.generation).catch((err) => this.deps.log.error({ err, folder: folder.path }, "Abgleich fehlgeschlagen"));
+    this.deps.log.info({ folder: folder.path }, "Watch folder active");
+    void this.catchUp(folder, this.generation).catch((err) => this.deps.log.error({ err, folder: folder.path }, "Catch-up failed"));
   }
 
   /**
@@ -78,7 +78,7 @@ export class WatchService {
       if (st?.isFile() && st.ctimeMs >= since) candidates.push({ file, size: st.size, mtime: st.mtimeMs });
     }
     if (!candidates.length) return [];
-    this.deps.log.info({ folder: folder.path, files: candidates.length }, "Watch-Folder: verpasste Dateien gefunden");
+    this.deps.log.info({ folder: folder.path, files: candidates.length }, "Watch folder: missed files found");
 
     const taken: string[] = [];
     let waiting = candidates;
@@ -135,7 +135,7 @@ export class WatchService {
           }),
         });
       } catch (err) {
-        this.deps.log.error({ err, root }, "Watch-Job konnte nicht angelegt werden");
+        this.deps.log.error({ err, root }, "Could not create watch job");
       }
     }
   }

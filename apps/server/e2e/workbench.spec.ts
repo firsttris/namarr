@@ -54,11 +54,12 @@ test("Workbench: Media-Modus, Vorschau, Treffer korrigieren, ausführen, rückg�
   const grid = page.getByRole("grid");
   await expect(grid.getByText("Severance (2022)/Season 02/").first()).toBeVisible();
   await expect(grid.getByText("Hallo, Frau Cobel").first()).toBeVisible();
-  // Double episode (compact numbering) and folder-context file wait for review
-  await expect(grid.getByText(/% prüfen/)).toHaveCount(2);
+  // The double episode (compact numbering) waits for review; "Severance/Staffel 2/06.mkv" does
+  // not: season folder and episode are confirmed by the source.
+  await expect(grid.getByText(/% prüfen/)).toHaveCount(1);
   await expect(grid.getByText("Übersprungen: Sample-Datei")).toBeVisible();
   await expect(grid.getByText("Kein Treffer gefunden")).toBeVisible();
-  await expect(page.getByRole("button", { name: /3 Dateien testen/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /4 Dateien testen/ })).toBeVisible();
 
   // Template editor: live example at the selected file
   await expect(page.getByText("Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv").first()).toBeVisible();
@@ -79,11 +80,8 @@ test("Workbench: Media-Modus, Vorschau, Treffer korrigieren, ausführen, rückg�
   await expect(dialog).toBeHidden();
   await expect(grid.getByText("The Matrix (1999)/").first()).toBeVisible();
 
-  // Approve both review items via the side panel
+  // Approve the review item via the side panel
   await grid.getByText("severance.204-205.720p.mkv").click();
-  await page.getByRole("button", { name: "Freigeben" }).click();
-  await expect(grid.getByText(/% prüfen/)).toHaveCount(1);
-  await grid.getByText("Severance/Staffel 2/06.mkv").click();
   await page.getByRole("button", { name: "Freigeben" }).click();
   await expect(grid.getByText(/% prüfen/)).toHaveCount(0);
 

@@ -6,7 +6,6 @@ import {
   allowedRoots,
   countItemsByState,
   createJob,
-  createProfile,
   createWatchFolder,
   dashboardStats,
   defaultFolder,
@@ -15,6 +14,7 @@ import {
   getJob,
   getSettings,
   getWatchFolder,
+  inboxCountUnder,
   insertItems,
   insertOperation,
   type JobConfig,
@@ -23,7 +23,6 @@ import {
   listItems,
   listOperations,
   listOverrides,
-  listProfiles,
   listWatchFolders,
   markUndone,
   migrateProfiles,
@@ -39,6 +38,10 @@ import {
 } from "../src/index.ts";
 
 const config: JobConfig = { mode: "media", action: "test", conflictPolicy: "skip" };
+// Profiles are gone; their table stays until every installation took them over (migrateProfiles).
+const createLegacyProfile = (db: ReturnType<typeof openDatabase>, values: typeof schema.profiles.$inferInsert) =>
+  db.insert(schema.profiles).values(values).returning().get();
+const listLegacyProfiles = (db: ReturnType<typeof openDatabase>) => db.select().from(schema.profiles).orderBy(schema.profiles.name).all();
 const fresh = () => openDatabase(":memory:");
 
 describe("Migrationen", () => {
@@ -130,7 +133,7 @@ describe("Ordner", () => {
     db.$client.run("INSERT INTO watch_folders (name, path, target_root) VALUES ('TV', '/dl/tv', '/media/tv')");
     const sql = readFileSync(new URL("../drizzle/0003_targets.sql", import.meta.url), "utf8");
     for (const statement of sql.split("--> statement-breakpoint").filter((s) => s.includes("UPDATE"))) db.$client.run(statement);
-    expect(listProfiles(db).map((p) => [p.name, p.targets, p.targetRoot])).toEqual([
+    expect(listLegacyProfiles(db).map((p) => [p.name, p.targets, p.targetRoot])).toEqual([
       ["Fotos", { other: "/photos" }, null],
       ["Leer", {}, null],
       ["Medien", { movie: "/media", series: "/media" }, null],
@@ -159,14 +162,19 @@ describe("Formate", () => {
 
   it("Profile werden einmalig zu Formaten und Watch-Folder-Optionen", () => {
     const db = fresh();
-    const custom = createProfile(db, {
+    const custom = createLegacyProfile(db, {
       name: "Anime",
       template: { episode: "{n}/{absolute}" },
       provider: "anidb",
       action: "hardlink",
       targets: { series: "/anime" },
     });
-    const plex = createProfile(db, { name: "Plex", preset: "plex", action: "move", rulesJson: [{ type: "case", mode: "lower" }] as never });
+    const plex = createLegacyProfile(db, {
+      name: "Plex",
+      preset: "plex",
+      action: "move",
+      rulesJson: [{ type: "case", mode: "lower" }] as never,
+    });
     const a = createWatchFolder(db, { name: "Anime", path: "/dl/anime", profileId: custom.id, targets: { movie: "/movies" } });
     const b = createWatchFolder(db, { name: "Rest", path: "/dl/rest", profileId: plex.id });
 
@@ -271,6 +279,26 @@ describe("Bekannte Quellpfade", () => {
     expect([...knownSourcePaths(db, "/dl")].sort()).toEqual(["/dl/100%_done/a.mkv", "/dl/b.mkv"]);
     expect([...knownSourcePaths(db, "/dl/100%_done/")]).toEqual(["/dl/100%_done/a.mkv"]);
     expect([...knownSourcePaths(db, "/dl_")]).toEqual([]);
+    // A neighbour like "/dl.old" stays outside the range.
+    insertItems(db, [{ jobId: job.id, sourcePath: "/dl.old/e.mkv" }]);
+    expect([...knownSourcePaths(db, "/dl")].sort()).toEqual(["/dl/100%_done/a.mkv", "/dl/b.mkv"]);
+  });
+
+  it("Pragmas für WAL", () => {
+    const pragma = (name: string) => Object.values(fresh().$client.query(`PRAGMA ${name}`).get() as object)[0];
+    expect(pragma("synchronous")).toBe(1); // NORMAL
+    expect(pragma("temp_store")).toBe(2); // MEMORY
+  });
+
+  it("Indizes für die häufigen Abfragen", () => {
+    const db = fresh();
+    const plan = (q: string) => (db.$client.query(`EXPLAIN QUERY PLAN ${q}`).all() as { detail: string }[]).map((r) => r.detail).join(" ");
+    expect(plan("SELECT source_path FROM job_items WHERE source_path >= '/dl/' AND source_path < '/dl0'")).toContain(
+      "job_items_source_idx",
+    );
+    expect(plan("SELECT * FROM job_items WHERE target_path = '/x'")).toContain("job_items_target_idx");
+    expect(plan("SELECT * FROM operations WHERE undone_at IS NULL")).toContain("operations_undone_idx");
+    expect(plan("SELECT * FROM inbox ORDER BY created_at")).toContain("inbox_created_idx");
   });
 });
 
@@ -339,5 +367,32 @@ describe("Dashboard", () => {
     insertOperation(db, { jobId: job.id, action: "hardlink", fromPath: "/a/2.mkv", toPath: "/b/2.mkv", size: 1, inode: 2 });
     addToInbox(db, items[2]!.id, "x");
     expect(dashboardStats(db)).toEqual({ renamedToday: 2, inboxOpen: 1, autoRate: 2 / 3, undoable: 2 });
+  });
+
+  it("Inbox pro Watch-Folder, auch über eine Seite hinaus", () => {
+    const db = fresh();
+    const job = createJob(db, { sourcePaths: ["/dl/tv"], config });
+    const items = insertItems(
+      db,
+      Array.from({ length: 60 }, (_, i) => ({ jobId: job.id, sourcePath: `/dl/tv/${i}.mkv`, state: "needs_review" as const })),
+    );
+    const other = insertItems(db, [{ jobId: job.id, sourcePath: "/dl/tvx/a.mkv", state: "needs_review" as const }]);
+    for (const it of [...items, ...other]) addToInbox(db, it.id, "x");
+    expect(inboxCountUnder(db, "/dl/tv")).toBe(60);
+    expect(inboxCountUnder(db, "/dl/tv/")).toBe(60);
+    expect(inboxCountUnder(db, "/dl")).toBe(61);
+  });
+
+  it("Auto-Quote nach der Schwelle des Jobs", () => {
+    const db = fresh();
+    const lenient = createJob(db, { sourcePaths: ["/a"], config: { ...config, autoThreshold: 0.8 } });
+    const strict = createJob(db, { sourcePaths: ["/b"], config: { ...config, autoThreshold: 0.95 } });
+    insertItems(db, [
+      { jobId: lenient.id, sourcePath: "/a/1.mkv", state: "done", confidence: 0.85 },
+      { jobId: lenient.id, sourcePath: "/a/2.mkv", state: "done", confidence: 0.82 },
+      { jobId: strict.id, sourcePath: "/b/1.mkv", state: "needs_review", confidence: 0.92 },
+    ]);
+    // Sure by 0.8, but not by 0.9; the 0.92 is not sure by 0.95.
+    expect(dashboardStats(db).autoRate).toBe(2 / 3);
   });
 });

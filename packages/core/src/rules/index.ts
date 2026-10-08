@@ -69,6 +69,11 @@ export class RuleError extends Error {
 
 type Parts = { dir: string; stem: string; ext: string };
 
+/**
+ * Only the last dot starts the extension, on purpose: rules work like ReNamer, so in
+ * "Movie.de.srt" the stem is "Movie.de" and a rule may change the language tag. Media mode uses
+ * the parser's splitExtension instead, which keeps ".de.srt" together.
+ */
 function split(path: string): Parts {
   const slash = path.lastIndexOf("/");
   const dir = slash >= 0 ? path.slice(0, slash + 1) : "";

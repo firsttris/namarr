@@ -3,6 +3,7 @@ import { groupRule, type ParseContext, RULES, resolvePending } from "./rules.ts"
 
 export * from "./rules.ts";
 
+/** `iso`: disc images count as movies by their name; ffprobe cannot read them, so quality comes from the name only. */
 export const VIDEO_EXTENSIONS = ["mkv", "mp4", "avi", "m4v", "mov", "wmv", "ts", "m2ts", "webm", "mpg", "mpeg", "flv", "iso"];
 export const SUBTITLE_EXTENSIONS = ["srt", "ass", "ssa", "sub", "idx", "sup", "vtt"];
 export const SIDECAR_EXTENSIONS = [...SUBTITLE_EXTENSIONS, "nfo", "jpg", "jpeg", "png", "txt"];

@@ -24,8 +24,6 @@ import {
 
 type AnyDb = BunSQLiteDatabase<typeof schema>;
 
-export type Profile = typeof profiles.$inferSelect;
-export type NewProfile = typeof profiles.$inferInsert;
 export type WatchFolder = typeof watchFolders.$inferSelect;
 export type NewWatchFolder = typeof watchFolders.$inferInsert;
 export type Job = typeof jobs.$inferSelect;
@@ -59,6 +57,8 @@ export type Settings = {
   libraryRefresh: { kind: "jellyfin" | "plex" | "emby"; url: string; token: string }[];
   /** Set once profiles were taken over into formats and watch folders. */
   profilesMigrated?: boolean;
+  /** Logins issued before this (ms) are void: set by logout. */
+  sessionsValidAfter?: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -156,13 +156,6 @@ export function migrateProfiles(db: AnyDb): { skippedRules: string[] } {
   });
   return { skippedRules };
 }
-
-export const listProfiles = (db: AnyDb) => db.select().from(profiles).orderBy(asc(profiles.name)).all();
-export const getProfile = (db: AnyDb, id: number) => db.select().from(profiles).where(eq(profiles.id, id)).get();
-export const createProfile = (db: AnyDb, values: NewProfile) => db.insert(profiles).values(values).returning().get();
-export const updateProfile = (db: AnyDb, id: number, values: Partial<NewProfile>) =>
-  db.update(profiles).set(values).where(eq(profiles.id, id)).returning().get();
-export const deleteProfile = (db: AnyDb, id: number) => db.delete(profiles).where(eq(profiles.id, id)).run();
 
 // ---------- watch folders ----------
 
@@ -262,9 +255,27 @@ export function allItems(db: AnyDb, jobId: number): JobItem[] {
 
 /** Source paths below `dir` that some job already took (renamed, skipped or still pending). */
 export function knownSourcePaths(db: AnyDb, dir: string): Set<string> {
-  const prefix = `${dir.replace(/\/+$/, "").replace(/[%_\\]/g, "\\$&")}/%`;
-  const rows = db.select({ path: jobItems.sourcePath }).from(jobItems).where(sql`${jobItems.sourcePath} LIKE ${prefix} ESCAPE '\\'`).all();
+  // A range instead of LIKE 'dir/%', so the index on source_path is used: "0" follows "/".
+  const base = dir.replace(/\/+$/, "");
+  const rows = db
+    .select({ path: jobItems.sourcePath })
+    .from(jobItems)
+    .where(and(gte(jobItems.sourcePath, `${base}/`), lt(jobItems.sourcePath, `${base}0`)))
+    .all();
   return new Set(rows.map((r) => r.path));
+}
+
+/** Inbox entries for files below `dir` (a watch folder), counted in the database. */
+export function inboxCountUnder(db: AnyDb, dir: string): number {
+  const base = dir.replace(/\/+$/, "");
+  return (
+    db
+      .select({ n: count() })
+      .from(inbox)
+      .innerJoin(jobItems, eq(inbox.jobItemId, jobItems.id))
+      .where(and(gte(jobItems.sourcePath, `${base}/`), lt(jobItems.sourcePath, `${base}0`)))
+      .get()?.n ?? 0
+  );
 }
 
 /** The item whose file now lives at `targetPath`: its parsed name still knows source and quality. */
@@ -420,7 +431,11 @@ export function dashboardStats(db: AnyDb, now = new Date()): DashboardStats {
   const inboxOpen = db.select({ n: count() }).from(inbox).get()?.n ?? 0;
   const undoable = db.select({ n: count() }).from(operations).where(isNull(operations.undoneAt)).get()?.n ?? 0;
   const recent = db
-    .select({ auto: sql<number>`sum(case when ${jobItems.confidence} >= 0.9 then 1 else 0 end)`, n: count() })
+    // Sure by the job's own threshold (a watch folder can set 0.8 or 0.95), 0.9 where it has none.
+    .select({
+      auto: sql<number>`sum(case when ${jobItems.confidence} >= coalesce(json_extract(${jobs.config}, '$.autoThreshold'), 0.9) then 1 else 0 end)`,
+      n: count(),
+    })
     .from(jobItems)
     .innerJoin(jobs, eq(jobItems.jobId, jobs.id))
     .where(and(gte(jobs.createdAt, weekAgo), inArray(jobItems.state, ["done", "ready", "needs_review"])))

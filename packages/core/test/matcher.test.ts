@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   classify,
   DOUBLE_EPISODE,
@@ -7,6 +7,7 @@ import {
   matchAll,
   NO_MATCH,
   normalizeTitle,
+  overridePattern,
   rank,
   resolveEpisodes,
   scoreCandidate,
@@ -79,6 +80,69 @@ describe("Bewertung", () => {
 });
 
 describe("Gruppierung und matchAll", () => {
+  it("Serien mit verschiedenen Jahren sind verschiedene Gruppen", () => {
+    const groups = (files: string[]) =>
+      groupInputs(files.map((f) => ({ key: f, parsed: parse(f) }))).map((g) => [g.title, g.year, g.items.map((i) => i.key)]);
+    expect(groups(["The.Office.2005.S01E01.mkv", "The.Office.2001.S01E01.mkv"])).toHaveLength(2);
+    // Without a year: joins the only dated group of the show.
+    expect(groups(["Severance.2022.S02E01.mkv", "Severance.S02E02.mkv"])).toEqual([
+      ["Severance", 2022, ["Severance.2022.S02E01.mkv", "Severance.S02E02.mkv"]],
+    ]);
+    // But not a show whose name only starts the same.
+    expect(groups(["Dark.S01E01.mkv", "Dark.Matter.2015.S01E01.mkv"])).toHaveLength(2);
+  });
+
+  it("lädt nur die Staffeln, die die Dateien nennen", async () => {
+    const provider = new FakeProvider({ series: [severance], episodes: { "95396": severanceEpisodes } });
+    const episodes = vi.spyOn(provider, "episodes");
+    const files = ["Severance.S02E01.mkv", "Severance.S02E02.mkv"].map((f) => ({ key: f, parsed: parse(f) }));
+    const results = await matchAll(files, provider);
+    expect(episodes).toHaveBeenCalledTimes(1);
+    expect(episodes.mock.calls[0]![1]).toMatchObject({ season: 2 });
+    expect(results.get("Severance.S02E02.mkv")!.episodes).toEqual([severanceEpisodes.find((e) => e.season === 2 && e.episode === 2)]);
+    // Without a season every season is needed.
+    episodes.mockClear();
+    await matchAll([{ key: "a", parsed: parse("Severance - 10.mkv") }], provider);
+    expect(episodes.mock.calls[0]![1]).toMatchObject({ season: undefined });
+  });
+
+  it("mehrere Titel gleichzeitig, höchstens vier", async () => {
+    let active = 0;
+    let most = 0;
+    const provider = new FakeProvider({ series: [severance], episodes: { "95396": severanceEpisodes } });
+    const search = provider.searchSeries.bind(provider);
+    provider.searchSeries = async (query: string) => {
+      most = Math.max(most, ++active);
+      await new Promise((r) => setTimeout(r, 10));
+      active--;
+      return search(query);
+    };
+    const titles = ["Severance", "Andor", "Dark", "Slow Horses", "Shogun", "Fallout"];
+    const progress: number[] = [];
+    const results = await matchAll(
+      titles.map((t, i) => ({ key: String(i), parsed: parse(`${t}.S01E01.mkv`) })),
+      provider,
+      { onProgress: (done) => progress.push(done) },
+    );
+    expect(results.size).toBe(6);
+    expect(results.get("0")!.best?.title).toBe("Severance");
+    expect(most).toBeGreaterThan(1);
+    expect(most).toBeLessThanOrEqual(4);
+    expect(progress).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("ein bestätigter Treffer hebt den Parser-Abzug auf", async () => {
+    const dune: MediaCandidate = { provider: "tmdb", id: "438631", kind: "movie", title: "Dune", year: 2021 };
+    const provider = new FakeProvider({ movies: [dune], series: [severance], episodes: { "95396": severanceEpisodes } });
+    const conf = async (file: string) => (await matchAll([{ key: "x", parsed: parse(file) }], provider)).get("x")!.confidence;
+    // Clean title and year the source knows exactly: sure enough to run on its own.
+    expect(await conf("Dune (2021).mkv")).toBeGreaterThanOrEqual(0.9);
+    // Season folder and an episode that exists in it.
+    expect(await conf("Severance/Staffel 2/03.mkv")).toBeGreaterThanOrEqual(0.9);
+    // "203" could be an absolute number: stays below the threshold.
+    expect(await conf("severance.203.mkv")).toBeLessThan(0.9);
+  });
+
   const files = [
     "Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv",
     "Severance.S02E02.German.DL.1080p.WEB.h264-GRP.mkv",
@@ -120,6 +184,25 @@ describe("Gruppierung und matchAll", () => {
     const result = (await matchAll(input, provider)).get("x")!;
     expect(result.reasons.map((r) => text(r, "de"))).toContain("Episode nicht beim Anbieter gefunden");
     expect(classify(result.confidence)).not.toBe("auto");
+  });
+
+  it("gelernte Entscheidung mit Jahr: Doctor Who 1963 und 2005 bleiben getrennt", async () => {
+    const classic: MediaCandidate = { provider: "tmdb", id: "121", kind: "series", title: "Doctor Who", year: 1963 };
+    const modern: MediaCandidate = { provider: "tmdb", id: "57243", kind: "series", title: "Doctor Who", year: 2005 };
+    const provider = new FakeProvider({ series: [classic, modern] });
+    const pattern = (file: string) => overridePattern(parse(file))!;
+    expect(pattern("Doctor.Who.2005.S01E01.mkv")).toBe("Doctor Who (2005)");
+    const overrides = [
+      { pattern: "Doctor Who (1963)", provider: "tmdb", externalId: "121" },
+      { pattern: "Doctor Who (2005)", provider: "tmdb", externalId: "57243" },
+    ];
+    const best = async (file: string) => (await matchAll([{ key: "x", parsed: parse(file) }], provider, { overrides })).get("x")!.best?.id;
+    expect(await best("Doctor.Who.2005.S01E01.mkv")).toBe("57243");
+    expect(await best("Doctor.Who.1963.S01E01.mkv")).toBe("121");
+    // A year no decision names: searched, not overridden.
+    expect(
+      (await matchAll([{ key: "x", parsed: parse("Doctor.Who.2023.S01E01.mkv") }], provider, { overrides })).get("x")!.overridden,
+    ).toBe(false);
   });
 
   it("gespeicherte Entscheidung (Override) gewinnt", async () => {

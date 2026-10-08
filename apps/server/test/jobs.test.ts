@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { APPROVED, DOUBLE_EPISODE } from "@namarr/core";
+import { APPROVED, DOUBLE_EPISODE, type Parsed } from "@namarr/core";
 import {
   allItems,
   createWatchFolder,
@@ -19,7 +19,7 @@ import { DemoProvider } from "@namarr/providers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { localizeIn } from "~/lib/i18n";
 import { EventBus, type NamarrEvent } from "~/server/events.server";
-import { JobService } from "~/server/jobs.server";
+import { cleanupStop, JobService } from "~/server/jobs.server";
 import type { JobSummary } from "~/server/notify.server";
 
 let tmp: string;
@@ -201,7 +201,84 @@ describe("JobService: Regeln mit Daten aus der Datei", () => {
   });
 });
 
+describe("JobService: Aufräumen nach dem Verschieben", () => {
+  it("bis wohin leere Ordner verschwinden", () => {
+    const settings = { folders: [{ path: "/dl", name: "dl", kind: "folder" as const }] };
+    // The folder chosen in the workbench stays.
+    expect(cleanupStop({ kind: "manual", sourcePaths: ["/dl/tv"] }, "/dl/tv/a/x.mkv", settings)).toBe("/dl/tv");
+    // A release folder from a watch folder or a download client goes too.
+    expect(cleanupStop({ kind: "watch", sourcePaths: ["/dl/tv/Rel"] }, "/dl/tv/Rel/x.mkv", settings)).toBe("/dl/tv");
+    // A single file: its folder stays.
+    expect(cleanupStop({ kind: "hook", sourcePaths: ["/dl/x.mkv"] }, "/dl/x.mkv", settings)).toBe("/dl");
+    // A folder from the settings never goes.
+    expect(cleanupStop({ kind: "hook", sourcePaths: ["/dl"] }, "/dl/Rel/x.mkv", settings)).toBe("/dl");
+    // Several sources: the one the file comes from.
+    expect(cleanupStop({ kind: "manual", sourcePaths: ["/a", "/b"] }, "/b/c/x.mkv", settings)).toBe("/b");
+  });
+
+  it("Watch-Job: der Release-Ordner verschwindet mit dem Verschieben", async () => {
+    const release = path.join(tv(), "Severance.S02.German.DL.1080p.WEB-GRP");
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E03.German.DL.1080p.WEB.h264-GRP.mkv");
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/release.sfv");
+    // Sure matches run on their own in a watch job.
+    await jobs.create({ paths: [release], config: config({ action: "move", autoThreshold: 0.5 }), kind: "watch" });
+    await jobs.idle();
+    expect(await exists(path.join(media(), "Severance (2022)/Season 02/Severance (2022) - S02E03 - Wer ist lebendig.mkv"))).toBe(true);
+    expect(await exists(release)).toBe(false);
+    expect(await exists(tv())).toBe(true);
+  });
+});
+
+describe("JobService: create", () => {
+  it("lässt die Config des Aufrufers unverändert", async () => {
+    const input = config({ targetRoot: `${tmp}/media/../media/tv`, targets: { movie: media() } });
+    const copy = structuredClone(input);
+    await jobs.create({ paths: [tv()], config: input });
+    await jobs.idle();
+    expect(input).toStrictEqual(copy);
+  });
+});
+
+describe("JobService: Ausführen in der Warteschlange", () => {
+  it("ab dem Klick ist der Job belegt, auch wenn er noch hinter einem anderen wartet", async () => {
+    const { job } = await analyzed();
+    // Another job keeps the queue busy.
+    await jobs.create({ paths: [tv()], config: config() });
+    const run = jobs.executeNow(job.id, { action: "test" });
+    expect(getJob(db, job.id)!.status).toBe("executing");
+    await expect(jobs.recompute(job.id, { template: { episode: "{n}" } })).rejects.toThrow();
+    await run;
+    expect(getJob(db, job.id)!.status).toBe("ready");
+  });
+});
+
+describe("JobService: Watch-Jobs auf denselben Release-Ordner", () => {
+  it("der zweite Job nimmt nur, was noch kein Job kennt", async () => {
+    const release = path.join(tv(), "Severance.S02.German.DL.1080p.WEB-GRP");
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E03.German.DL.1080p.WEB.h264-GRP.mkv");
+    await jobs.create({ paths: [release], config: config({ action: "copy", autoThreshold: 0.5 }), kind: "watch" });
+    await jobs.idle();
+    // The next file of the pack finishes later; with copy the first one is still there.
+    await touch("downloads/tv/Severance.S02.German.DL.1080p.WEB-GRP/Severance.S02E04.German.DL.1080p.WEB.h264-GRP.mkv");
+    const second = await jobs.create({ paths: [release], config: config({ action: "copy", autoThreshold: 0.5 }), kind: "watch" });
+    await jobs.idle();
+    expect(allItems(db, second.id).map((i) => path.basename(i.sourcePath))).toEqual(["Severance.S02E04.German.DL.1080p.WEB.h264-GRP.mkv"]);
+  });
+});
+
 describe("JobService: Vorschau neu berechnen ohne neues Matching", () => {
+  it("schreibt und meldet nur Items, die sich ändern", async () => {
+    const { job } = await analyzed();
+    const updates = () => events.filter((e) => e.type === "item.updated");
+    await jobs.recompute(job.id, { template: { episode: "{n}/{s00e00}" } });
+    const before = updates().length;
+    // Same again: nothing moves, nothing is written or announced.
+    await jobs.recompute(job.id, { template: { episode: "{n}/{s00e00}" } });
+    expect(updates().length).toBe(before);
+    await jobs.recompute(job.id, { template: { episode: "{n} - {s00e00}" } });
+    expect(updates().length).toBe(before + 1);
+  });
+
   it("Template, Regeln und Ziel ändern", async () => {
     const { job, by } = await analyzed();
     await jobs.recompute(job.id, {
@@ -439,6 +516,16 @@ describe("JobService: Bessere Qualität behalten", () => {
     expect(await fs.readFile(`${episode()}.de.srt`, "utf8")).toBe("alte Untertitel");
   });
 
+  it("ohne Konflikt der Hauptdatei bleibt ein vorhandener Untertitel unangetastet", async () => {
+    await touch(path.relative(tmp, `${episode()}.de.srt`), "eigene Untertitel");
+    const { job } = await analyzed({ conflictPolicy: "keep-better" });
+    await jobs.executeNow(job.id);
+    const item = severanceE01(allItems(db, job.id));
+    expect(item.state).toBe("done");
+    expect(await fs.readFile(`${episode()}.de.srt`, "utf8")).toBe("eigene Untertitel");
+    expect(item.error).toContain(".de.srt");
+  });
+
   it("lässt eine bessere vorhandene Datei liegen und sagt warum", async () => {
     await earlier("Severance.S02E01.1080p.BluRay.x264-OLD", "BluRay");
     const { job } = await analyzed({ conflictPolicy: "keep-better" });
@@ -475,16 +562,14 @@ describe("JobService: ffprobe", () => {
     expect(by("Severance.S02E01.German.DL.1080p.WEB.h264-GRP.mkv").targetPath).toBe(path.join(media(), "Severance S02E01 1080p H.264.mkv"));
   });
 
-  it("ohne ffprobe wird nach dem ersten Versuch abgebrochen", async () => {
-    const probe = vi.fn(async () => undefined);
+  it("eine unlesbare erste Datei hält die anderen nicht auf", async () => {
+    let calls = 0;
+    const probe = vi.fn(async () => (calls++ === 0 ? undefined : { resolution: "2160p", videoCodec: "H.265", audio: [] }));
     jobs = new JobService({ db, bus, provider: () => new DemoProvider(), log, notify, probe });
-    await touch("downloads/tv/a.s01e01.mkv");
-    await touch("downloads/tv/b.s01e01.mkv");
-    await touch("downloads/tv/c.s01e01.mkv");
-    await touch("downloads/tv/d.s01e01.mkv");
-    await touch("downloads/tv/e.s01e01.mkv");
-    await analyzed();
-    expect(probe).toHaveBeenCalledTimes(4);
+    const { items } = await analyzed();
+    expect(probe).toHaveBeenCalledTimes(2);
+    // The second file still gets what ffprobe read.
+    expect(items.filter((i) => (i.parsedJson as Parsed).release.videoCodec === "H.265")).toHaveLength(1);
   });
 });
 

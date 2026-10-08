@@ -1,3 +1,4 @@
+import { mapLimit } from "../concurrency.ts";
 import { msg } from "../i18n.ts";
 import type { EpisodeInfo, EpisodeOrder, MediaCandidate, MetadataProvider, Parsed } from "../types.ts";
 import { normalizeTitle, titleSimilarity } from "./similarity.ts";
@@ -106,10 +107,21 @@ export function rank(parsed: Parsed, candidates: MediaCandidate[]): { ranked: Sc
   return { ranked, confidence: Math.min(1, confidence), reasons };
 }
 
-/** How sure the parser is about a file's structure weighs into its match confidence. */
-export function withParserConfidence(confidence: number, parsed: Parsed): number {
+/**
+ * How sure the parser is about a file's structure weighs into its match confidence, unless the
+ * match settles it (`confirmed`): a movie whose exact year and title the source knows, an episode
+ * that is in the list of its season. Otherwise "Dune (2021).mkv" could never run on its own.
+ */
+export function withParserConfidence(confidence: number, parsed: Parsed, confirmed = false): number {
+  if (confirmed) return confidence;
   return confidence * (0.4 + 0.6 * Math.max(parsed.kind.confidence, 0.5));
 }
+
+/** Titles looked up at the same time by matchAll. */
+const GROUP_CONCURRENCY = 4;
+
+/** Below this, a file's structure stays doubtful even when its episode exists ("severance.203"). */
+const SURE_STRUCTURE = 0.75;
 
 type Group = { kind: "movie" | "series"; title: string; year?: number; season?: number; items: MatchInput[] };
 
@@ -120,7 +132,8 @@ export function groupInputs(inputs: MatchInput[]): Group[] {
     const { parsed } = input;
     if (!parsed.title || parsed.kind.value === "unknown") continue;
     const kind = parsed.kind.value === "episode" ? "series" : "movie";
-    const key = `${kind}|${normalizeTitle(parsed.title)}|${kind === "movie" ? (parsed.year ?? "") : ""}`;
+    // Series with different years are different shows ("The.Office.2005" and "The.Office.2001").
+    const key = `${kind}|${normalizeTitle(parsed.title)}|${parsed.year ?? ""}`;
     let group = groups.get(key);
     if (!group) {
       group = { kind, title: parsed.title, year: parsed.year, items: [] };
@@ -129,19 +142,42 @@ export function groupInputs(inputs: MatchInput[]): Group[] {
     group.year ??= parsed.year;
     group.items.push(input);
   }
+  // Episodes without a year join their show when only one year of it is in the job.
+  for (const [key, group] of groups) {
+    if (group.kind !== "series" || group.year !== undefined) continue;
+    // The key ends with "|" here: "series|dark|" must not take "series|dark matter|2015".
+    const dated = [...groups.entries()].filter(([k, g]) => k !== key && k.startsWith(key) && g.kind === "series");
+    if (dated.length === 1) {
+      dated[0]![1].items.push(...group.items);
+      groups.delete(key);
+    }
+  }
   return [...groups.values()];
 }
 
+/** What a learned decision is remembered by: the title, and its year when the name has one. */
+export function overridePattern(parsed: Parsed): string | undefined {
+  if (!parsed.title) return undefined;
+  return parsed.year ? `${parsed.title} (${parsed.year})` : parsed.title;
+}
+
+/**
+ * A learned decision for this file. "Doctor Who (2005)" applies to files of 2005 or without a year,
+ * never to "Doctor.Who.1963"; an exact year wins over one learned without a year.
+ */
 function findOverride(parsed: Parsed, overrides: MatchOverride[] | undefined, provider: string) {
   if (!overrides?.length || !parsed.title) return undefined;
   const title = normalizeTitle(parsed.title);
   const group = parsed.release.group?.toLowerCase();
-  return overrides.find((o) => {
+  const fitting = overrides.filter((o) => {
     if (o.provider !== provider) return false;
     const pattern = o.pattern.toLowerCase();
     if (pattern.startsWith("group:")) return group === pattern.slice(6).trim();
-    return normalizeTitle(o.pattern) === title;
+    const withYear = /^(.*) \((\d{4})\)$/.exec(o.pattern);
+    if (!withYear) return normalizeTitle(o.pattern) === title;
+    return normalizeTitle(withYear[1]!) === title && (parsed.year === undefined || parsed.year === Number(withYear[2]));
   });
+  return fitting.find((o) => parsed.year !== undefined && o.pattern.endsWith(`(${parsed.year})`)) ?? fitting[0];
 }
 
 /** AniDB and co.: the entry is the season, so S02E05 is episode 5 of whatever entry was chosen. */
@@ -182,17 +218,30 @@ export async function matchAll(
   }
   const groups = groupInputs(inputs);
   const episodeCache = new Map<string, Promise<EpisodeInfo[]>>();
-  const loadEpisodes = (id: string) => {
-    let promise = episodeCache.get(id);
+  const loadSeason = (id: string, season?: number) => {
+    const key = season === undefined ? id : `${id}|${season}`;
+    let promise = episodeCache.get(key);
     if (!promise) {
-      promise = provider.episodes(id, { language: options.language, order: options.order });
-      episodeCache.set(id, promise);
+      promise = provider.episodes(id, { language: options.language, order: options.order, season });
+      episodeCache.set(key, promise);
     }
     return promise;
   };
+  /** Only the seasons the files name (a 30-season show is 30 requests otherwise); all when unsure. */
+  const loadEpisodes = async (id: string, seasons?: Set<number>) => {
+    if (!seasons) return loadSeason(id);
+    const lists = await Promise.all([...seasons].map((n) => loadSeason(id, n)));
+    // A source that ignores `season` returns everything each time: once is enough.
+    const seen = new Set<string>();
+    return lists.flat().filter((e) => {
+      const key = `${e.season}x${e.episode}`;
+      return !seen.has(key) && Boolean(seen.add(key));
+    });
+  };
 
   let done = 0;
-  for (const group of groups) {
+  // A few titles at once: each source's own limiter keeps its rate (AniDB one at a time).
+  await mapLimit(groups, GROUP_CONCURRENCY, async (group) => {
     const first = group.items[0]!.parsed;
     const override = findOverride(first, options.overrides, provider.nameFor?.(group.kind) ?? provider.name);
     const ids = group.items.find((i) => i.parsed.ids)?.parsed.ids;
@@ -220,13 +269,23 @@ export async function matchAll(
       reasons = ranked.reasons;
     }
 
-    const episodes = best && group.kind === "series" ? await loadEpisodes(best.id) : [];
+    // Files without a season (absolute numbers, dates), a learned season offset or one entry per
+    // season (AniDB) need every season.
+    const seasons =
+      override?.seasonOffset ||
+      best?.seasonsAsEntries ||
+      group.items.some((i) => i.parsed.season === undefined || i.parsed.absolute !== undefined)
+        ? undefined
+        : new Set(group.items.map((i) => i.parsed.season!));
+    const episodes = best && group.kind === "series" ? await loadEpisodes(best.id, seasons) : [];
     for (const item of group.items) {
+      const movieConfirmed =
+        group.kind === "movie" && item.parsed.year !== undefined && best?.year === item.parsed.year && confidence >= 0.95;
       const result: MatchResult = {
         best,
         episodes: [],
         alternatives,
-        confidence: override || byId ? confidence : withParserConfidence(confidence, item.parsed),
+        confidence: override || byId ? confidence : withParserConfidence(confidence, item.parsed, movieConfirmed),
         reasons: [...reasons],
         overridden: Boolean(override),
       };
@@ -238,6 +297,16 @@ export async function matchAll(
           if (!override && !byId) result.confidence = Math.min(result.confidence, 0.7);
         }
         const wanted = item.parsed.date ? 1 : Math.max(1, item.parsed.episodes.length);
+        // The episode is in the list of its season: the match confirms what the parser read.
+        if (
+          !override &&
+          !byId &&
+          parsed === item.parsed &&
+          item.parsed.kind.confidence >= SURE_STRUCTURE &&
+          result.episodes.length >= wanted
+        ) {
+          result.confidence = withParserConfidence(confidence, item.parsed, true);
+        }
         if (result.episodes.length < wanted) {
           result.confidence *= item.parsed.episodes.length === 0 && !item.parsed.date ? 0.5 : 0.7;
           result.reasons.push(item.parsed.episodes.length === 0 ? msg("matcher_reason_noEpisode") : msg("matcher_reason_episodeNotFound"));
@@ -252,7 +321,7 @@ export async function matchAll(
       results.set(item.key, result);
     }
     options.onProgress?.(++done, groups.length);
-  }
+  });
   return results;
 }
 

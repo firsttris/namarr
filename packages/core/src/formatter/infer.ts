@@ -33,8 +33,9 @@ const ORDER: Record<InferKind, string[]> = {
   episode: [
     "s00e00",
     "sxe",
-    "t",
+    // The name before the episode title: "Boardwalk Empire S01E01 Boardwalk Empire".
     "n",
+    "t",
     "y",
     "rating",
     "s00",
@@ -237,8 +238,10 @@ export function mergeTemplates(a: string, b: string): string {
     } else if (i < x.length && (j >= y.length || lcs[i + 1]![j]! >= lcs[i]![j + 1]!)) {
       out += x[i++];
     } else {
-      // Only b's conditional blocks come in; its other parts are b's own.
-      if (y[j]!.startsWith("{?")) out += y[j];
+      // Only b's conditional blocks come in, and only for a token a has no condition on yet;
+      // its other parts are b's own.
+      const block = y[j]!;
+      if (block.startsWith("{?") && !a.includes(block.slice(0, block.indexOf("}") + 1))) out += block;
       j++;
     }
   }
@@ -257,7 +260,11 @@ export function inferFormat(samples: InferSample[], kind: InferKind): InferResul
   for (const t of derived) votes.set(t, (votes.get(t) ?? 0) + 1);
   // Each file shows only part of the format: fold the others into each derived template.
   const unique = [...votes.keys()];
-  const merged = unique.map((start) => unique.reduce((acc, t) => mergeTemplates(acc, t), start));
+  // Pairs too: one odd file must not spoil every fold.
+  const merged = [
+    ...unique.map((start) => unique.reduce((acc, t) => mergeTemplates(acc, t), start)),
+    ...unique.flatMap((a) => unique.filter((b) => b !== a).map((b) => mergeTemplates(a, b))),
+  ];
 
   const scored = new Map<string, number>();
   let best: Omit<InferResult, "presets"> | undefined;

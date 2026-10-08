@@ -21,6 +21,12 @@
 - name: Blade.Runner.2049.2017.1080p.BluRay.x264-GRP.mkv
   category: movie
   expect: { kind: movie, title: Blade Runner 2049, year: 2017 }
+- name: Blade Runner 2049 (2017).mkv
+  category: movie
+  expect: { kind: movie, title: Blade Runner 2049, year: 2017 }
+- name: The.1917.2019.mkv
+  category: movie
+  expect: { kind: movie, title: The 1917, year: 2019 }
 - name: 300.2006.1080p.BluRay.mkv
   category: movie
   expect: { kind: movie, title: "300", year: 2006 }

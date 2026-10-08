@@ -6,11 +6,20 @@ import { createWatchFolder, type Db, getSettings, listJobs, openDatabase, type S
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { localizeIn } from "~/lib/i18n";
-import { isAuthenticated, isPublicPath, SESSION_COOKIE, sessionCookie, sessionValue } from "~/server/auth.server";
-import { assertSafeBinding, readEnv } from "~/server/env.server";
+import {
+  isAuthenticated,
+  isPublicPath,
+  loginThrottle,
+  SESSION_COOKIE,
+  sessionCookie,
+  sessionValue,
+  setSessionsValidAfter,
+} from "~/server/auth.server";
+import { assertSafeBinding, isTrustedProxy, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
 import { JobService } from "~/server/jobs.server";
 import { afterExecution, checkLibrary, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
+import { forbiddenFolder, hiddenInBrowser } from "~/server/paths.server";
 import { seedFolders } from "~/server/runtime.server";
 import { accepts, compressHtml, precompress, staticFiles } from "~/server/static.server";
 import { isCandidate, WatchService } from "~/server/watch.server";
@@ -26,6 +35,20 @@ describe("Umgebung und Bindung", () => {
     expect(() => assertSafeBinding(readEnv({ NAMARR_HOST: "0.0.0.0", NAMARR_TOKEN: "x" }))).not.toThrow();
     expect(() => assertSafeBinding(readEnv({ NAMARR_HOST: "0.0.0.0", NAMARR_AUTH_HEADER: "Remote-User" }))).not.toThrow();
     expect(() => assertSafeBinding(readEnv({}))).not.toThrow();
+  });
+
+  it("Pfad-Zuordnung am ersten Doppelpunkt, Unbrauchbares wird gemeldet; Port wird geprüft", () => {
+    const env = readEnv({ NAMARR_PATH_MAP: "/downloads/:/data/downloads, /a:/b:c, kaputt, :/x" });
+    expect(env.pathMap).toEqual([
+      ["/downloads", "/data/downloads"],
+      ["/a", "/b:c"],
+    ]);
+    expect(env.warnings).toEqual([
+      'NAMARR_PATH_MAP: "kaputt" ignored, expected /from:/to',
+      'NAMARR_PATH_MAP: ":/x" ignored, expected /from:/to',
+    ]);
+    expect(() => assertSafeBinding(readEnv({ NAMARR_PORT: "achtzig" }))).toThrow(/NAMARR_PORT/);
+    expect(() => assertSafeBinding(readEnv({ NAMARR_PORT: "70000" }))).toThrow(/NAMARR_PORT/);
   });
 });
 
@@ -45,6 +68,65 @@ describe("Auth", () => {
     expect(isAuthenticated(env, h({ authorization: "Bearer nein" }))).toBe(false);
     expect(isAuthenticated(env, h({ authorization: `Basic ${btoa("user:geheim")}` }))).toBe(true);
     expect(isAuthenticated(env, h({ authorization: `Basic ${btoa("user:nein")}` }))).toBe(false);
+  });
+
+  it("Sessions: jede anders, laufen ab, Logout beendet alle", () => {
+    const now = Date.now();
+    const cookie = (v: string) => h({ cookie: `${SESSION_COOKIE}=${v}` });
+    const first = sessionValue("geheim", now - 1000);
+    expect(sessionValue("geheim", now)).not.toBe(first);
+    expect(isAuthenticated(env, cookie(first), now)).toBe(true);
+    // Expired on the server, whatever the browser keeps.
+    expect(isAuthenticated(env, cookie(sessionValue("geheim", now - 31 * 24 * 3600 * 1000)), now)).toBe(false);
+    // Tampered timestamp: the signature no longer fits.
+    expect(isAuthenticated(env, cookie(`${now}.${first.split(".")[1]}`), now)).toBe(false);
+    expect(isAuthenticated(env, cookie("kaputt"), now)).toBe(false);
+    // Logout: every session issued so far is void, a new login works.
+    setSessionsValidAfter(now);
+    try {
+      expect(isAuthenticated(env, cookie(first), now)).toBe(false);
+      expect(isAuthenticated(env, cookie(sessionValue("geheim", now + 1)), now + 2)).toBe(true);
+    } finally {
+      setSessionsValidAfter(0);
+    }
+  });
+
+  it("Ordner: nicht das ganze Dateisystem, keine Systemordner, nicht die eigene Datenbank", () => {
+    expect(forbiddenFolder("/", "/config")).toBe(true);
+    expect(forbiddenFolder("/proc/self", "/config")).toBe(true);
+    expect(forbiddenFolder("/dev", "/config")).toBe(true);
+    expect(forbiddenFolder("/config", "/config")).toBe(true);
+    expect(forbiddenFolder("/srv", "/srv/namarr/config")).toBe(true);
+    expect(forbiddenFolder("/config/sub", "/config")).toBe(true);
+    expect(forbiddenFolder("/data", "/config")).toBe(false);
+    expect(forbiddenFolder("/devices", "/config")).toBe(false);
+    // Browsing the whole disk: the system trees and the config are left out, its parents stay.
+    expect(hiddenInBrowser("/proc", "/srv/namarr/config")).toBe(true);
+    expect(hiddenInBrowser("/srv/namarr/config", "/srv/namarr/config")).toBe(true);
+    expect(hiddenInBrowser("/srv", "/srv/namarr/config")).toBe(false);
+  });
+
+  it("Login: nach 10 Fehlversuchen pro Minute und Adresse ist Pause", () => {
+    const t = 1_000_000;
+    for (let i = 0; i < 10; i++) loginThrottle.failed("10.0.0.9", t + i);
+    expect(loginThrottle.blocked("10.0.0.9", t + 20)).toBe(true);
+    // Other addresses are not affected; after a minute it is over.
+    expect(loginThrottle.blocked("10.0.0.8", t + 20)).toBe(false);
+    expect(loginThrottle.blocked("10.0.0.9", t + 61_000)).toBe(false);
+    loginThrottle.failed("10.0.0.7", t);
+    loginThrottle.succeeded("10.0.0.7");
+    expect(loginThrottle.blocked("10.0.0.7", t)).toBe(false);
+  });
+
+  it("Proxy-Header nur von vertrauenswürdigen Adressen", () => {
+    expect(readEnv({}).trustedProxies).toEqual(["127.0.0.1", "::1"]);
+    const trusted = readEnv({ NAMARR_TRUSTED_PROXIES: "10.88.0.5, 172.16.0.0/12" }).trustedProxies;
+    expect(isTrustedProxy("10.88.0.5", trusted)).toBe(true);
+    expect(isTrustedProxy("::ffff:10.88.0.5", trusted)).toBe(true);
+    expect(isTrustedProxy("172.20.1.2", trusted)).toBe(true);
+    expect(isTrustedProxy("10.88.0.6", trusted)).toBe(false);
+    expect(isTrustedProxy("192.168.1.10", trusted)).toBe(false);
+    expect(isTrustedProxy(undefined, trusted)).toBe(false);
   });
 
   it("Reverse-Proxy-Header", () => {
@@ -114,7 +196,7 @@ describe("Benachrichtigungen und Library-Refresh", () => {
     await afterExecution(settings, { jobId: 1, done: 1, failed: 0, skipped: 0, source: "/x" }, log, fetchImpl);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(log.mock.calls.map((c) => c[0])).toEqual(
-      expect.arrayContaining(["Benachrichtigung fehlgeschlagen: jf:8096", "Benachrichtigung fehlgeschlagen: hook.example HTTP 500"]),
+      expect.arrayContaining(["Notification failed: jf:8096", "Notification failed: hook.example HTTP 500"]),
     );
   });
 
