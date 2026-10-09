@@ -1,0 +1,22 @@
+name: Update screenshots
+
+# Takes the README pictures (docs/screenshot-*.png) against the demo backend and renders the social
+# preview from them (bun run docs:screenshots), then commits the ones that changed. Run it after a
+# change to the look.
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    uses: firsttris/workflows/.github/workflows/screenshots.yml@v1
+    with:
+      bun: true
+      bun-version: 1.4.x
+      install: bun install --frozen-lockfile
+      lockfile: bun.lock
+      command: bun run docs:screenshots
+      paths: |
+        docs/screenshot-*.png
+        docs/social-preview.png
+    permissions:
+      contents: write
