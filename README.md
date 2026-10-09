@@ -60,7 +60,7 @@ expect, or in your own.
 | **AniDB** | | | ✅ | registered client |
 
 Series and movies can come from different sources, and every watch folder can pick its own series
-source, for example AniDB for an anime folder. Details: [docs/metadata.md](docs/metadata.md).
+source, for example AniDB for an anime folder. Details: [Metadata sources](https://firsttris.github.io/namarr/metadata.html).
 
 ## 🐳 Quick start
 
@@ -72,8 +72,8 @@ docker compose up -d
 ```
 
 Open **http://localhost:8420**, sign in with your token, then under *Settings* add your
-[folders](docs/installation.md#folders-and-libraries) (`/data`, or your download, movie and series
-mounts) and a TMDB API key, or set up one of the [other sources](docs/metadata.md).
+[folders](https://firsttris.github.io/namarr/installation.html#folders-and-libraries) (`/data`, or your download, movie and series
+mounts) and a TMDB API key, or set up one of the [other sources](https://firsttris.github.io/namarr/metadata.html).
 
 <details>
 <summary><b>docker run</b></summary>
@@ -116,7 +116,7 @@ Use the template in [`docker/unraid/namarr.xml`](docker/unraid/namarr.xml).
 | `/data` | your downloads and your library (or one mount each, see the installation guide) |
 
 Environment variables, image tags, updates and the API are in the
-[installation guide](docs/installation.md).
+[installation guide](https://firsttris.github.io/namarr/installation.html).
 
 ## 📸 Screenshots
 
@@ -127,7 +127,7 @@ Environment variables, image tags, updates and the API are in the
 ## 📚 Documentation
 
 The full documentation is a website with search: **[firsttris.github.io/namarr](https://firsttris.github.io/namarr/)**.
-The same pages are in [`docs/`](docs/README.md) here on GitHub.
+The same pages are in [`docs/`](docs/) here on GitHub.
 
 | | |
 |---|---|
@@ -149,7 +149,7 @@ NAMARR_DEMO=1 bun run dev   # http://localhost:8420 with an offline demo catalog
 ```
 
 **Stack**: Bun, TanStack Start (React, server functions), TanStack Query and Virtual, Tailwind,
-SQLite with Drizzle, Vitest and Playwright. More in [docs/development.md](docs/development.md).
+SQLite with Drizzle, Vitest and Playwright. More in [Development](https://firsttris.github.io/namarr/development.html).
 
 ## 🤝 Contributing
 
