@@ -3,6 +3,7 @@
 Everything about namarr in detail: installing it, the workbench, automation, where the metadata
 comes from and how it is built. The quick overview is the
 [README on GitHub](https://github.com/firsttris/namarr#readme).
+Also as a website with search: **https://firsttris.github.io/namarr/**
 
 | | |
 |---|---|
