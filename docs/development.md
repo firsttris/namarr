@@ -85,6 +85,21 @@ The corpus is a start (the goal is 500+ real names) and was written together wit
 100 % says little. Every reported miss becomes a new entry in
 `packages/core/test/corpus/releases.yaml`.
 
+## Screenshots
+
+The README pictures `docs/screenshot-dashboard.png` and `docs/screenshot-workbench.png` come from the
+demo backend, in English: `apps/server/scripts/screenshots.spec.ts` sets up two libraries, two watch
+folders and three download-client jobs (one renamed, two in the inbox) on the fake files of
+`scripts/screenshots-setup.ts`, then takes the workbench with a season of Severance and the
+dashboard. `bun run docs:screenshots` builds, takes them and renders `docs/social-preview.png` from
+them (`bun run docs:social-preview` alone renders only that). The fake files go to `/data`, like in
+the container, so the paths in the pictures read as in real use; `SHOTS_DATA=/tmp/namarr-shots`
+puts them elsewhere.
+
+After a change to the look, run **Update screenshots** (Actions → Run workflow,
+`.github/workflows/screenshots.yml`) on the branch: it takes the pictures in the official
+Playwright image and commits the ones that changed.
+
 ## Releases
 
 A version is a tag. Without a checkout: *Actions → Bump version → Run workflow* with patch, minor or
