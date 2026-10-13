@@ -120,7 +120,8 @@ The tag push starts the *Release* workflow (CI here, the rest from the shared
 [`docker-release.yml`](https://github.com/firsttris/workflows) in `firsttris/workflows`):
 
 1. the tag must match `version` in the root `package.json`,
-2. the full CI (lint, typecheck, tests, parser benchmark, build, E2E),
+2. the full CI (lint, typecheck, tests, parser benchmark, build, E2E), unless `main`'s CI already
+   passed for the same code (a *Bump version* commit only changes the version),
 3. the image as `x.y.z`, `x.y` and `latest` on Docker Hub and GHCR, plus the Docker Hub description,
 4. only then the GitHub release with generated notes.
 
