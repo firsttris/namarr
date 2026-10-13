@@ -59,7 +59,21 @@ jobs:
         with:
           bun-version: 1.4.x
       - run: bun install --frozen-lockfile
-      - run: bunx playwright install --with-deps chromium
+      # Chromium from the Actions cache, per Playwright version; the system libraries install on
+      # every run. The tests compare no screenshots, the runner stays the same as before
+      - id: playwright
+        working-directory: apps/server
+        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - id: browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/server
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
         working-directory: apps/server
       - name: Playwright (Workbench-Flows gegen Demo-Backend)
         run: bun run e2e
