@@ -9,11 +9,13 @@ FileBot-style media matching and ReNamer-style rules in one web UI, in a Docker 
 Every change starts as a preview, and every change can be undone.
 
 [![CI](https://github.com/firsttris/namarr/actions/workflows/ci.yml/badge.svg)](https://github.com/firsttris/namarr/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/firsttris/namarr?logo=github&label=release)](https://github.com/firsttris/namarr/releases/latest)
 [![Docker Pulls](https://img.shields.io/docker/pulls/tristanteu/namarr?logo=docker&logoColor=white)](https://hub.docker.com/r/tristanteu/namarr)
 [![Image Size](https://img.shields.io/docker/image-size/tristanteu/namarr/latest?logo=docker&logoColor=white&label=image)](https://hub.docker.com/r/tristanteu/namarr)
 [![Platforms](https://img.shields.io/badge/platform-amd64%20%7C%20arm64-lightgrey)](https://hub.docker.com/r/tristanteu/namarr/tags)
 [![Bun](https://img.shields.io/badge/built%20with-Bun-fbf0df?logo=bun&logoColor=black)](https://bun.sh/)
 [![Docs](https://img.shields.io/badge/docs-firsttris.github.io%2Fnamarr-d9862e?logo=materialformkdocs&logoColor=white)](https://firsttris.github.io/namarr/)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
 [Features](#-features) •
