@@ -49,7 +49,9 @@ docker/       Dockerfile, compose example, Quadlet, Unraid template
 
 One Bun process: `apps/server/server.ts` runs the migrations at startup and starts the job queue and
 the watch folders exactly once (a singleton on `globalThis`, also in Vite dev mode). Server functions
-only create jobs; scanning, matching and execution run in the queue, progress arrives over SSE. The
+only create jobs; scanning, matching and execution run in the queue, progress arrives over SSE.
+The server functions (UI) and the MCP tools (`server/mcp.server.ts`, agents) are both thin adapters:
+they validate with the same inputs (`lib/inputs.ts`) and run the same code (`server/commands.server.ts`). The
 workbench renders on the client (`ssr: false`).
 
 The build writes `.br` and `.gz` next to the client assets (`apps/server/scripts/precompress.ts`);

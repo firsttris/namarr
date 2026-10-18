@@ -146,3 +146,4 @@ target becomes the default library for movies and series.
 - `GET /api/events`: Server-Sent Events: `job.progress`, `item.updated`, `inbox.added`,
   `watch.detected`.
 - `POST /api/jobs` and `GET /api/jobs/<id>`: the [download client hook](automation.md#download-client-hook).
+- `POST /api/mcp`: the [MCP server for AI agents](automation.md#ai-agents-mcp).

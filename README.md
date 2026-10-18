@@ -21,6 +21,7 @@ Every change starts as a preview, and every change can be undone.
 [Features](#-features) •
 [Metadata](#-metadata-sources) •
 [Quick start](#-quick-start) •
+[AI agents](#-ai-agents) •
 [Documentation](https://firsttris.github.io/namarr/) •
 [Contributing](#-contributing)
 
@@ -119,6 +120,18 @@ Use the template in [`docker/unraid/namarr.xml`](docker/unraid/namarr.xml).
 
 Environment variables, image tags, updates and the API are in the
 [installation guide](https://firsttris.github.io/namarr/installation.html).
+
+## 🤖 AI agents
+
+namarr is an MCP server: an agent such as Claude Code previews, corrects, renames and undoes like you do
+in the workbench. Nothing moves without an explicit `execute_job`, and `NAMARR_MCP=readonly` leaves
+out every tool that changes files.
+
+```bash
+claude mcp add --transport http namarr http://localhost:8420/api/mcp --header "Authorization: Bearer $NAMARR_TOKEN"
+```
+
+Tools and setup for other clients: [AI agents (MCP)](https://firsttris.github.io/namarr/automation.html#ai-agents-mcp).
 
 ## 📸 Screenshots
 

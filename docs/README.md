@@ -9,6 +9,6 @@ Also as a website with search: **https://firsttris.github.io/namarr/**
 |---|---|
 | [Installation](installation.md) | Docker Compose, docker run, Podman Quadlet, Unraid, folders, environment variables, image tags, updates and backup, health and events |
 | [Workbench](workbench.md) | preview, actions, conflicts and *keep better*, undo, template language, naming formats and detecting them from a library, rules |
-| [Automation](automation.md) | watch folders, inbox, download client hook, library refresh, notifications |
+| [Automation](automation.md) | watch folders, inbox, download client hook, AI agents (MCP), library refresh, notifications |
 | [Metadata sources](metadata.md) | TMDB, TheTVDB, TVmaze, AniDB, IDs in folder names, languages, episode order |
 | [Development](development.md) | setup, checks, architecture, tests, parser corpus, roadmap |
