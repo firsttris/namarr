@@ -136,6 +136,7 @@ target becomes the default library for movies and series.
 | `NAMARR_HOST` / `NAMARR_PORT` | `127.0.0.1` / `8420` | Outside Docker only reachable locally by default. |
 | `PUID` / `PGID` | `1000` | The server starts as root, hands `/config` over and then runs as this user. |
 | `NAMARR_PATH_MAP` | – | Maps paths of other containers to namarr's view, e.g. `/downloads:/data/downloads` (several separated by commas). Used by the [download client hook](automation.md#download-client-hook). |
+| `NAMARR_MCP` | `on` | [MCP endpoint](automation.md#ai-agents-mcp) for AI agents: `on`, `readonly` (no tools that change files) or `off`. An unknown value turns it off. |
 | `NAMARR_DEMO` | – | `1`: offline demo catalog instead of TMDB, to try the UI and for the E2E tests. |
 | `NAMARR_LOG_LEVEL` | `info` | pino log level. |
 

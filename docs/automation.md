@@ -66,6 +66,48 @@ unknown).
 - When the client and namarr run in different containers with different mounts, for example
   `/downloads` against `/data/downloads`, set `NAMARR_PATH_MAP=/downloads:/data/downloads`.
 
+## AI agents (MCP)
+
+namarr is an [MCP](https://modelcontextprotocol.io) server, so an AI agent (Claude Code, Claude
+Desktop, Cursor, VS Code, …) can rename files the way you do in the workbench: preview first, then
+execute, and undo whenever needed. The endpoint is `/api/mcp` (Streamable HTTP) and takes the same token as the API.
+
+```bash
+claude mcp add --transport http namarr http://namarr:8420/api/mcp --header "Authorization: Bearer $NAMARR_TOKEN"
+```
+
+For clients that configure servers in JSON:
+
+```json
+{
+  "mcpServers": {
+    "namarr": {
+      "type": "http",
+      "url": "http://namarr:8420/api/mcp",
+      "headers": { "Authorization": "Bearer <NAMARR_TOKEN>" }
+    }
+  }
+}
+```
+
+| Tool | What it does |
+|---|---|
+| `get_overview` | Folders and libraries, watch folders, naming formats, inbox count, latest jobs |
+| `browse_folder` | Lists a folder inside the allowed folders |
+| `create_job` | Scans and matches files and waits for the preview. Always in **test mode**, nothing moves |
+| `get_job`, `list_job_items` | Status, and old → new per file with match, episodes, confidence, reasons and conflicts |
+| `search_metadata`, `update_item` | Picks another match, sets your own target, excludes or approves a file |
+| `recompute_preview` | Another template, format, rules or target folder, without matching again |
+| `cancel_job` | Stops a running job |
+| `execute_job` | Runs the preview: `move`, `copy` or `rename` |
+| `list_inbox`, `approve_inbox` | Shows and approves uncertain matches from watch folders and the hook |
+| `list_history`, `undo` | Executed operations, and undo per job, file, operation or point in time |
+
+The agent is told to ask before `execute_job`, `approve_inbox` and `undo`, and these tools are
+marked as destructive, so clients ask for confirmation. `NAMARR_MCP=readonly` leaves those three tools out:
+the agent can look and prepare previews, but only you run them in the workbench. `NAMARR_MCP=off` turns the
+endpoint off.
+
 ## After a job
 
 - **Library refresh** for Jellyfin, Emby and Plex, so new episodes show up right away. *Test

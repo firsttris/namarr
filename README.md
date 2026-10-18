@@ -47,7 +47,7 @@ expect, or in your own.
 | ✏️ **Rules for everything else** | 16 ReNamer-style rules (replace, regex, numbering, clean up …) · photos by EXIF date · music by tags · rule sets as YAML |
 | 🧩 **Naming formats** | Template language with live example · built in: Plex, Jellyfin, Emby, Kodi · own formats per kind · **detect the format of your existing library** |
 | 🔍 **Preview & undo** | Test mode by default · diff view, keyboard control · conflicts incl. *keep better* (resolution, HDR, codecs, audio) · undo per file, job or point in time |
-| 🤖 **Automation** | Watch folders that wait for finished downloads · inbox for uncertain matches · hook for qBittorrent, SABnzbd, NZBGet |
+| 🤖 **Automation** | Watch folders that wait for finished downloads · inbox for uncertain matches · hook for qBittorrent, SABnzbd, NZBGet · MCP server for AI agents |
 | 📚 **Libraries** | One default folder each for movies and series · move, copy or rename in place · folder browser for every path |
 | 🔔 **After a job** | Library refresh for Jellyfin, Emby, Plex · notifications via ntfy, Gotify, Telegram, Discord, webhook |
 | 🌍 **UI** | English and German, including every server message |
@@ -135,7 +135,7 @@ The same pages are in [`docs/`](docs/) here on GitHub.
 |---|---|
 | [Installation](https://firsttris.github.io/namarr/installation.html) | Compose, docker run, Quadlet, Unraid, folders, environment variables, image tags, updates and backup, health and events |
 | [Workbench](https://firsttris.github.io/namarr/workbench.html) | preview, actions, conflicts and *keep better*, undo, template language, naming formats and detecting them from a library, rules |
-| [Automation](https://firsttris.github.io/namarr/automation.html) | watch folders, inbox, download client hook, library refresh, notifications |
+| [Automation](https://firsttris.github.io/namarr/automation.html) | watch folders, inbox, download client hook, AI agents (MCP), library refresh, notifications |
 | [Metadata sources](https://firsttris.github.io/namarr/metadata.html) | TMDB, TheTVDB, TVmaze, AniDB, IDs in folder names, languages, episode order |
 | [Development](https://firsttris.github.io/namarr/development.html) | setup, checks, architecture, tests, parser corpus, roadmap |
 

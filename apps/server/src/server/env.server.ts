@@ -1,5 +1,8 @@
 import * as path from "node:path";
 
+export const MCP_MODES = ["on", "readonly", "off"] as const;
+export type McpMode = (typeof MCP_MODES)[number];
+
 /** Process configuration from environment variables. */
 export type Env = {
   configDir: string;
@@ -16,6 +19,8 @@ export type Env = {
   /** Path prefixes of other containers mapped to namarr's view: `/downloads:/data/downloads`. */
   pathMap: [from: string, to: string][];
   demo: boolean;
+  /** MCP endpoint for AI agents (`/api/mcp`): all tools, only those that change no files, or none. */
+  mcp: McpMode;
   logLevel: string;
   /** Settings that were ignored, logged at startup. */
   warnings: string[];
@@ -35,6 +40,10 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
     if (from && to) pathMap.push([from, to]);
     else warnings.push(`NAMARR_PATH_MAP: "${entry}" ignored, expected /from:/to`);
   }
+  const mcp = (env.NAMARR_MCP ?? "on").trim().toLowerCase();
+  // A typo must not open more than was meant: an unknown value turns the endpoint off.
+  if (!MCP_MODES.includes(mcp as McpMode))
+    warnings.push(`NAMARR_MCP: "${env.NAMARR_MCP}" unknown, expected on, readonly or off; MCP is off`);
   return {
     configDir: path.resolve(env.NAMARR_CONFIG_DIR ?? "./config"),
     host: env.NAMARR_HOST ?? "127.0.0.1",
@@ -51,6 +60,7 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
       .map((r) => r.trim())
       .filter(Boolean),
     demo: env.NAMARR_DEMO === "1" || env.NAMARR_DEMO === "true",
+    mcp: MCP_MODES.includes(mcp as McpMode) ? (mcp as McpMode) : "off",
     logLevel: env.NAMARR_LOG_LEVEL ?? "info",
     warnings,
   };
