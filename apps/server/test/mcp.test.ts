@@ -102,6 +102,8 @@ describe("MCP: Protokoll", () => {
     expect((await post(ping, { origin: "http://evil.example" })).status).toBe(403);
     expect((await post(ping, { origin: "null" })).status).toBe(403);
     expect((await post(ping, { origin: "http://namarr:8420" })).status).toBe(200);
+    // Media types are case-insensitive.
+    expect((await post(ping, { "content-type": "Application/JSON; charset=utf-8" })).status).toBe(200);
   });
 
   it("tools/list mit JSON-Schema und Hinweisen; readonly lässt Dateiänderungen weg", async () => {

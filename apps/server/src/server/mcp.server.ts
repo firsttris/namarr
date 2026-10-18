@@ -260,7 +260,7 @@ export const TOOLS: Tool[] = [
     name: "update_item",
     title: "Correct a file",
     description:
-      "Corrects one file of a job before it runs: another match (id and kind from search_metadata; remember: use it for this release from now on), an own target path (relative to the job's target folder; null: back to the template), exclude it, or approve a doubtful match. Recomputes the preview.",
+      "Corrects one file of a job before it runs: another match (id and kind from search_metadata; remember: use it for this release from now on), an own target path (absolute, or relative to the job's targetRoot, else to the file's own folder; null: back to the template), exclude it, or approve a doubtful match. Recomputes the preview.",
     input: updateItemInput,
     effect: "preview",
     external: true,
@@ -432,7 +432,7 @@ export async function handleMcp(rt: Runtime, request: Request): Promise<Response
   // Against DNS rebinding: a browser page on another site must not reach the tools.
   if (!sameOrigin(request)) return new Response("Forbidden origin", { status: 403 });
   // JSON only: a cross-site form or text/plain POST cannot get past the browser's preflight then.
-  if (!(request.headers.get("content-type") ?? "").includes("application/json"))
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json"))
     return new Response("Content-Type must be application/json", { status: 415 });
 
   let message: RpcMessage;
