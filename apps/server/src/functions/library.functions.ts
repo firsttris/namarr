@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { CONFLICT_POLICIES, isInside, resolveInRoots, VIDEO_EXTENSIONS, WATCH_ACTIONS } from "@namarr/core";
+import { CONFLICT_POLICIES, isInside, resolveInRoots, WATCH_ACTIONS } from "@namarr/core";
 import { msg } from "@namarr/core/i18n";
 import {
   allowedRoots,
@@ -11,7 +11,6 @@ import {
   FORMAT_KINDS,
   type FolderKind,
   findFormat,
-  getItem,
   getSettings,
   inboxCountUnder,
   type LibraryFolder,
@@ -28,9 +27,11 @@ import {
 } from "@namarr/db";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { approveInboxInput, browseInput, historyInput } from "~/lib/inputs";
+import * as commands from "~/server/commands.server";
 import { libraryFormat } from "~/server/infer.server";
 import { checkLibrary } from "~/server/notify.server";
-import { forbiddenFolder, hiddenInBrowser } from "~/server/paths.server";
+import { forbiddenFolder } from "~/server/paths.server";
 import { authed } from "./middleware";
 
 const id = z.number().int().positive();
@@ -81,32 +82,8 @@ export function normalizeFolders(folders: LibraryFolder[]): LibraryFolder[] {
 
 export const browseFolder = createServerFn({ method: "GET" })
   .middleware([authed])
-  // scope "all": the whole file system, folders only, for choosing the folders themselves (settings).
-  .validator(z.object({ path: z.string().optional(), scope: z.enum(["allowed", "all"]).optional() }))
-  .handler(async ({ data, context: { rt } }) => {
-    const all = data.scope === "all";
-    const roots = all ? ["/"] : allowedRoots(getSettings(rt.db));
-    if (!data.path && !all)
-      return { path: null, parent: null, roots, entries: [] as { name: string; path: string; dir: boolean; video: boolean }[] };
-    const dir = all ? path.resolve(data.path ?? "/") : await resolveInRoots(data.path!, roots);
-    const dirents = await fs.readdir(dir, { withFileTypes: true });
-    const entries = dirents
-      .filter(
-        (d) =>
-          !d.name.startsWith(".") &&
-          d.name !== "@eaDir" &&
-          (!all || (d.isDirectory() && !hiddenInBrowser(path.join(dir, d.name), rt.env.configDir))),
-      )
-      .map((d) => ({
-        name: d.name,
-        path: path.join(dir, d.name),
-        dir: d.isDirectory(),
-        video: VIDEO_EXTENSIONS.includes(path.extname(d.name).slice(1).toLowerCase()),
-      }))
-      .sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name, "de", { numeric: true }));
-    const atRoot = roots.some((r) => path.resolve(r) === dir);
-    return { path: dir, parent: atRoot ? null : path.dirname(dir), roots, entries };
-  });
+  .validator(browseInput)
+  .handler(async ({ data, context: { rt } }) => commands.browseFolder(rt, data));
 
 // ---------- inbox ----------
 
@@ -117,27 +94,14 @@ export const getInbox = createServerFn({ method: "GET" })
 /** Approve: mark ready and execute with the job's action. */
 export const approveInbox = createServerFn({ method: "POST" })
   .middleware([authed])
-  .validator(z.object({ itemIds: z.array(id).optional(), minConfidence: z.number().min(0).max(1).optional() }))
-  .handler(async ({ data, context: { rt } }) => {
-    const inbox = listInbox(rt.db, 10_000);
-    const chosen = inbox.filter(
-      (e) =>
-        (data.itemIds ? data.itemIds.includes(e.item.id) : true) &&
-        (data.minConfidence === undefined || e.item.confidence >= data.minConfidence),
-    );
-    const byJob = await rt.jobs.approve(chosen.map((e) => e.item.id));
-    for (const [jobId, itemIds] of byJob) if (itemIds.length) await rt.jobs.executeNow(jobId, { itemIds });
-    const approved = [...byJob.values()].flat();
-    return { approved: approved.length, done: approved.filter((i) => getItem(rt.db, i)?.state === "done").length };
-  });
+  .validator(approveInboxInput)
+  .handler(async ({ data, context: { rt } }) => commands.approveInbox(rt, data));
 
 // ---------- history ----------
 
 export const listHistory = createServerFn({ method: "GET" })
   .middleware([authed])
-  .validator(
-    z.object({ search: z.string().max(200).optional(), before: z.number().int().optional(), includeUndone: z.boolean().optional() }),
-  )
+  .validator(historyInput)
   .handler(async ({ data, context: { rt } }) => listOperations(rt.db, { ...data, limit: 200 }));
 
 // ---------- naming formats ----------

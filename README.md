@@ -21,6 +21,7 @@ Every change starts as a preview, and every change can be undone.
 [Features](#-features) •
 [Metadata](#-metadata-sources) •
 [Quick start](#-quick-start) •
+[AI agents](#-ai-agents) •
 [Documentation](https://firsttris.github.io/namarr/) •
 [Contributing](#-contributing)
 
@@ -47,7 +48,7 @@ expect, or in your own.
 | ✏️ **Rules for everything else** | 16 ReNamer-style rules (replace, regex, numbering, clean up …) · photos by EXIF date · music by tags · rule sets as YAML |
 | 🧩 **Naming formats** | Template language with live example · built in: Plex, Jellyfin, Emby, Kodi · own formats per kind · **detect the format of your existing library** |
 | 🔍 **Preview & undo** | Test mode by default · diff view, keyboard control · conflicts incl. *keep better* (resolution, HDR, codecs, audio) · undo per file, job or point in time |
-| 🤖 **Automation** | Watch folders that wait for finished downloads · inbox for uncertain matches · hook for qBittorrent, SABnzbd, NZBGet |
+| 🤖 **Automation** | Watch folders that wait for finished downloads · inbox for uncertain matches · hook for qBittorrent, SABnzbd, NZBGet · MCP server for AI agents |
 | 📚 **Libraries** | One default folder each for movies and series · move, copy or rename in place · folder browser for every path |
 | 🔔 **After a job** | Library refresh for Jellyfin, Emby, Plex · notifications via ntfy, Gotify, Telegram, Discord, webhook |
 | 🌍 **UI** | English and German, including every server message |
@@ -120,6 +121,18 @@ Use the template in [`docker/unraid/namarr.xml`](docker/unraid/namarr.xml).
 Environment variables, image tags, updates and the API are in the
 [installation guide](https://firsttris.github.io/namarr/installation.html).
 
+## 🤖 AI agents
+
+namarr is an MCP server: an agent such as Claude Code previews, corrects, renames and undoes like you do
+in the workbench. Nothing moves without an explicit `execute_job`, and `NAMARR_MCP=readonly` leaves
+out every tool that changes files.
+
+```bash
+claude mcp add --transport http namarr http://localhost:8420/api/mcp --header "Authorization: Bearer $NAMARR_TOKEN"
+```
+
+Tools and setup for other clients: [AI agents (MCP)](https://firsttris.github.io/namarr/automation.html#ai-agents-mcp).
+
 ## 📸 Screenshots
 
 <div align="center">
@@ -135,7 +148,7 @@ The same pages are in [`docs/`](docs/) here on GitHub.
 |---|---|
 | [Installation](https://firsttris.github.io/namarr/installation.html) | Compose, docker run, Quadlet, Unraid, folders, environment variables, image tags, updates and backup, health and events |
 | [Workbench](https://firsttris.github.io/namarr/workbench.html) | preview, actions, conflicts and *keep better*, undo, template language, naming formats and detecting them from a library, rules |
-| [Automation](https://firsttris.github.io/namarr/automation.html) | watch folders, inbox, download client hook, library refresh, notifications |
+| [Automation](https://firsttris.github.io/namarr/automation.html) | watch folders, inbox, download client hook, AI agents (MCP), library refresh, notifications |
 | [Metadata sources](https://firsttris.github.io/namarr/metadata.html) | TMDB, TheTVDB, TVmaze, AniDB, IDs in folder names, languages, episode order |
 | [Development](https://firsttris.github.io/namarr/development.html) | setup, checks, architecture, tests, parser corpus, roadmap |
 
