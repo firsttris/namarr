@@ -174,6 +174,13 @@ describe("Benachrichtigungen und Library-Refresh", () => {
     expect(refreshRequest({ kind: "emby", url: "http://emby:8096", token: "e" }).init.headers).toEqual({ "X-Emby-Token": "e" });
   });
 
+  it("Jellyfin-Token mit Leerraum aus der Zwischenablage ergibt gültigen Authorization-Header", () => {
+    // Vorher normalisierte fetch den X-Emby-Token-Wert (Leerraum am Rand entfernt); im quotierten Wert bleibt er stehen.
+    const headers = () => new Headers(refreshRequest({ kind: "jellyfin", url: "http://jf:8096", token: " j\n" }).init.headers);
+    expect(headers).not.toThrow();
+    expect(headers().get("authorization")).toBe('MediaBrowser Token="j"');
+  });
+
   it("Text der Zusammenfassung", () => {
     expect(summaryText({ jobId: 7, done: 3, failed: 1, skipped: 0, source: "/dl" })).toBe(
       "namarr Job #7: 3 umbenannt, 1 fehlgeschlagen (/dl)",
