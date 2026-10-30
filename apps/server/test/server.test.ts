@@ -169,8 +169,9 @@ describe("Benachrichtigungen und Library-Refresh", () => {
     );
     expect(refreshRequest({ kind: "jellyfin", url: "http://jf:8096", token: "j" })).toEqual({
       url: "http://jf:8096/Library/Refresh",
-      init: { method: "POST", headers: { "X-Emby-Token": "j" } },
+      init: { method: "POST", headers: { authorization: 'MediaBrowser Token="j"' } },
     });
+    expect(refreshRequest({ kind: "emby", url: "http://emby:8096", token: "e" }).init.headers).toEqual({ "X-Emby-Token": "e" });
   });
 
   it("Text der Zusammenfassung", () => {
@@ -403,7 +404,10 @@ describe("Library-Refresh: Verbindung testen", () => {
       name: "Wohnzimmer",
       version: "10.10.3",
     });
-    expect(fetchImpl).toHaveBeenCalledWith("http://jf:8096/System/Info", expect.objectContaining({ method: "GET" }));
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://jf:8096/System/Info",
+      expect.objectContaining({ method: "GET", headers: { authorization: 'MediaBrowser Token="t"', accept: "application/json" } }),
+    );
 
     const plex = vi.fn(json({ MediaContainer: { friendlyName: "NAS", version: "1.41.0" } }));
     expect(await checkLibrary({ kind: "plex", url: "http://plex:32400", token: "p" }, plex)).toEqual({

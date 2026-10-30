@@ -58,6 +58,14 @@ export function notificationRequest(target: Settings["notifications"][number], t
   }
 }
 
+/**
+ * Token header for Jellyfin/Emby. Jellyfin 12 dropped the legacy `X-Emby-Token` header and only
+ * accepts `Authorization: MediaBrowser Token="…"` (also understood by Jellyfin 10.x); Emby keeps `X-Emby-Token`.
+ */
+function mediaServerAuth(target: { kind: string; token: string }): Record<string, string> {
+  return target.kind === "jellyfin" ? { authorization: `MediaBrowser Token="${target.token}"` } : { "X-Emby-Token": target.token };
+}
+
 /** Library refresh after execution: Jellyfin/Emby share the API, Plex uses its token parameter. */
 export function refreshRequest(target: Settings["libraryRefresh"][number]): { url: string; init: RequestInit } {
   if (target.kind === "plex") {
@@ -65,7 +73,7 @@ export function refreshRequest(target: Settings["libraryRefresh"][number]): { ur
     url.searchParams.set("X-Plex-Token", target.token);
     return { url: String(url), init: { method: "GET" } };
   }
-  return { url: String(new URL("/Library/Refresh", target.url)), init: { method: "POST", headers: { "X-Emby-Token": target.token } } };
+  return { url: String(new URL("/Library/Refresh", target.url)), init: { method: "POST", headers: mediaServerAuth(target) } };
 }
 
 export type LibraryCheck = { ok: true; name?: string; version?: string } | { ok: false; reason: string };
@@ -88,7 +96,7 @@ export async function checkLibrary(target: Settings["libraryRefresh"][number], f
   try {
     res = await fetchImpl(String(url), {
       method: "GET",
-      headers: plex ? { accept: "application/json" } : { "X-Emby-Token": target.token, accept: "application/json" },
+      headers: plex ? { accept: "application/json" } : { ...mediaServerAuth(target), accept: "application/json" },
       signal: AbortSignal.timeout(10_000),
     });
   } catch (e) {
