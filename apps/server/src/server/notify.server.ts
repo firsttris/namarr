@@ -63,7 +63,7 @@ export function notificationRequest(target: Settings["notifications"][number], t
  * accepts `Authorization: MediaBrowser Token="…"` (also understood by Jellyfin 10.x); Emby keeps `X-Emby-Token`.
  */
 function mediaServerAuth(target: { kind: string; token: string }): Record<string, string> {
-  return target.kind === "jellyfin" ? { authorization: `MediaBrowser Token="${target.token}"` } : { "X-Emby-Token": target.token };
+  return target.kind === "jellyfin" ? { authorization: `MediaBrowser Token="${target.token.trim()}"` } : { "X-Emby-Token": target.token };
 }
 
 /** Library refresh after execution: Jellyfin/Emby share the API, Plex uses its token parameter. */
