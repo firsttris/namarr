@@ -25,7 +25,7 @@
         "@tanstack/react-router": "^1",
         "@tanstack/react-start": "^1",
         "@tanstack/react-virtual": "^3",
-        "chokidar": "^5",
+        "chokidar": "^6.0.0",
         "pino": "^10",
         "react": "^19",
         "react-dom": "^19",
@@ -504,7 +504,7 @@
 
     "chai": ["chai@6.3.0", "", {}, "sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg=="],
 
-    "chokidar": ["chokidar@5.0.0", "", { "dependencies": { "readdirp": "^5.0.0" } }, "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw=="],
+    "chokidar": ["chokidar@6.0.0", "", { "dependencies": { "readdirp": "^5.1.1" } }, "sha512-Ec2Z7wpcKBiMpR7DxteoqS/sq5G5d2A4fpxzPv6+fD7xNNdrTghn7L11YwV5EN1B3i72Erc3XVT5FkWIDx90+A=="],
 
     "commander": ["commander@11.1.0", "", {}, "sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ=="],
 
@@ -753,6 +753,8 @@
     "@tailwindcss/oxide-wasm32-wasi/tslib": ["tslib@2.9.1", "", { "bundled": true }, "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA=="],
 
     "@tanstack/router-generator/magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
+
+    "@tanstack/router-plugin/chokidar": ["chokidar@5.0.0", "", { "dependencies": { "readdirp": "^5.0.0" } }, "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw=="],
 
     "@tanstack/router-plugin/unplugin": ["unplugin@3.7.0", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "@rolldown/pluginutils": "^1.0.1", "picomatch": "^4.0.7", "webpack-virtual-modules": "^0.6.2" }, "peerDependencies": { "@farmfe/core": "*", "@rsbuild/core": "*", "@rspack/core": "*", "bun-types-no-globals": "*", "esbuild": "*", "rolldown": "*", "rollup": "*", "unloader": "*", "vite": "*", "webpack": "*" }, "optionalPeers": ["@farmfe/core", "@rsbuild/core", "@rspack/core", "bun-types-no-globals", "esbuild", "rolldown", "rollup", "unloader", "vite", "webpack"] }, "sha512-GrM2uq3DQo3hvLU2FjeYhooJ8BY9N6j1Fbzgx7Pta3VVJevsD3VP4dPjZkZOS0mLvN8w9zzr9OlP+31bSMyuLw=="],
 
