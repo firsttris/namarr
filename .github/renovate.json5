@@ -1,0 +1,69 @@
+// Renovate (GitHub App, https://github.com/apps/renovate): a pull request for each new release of
+// what namarr builds on, plus the "Dependency Dashboard" issue listing what is open.
+// Only those: Bun (image, CI, the docs and its types) and the static ffprobe the image copies from
+// mwader/static-ffmpeg (quality, HDR, audio tracks and tags come from its JSON). The other
+// packages and the actions are not tracked here; namarr's own image moves with its releases.
+// Check with `npx --package renovate renovate-config-validator .github/renovate.json5`.
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended"],
+  enabledManagers: ["dockerfile", "bun", "custom.regex"],
+  timezone: "Europe/Berlin",
+  labels: ["dependencies"],
+  // Nothing merges itself: each of these needs the checks in its pull request read by a person
+  automerge: false,
+  customManagers: [
+    {
+      // The Bun of CI and the screenshots (bun-version: 1.4.x, the newest patch of a minor) and
+      // the version docs/development.md names
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/workflows/[^/]+\\.ya?ml$/", "/^docs/development\\.md$/"],
+      matchStrings: [
+        "bun-version: (?<currentValue>\\d+\\.\\d+)\\.x",
+        "Requires \\[Bun\\]\\(https://bun\\.sh/\\) (?<currentValue>\\d+\\.\\d+)\\.",
+      ],
+      depNameTemplate: "oven-sh/bun",
+      datasourceTemplate: "github-releases",
+      extractVersionTemplate: "^bun-v(?<version>\\d+\\.\\d+)\\.\\d+$",
+      versioningTemplate: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)$",
+    },
+  ],
+  packageRules: [
+    {
+      // From the packages only @types/bun (with Bun, below)
+      matchManagers: ["bun"],
+      enabled: false,
+    },
+    {
+      // namarr's own image moves with its releases (release.yml)
+      matchPackageNames: ["docker.io/tristanteu/**", "tristanteu/**", "ghcr.io/firsttris/**"],
+      enabled: false,
+    },
+    {
+      // The Dockerfile syntax line (# syntax=docker/dockerfile:1.7) is not what namarr builds on
+      matchPackageNames: ["docker/dockerfile", "docker.io/docker/dockerfile"],
+      enabled: false,
+    },
+    {
+      // Bun: the build and runtime images, bun-version in the workflows, the docs and the types, in
+      // one PR so they cannot drift apart
+      matchPackageNames: ["docker.io/oven/bun", "oven-sh/bun", "@types/bun"],
+      enabled: true,
+      groupName: "Bun",
+      sourceUrl: "https://github.com/oven-sh/bun",
+      prBodyNotes: [
+        "The image (`oven/bun` and `-slim`), CI and the screenshots (`bun-version`), docs/development.md and `@types/bun` move together. The server bundle is built with `bun build --target=bun` and the database is `bun:sqlite`: check the release notes for changes to either, and that typecheck, tests, the parser benchmark and the e2e run of this PR are green.",
+      ],
+    },
+    {
+      // ffprobe in the image (docker/Dockerfile); its output feeds parseFfprobe in packages/core
+      matchPackageNames: ["docker.io/mwader/static-ffmpeg"],
+      groupName: "ffprobe",
+      sourceUrl: "https://github.com/wader/static-ffmpeg",
+      commitMessageTopic: "ffprobe (static-ffmpeg)",
+      prBodyNotes: [
+        "namarr reads `ffprobe -print_format json -show_streams -show_format` (`packages/core/src/scanner/index.ts`, `parseFfprobe`) for resolution, codec, HDR, the best audio track (DTS-HD by its profile) and the tags and creation time of `{date}`/`{artist}`. Before merging: read the FFmpeg changelog for changes to stream fields, `profile`, `side_data_list` and tag names; build the image and probe a few files (HEVC HDR10, Dolby Vision, DTS-HD MA, MP3/FLAC with tags, an iPhone .mov) and compare the result with the old image.",
+      ],
+    },
+  ],
+}
