@@ -12,7 +12,7 @@ COPY . .
 RUN bun run --cwd apps/server build
 
 # ffprobe for container metadata, as a static binary (multi-arch, no apt, no shared libs).
-FROM docker.io/mwader/static-ffmpeg:7.1 AS ffmpeg
+FROM docker.io/mwader/static-ffmpeg:9.0 AS ffmpeg
 
 # Runtime: the slim Bun image plus the bundle. No node_modules: everything is in dist/.
 FROM docker.io/oven/bun:1.4-slim AS runtime
