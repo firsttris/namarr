@@ -53,13 +53,31 @@ export type Settings = {
   formats: NameFormat[];
   /** The format per kind used unless a job or watch folder picks another (ids; unset: Jellyfin). */
   defaultFormats: { movie?: string; series?: string };
-  notifications: { kind: "ntfy" | "gotify" | "telegram" | "discord" | "webhook"; url: string; token?: string }[];
+  notifications: NotificationTarget[];
+  /** Address namarr is reached at from outside (e.g. https://namarr.example); notifications link to it. */
+  publicUrl?: string;
   libraryRefresh: { kind: "jellyfin" | "plex" | "emby"; url: string; token: string }[];
   /** Set once profiles were taken over into formats and watch folders. */
   profilesMigrated?: boolean;
   /** Logins issued before this (ms) are void: set by logout. */
   sessionsValidAfter?: number;
 };
+
+/** job: summary after a job ran; inbox: files that wait for approval. */
+export const NOTIFICATION_EVENTS = ["job", "inbox"] as const;
+export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
+
+export type NotificationTarget = {
+  kind: "ntfy" | "gotify" | "telegram" | "discord" | "webhook";
+  url: string;
+  token?: string;
+  /** Which events go to this target; unset: all of them. */
+  events?: NotificationEvent[];
+};
+
+/** Whether `target` wants `event`; targets from before the event choice get everything. */
+export const wantsEvent = (target: Pick<NotificationTarget, "events">, event: NotificationEvent) =>
+  (target.events ?? NOTIFICATION_EVENTS).includes(event);
 
 export const DEFAULT_SETTINGS: Settings = {
   language: "de-DE",

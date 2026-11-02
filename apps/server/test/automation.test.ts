@@ -18,19 +18,31 @@ import { readEnv } from "~/server/env.server";
 import { EventBus } from "~/server/events.server";
 import { createHookJob, HookError, mapPath, readHookInput } from "~/server/hook.server";
 import { JobService } from "~/server/jobs.server";
+import type { InboxSummary } from "~/server/notify.server";
 import type { Runtime } from "~/server/runtime.server";
 import { WatchService } from "~/server/watch.server";
 
 let tmp: string;
 let db: Db;
 let jobs: JobService;
+let inboxNotes: InboxSummary[];
 const log = { info: () => {}, error: () => {} };
 
 beforeEach(async () => {
   tmp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "namarr-auto-")));
   db = openDatabase(":memory:");
   setSettings(db, { folders: [{ path: tmp, name: "root", kind: "folder" }] });
-  jobs = new JobService({ db, bus: new EventBus(), provider: () => new DemoProvider(), log, notify: async () => {} });
+  inboxNotes = [];
+  jobs = new JobService({
+    db,
+    bus: new EventBus(),
+    provider: () => new DemoProvider(),
+    log,
+    notify: async () => {},
+    notifyInbox: async (_s, summary) => {
+      inboxNotes.push(summary);
+    },
+  });
 });
 afterEach(async () => {
   await fs.rm(tmp, { recursive: true, force: true });
@@ -202,6 +214,16 @@ describe("Hook für Download-Clients", () => {
     expect(await exists(path.join(tmp, "media/Severance (2022)/Season 02/Severance (2022) - S02E01 - Hallo, Frau Cobel.mkv"))).toBe(true);
     // The uncertain double episode waits in the inbox
     expect(listInbox(db).map((e) => path.basename(e.item.sourcePath))).toEqual(["severance.204-205.720p.mkv"]);
+    // … and the notification says which file, with its match and why
+    expect(inboxNotes).toEqual([
+      {
+        jobId: job.id,
+        source: path.join(tmp, "dl/Severance.S02.German.DL.1080p.WEB-GRP"),
+        items: [
+          expect.objectContaining({ file: "severance.204-205.720p.mkv", title: "Severance", year: 2022, reason: expect.any(String) }),
+        ],
+      },
+    ]);
   });
 
   it("übernimmt Format, Ziel und Schwelle eines Watch-Folders, review hält alles an", async () => {
@@ -224,6 +246,7 @@ describe("Hook für Download-Clients", () => {
     });
     await jobs.idle();
     expect(listInbox(db)).toHaveLength(1);
+    expect(inboxNotes.flatMap((n) => n.items.map((i) => i.episode))).toEqual(["S02E01"]);
     await expect(fs.readdir(path.join(tmp, "media")).catch(() => [])).resolves.toEqual([]);
   });
 

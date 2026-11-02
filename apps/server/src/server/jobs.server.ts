@@ -66,7 +66,7 @@ import {
   updateJob,
 } from "@namarr/db";
 import type { EventBus } from "./events.server.ts";
-import { afterExecution, type JobSummary } from "./notify.server.ts";
+import { afterExecution, afterInbox, type InboxEntry, type InboxSummary, type JobSummary } from "./notify.server.ts";
 
 export type JobServiceDeps = {
   db: Db;
@@ -75,6 +75,8 @@ export type JobServiceDeps = {
   provider: (settings: Settings, choice?: { series?: SeriesProvider }) => MetadataProvider | undefined;
   log: { info: (o: object | string, msg?: string) => void; error: (o: object | string, msg?: string) => void };
   notify?: (settings: Settings, summary: JobSummary) => Promise<void>;
+  /** Files of a watch or hook job went into the inbox. */
+  notifyInbox?: (settings: Settings, summary: InboxSummary) => Promise<void>;
   /** Container metadata (ffprobe); undefined when unavailable. */
   probe?: (file: string) => Promise<ProbeInfo | undefined>;
 };
@@ -105,6 +107,27 @@ export function cleanupStop(job: Pick<Job, "kind" | "sourcePaths">, file: string
   if (!source || source === file) return path.dirname(file);
   if (job.kind === "manual" || allowedRoots(settings).some((r) => path.resolve(r) === path.resolve(source))) return source;
   return path.dirname(source);
+}
+
+/** What an inbox notification tells about one file: the match (title, year, episode) and why it waits. */
+export function inboxEntry(item: Pick<JobItem, "id" | "sourcePath" | "matchJson" | "parsedJson">, reason: string): InboxEntry {
+  const best = item.matchJson?.best;
+  const episodes = item.matchJson?.episodes ?? [];
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // Episode unknown at the provider: the numbers the name gives, like the formatter does.
+  const season = episodes[0]?.season ?? item.parsedJson?.season;
+  const numbers = episodes.length ? episodes.map((e) => e.episode) : (item.parsedJson?.episodes ?? []);
+  const episode =
+    best?.kind === "series" && season !== undefined && numbers.length
+      ? `S${pad(season)}${numbers.map((n) => `E${pad(n)}`).join("")}`
+      : undefined;
+  return {
+    itemId: item.id,
+    file: path.basename(item.sourcePath),
+    ...(best ? { title: best.title, ...(best.year ? { year: best.year } : {}) } : {}),
+    ...(episode ? { episode } : {}),
+    reason,
+  };
 }
 
 export type TargetPatch = Partial<Pick<JobConfig, "mode" | "preset" | "template" | "formats" | "rules">> & {
@@ -299,6 +322,7 @@ export class JobService {
     const job = getJob(db, jobId)!;
     const always = job.config.alwaysReview === true;
     const review: number[] = [];
+    const entries: InboxEntry[] = [];
     let ready = 0;
     for (const item of allItems(db, jobId)) {
       if (item.state === "ready" && !always) {
@@ -307,11 +331,17 @@ export class JobService {
       }
       if (item.state !== "needs_review" && item.state !== "ready") continue;
       const reason = item.reasons[0] ?? msg("jobs_reason_belowThreshold");
-      addToInbox(db, item.id, always ? (item.reasons[0] ? `${ALWAYS_REVIEW}: ${reason}` : ALWAYS_REVIEW) : reason);
+      const inboxReason = always ? (item.reasons[0] ? `${ALWAYS_REVIEW}: ${reason}` : ALWAYS_REVIEW) : reason;
+      addToInbox(db, item.id, inboxReason);
       updateItem(db, item.id, { state: "needs_review" });
       review.push(item.id);
+      entries.push(inboxEntry(item, inboxReason));
     }
-    if (review.length) this.deps.bus.emit({ type: "inbox.added", itemIds: review });
+    if (review.length) {
+      this.deps.bus.emit({ type: "inbox.added", itemIds: review });
+      const notify = this.deps.notifyInbox ?? ((s, sum) => afterInbox(s, sum, (m, err) => this.deps.log.error({ err }, m)));
+      void notify(getSettings(db), { jobId, source: job.sourcePaths.join(", "), items: entries });
+    }
     if (ready) await this.execute(jobId, new AbortController().signal);
   }
 

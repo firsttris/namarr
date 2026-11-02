@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as zlib from "node:zlib";
+import { msg, parse } from "@namarr/core";
 import { createWatchFolder, type Db, getSettings, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,8 +18,17 @@ import {
 } from "~/server/auth.server";
 import { assertSafeBinding, isTrustedProxy, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
-import { JobService } from "~/server/jobs.server";
-import { afterExecution, checkLibrary, notificationRequest, refreshRequest, summaryText } from "~/server/notify.server";
+import { inboxEntry, JobService } from "~/server/jobs.server";
+import {
+  afterExecution,
+  afterInbox,
+  checkLibrary,
+  inboxLink,
+  inboxText,
+  notificationRequest,
+  refreshRequest,
+  summaryText,
+} from "~/server/notify.server";
 import { forbiddenFolder, hiddenInBrowser } from "~/server/paths.server";
 import { seedFolders } from "~/server/runtime.server";
 import { accepts, compressHtml, precompress, staticFiles } from "~/server/static.server";
@@ -206,6 +216,96 @@ describe("Benachrichtigungen und Library-Refresh", () => {
     expect(log.mock.calls.map((c) => c[0])).toEqual(
       expect.arrayContaining(["Notification failed: jf:8096", "Notification failed: hook.example HTTP 500"]),
     );
+  });
+
+  it("Text für Dateien, die auf Freigabe warten", () => {
+    const items = Array.from({ length: 7 }, (_, i) => ({
+      itemId: i,
+      file: `f${i}.mkv`,
+      title: "Severance",
+      year: 2022,
+      episode: `S02E0${i + 1}`,
+      reason: "unsicher",
+    }));
+    items[1] = { itemId: 1, file: "unbekannt.mkv", reason: "kein Treffer" } as (typeof items)[number];
+    const text = inboxText({ jobId: 3, source: "/dl", items }, "en", "https://n.example/inbox");
+    expect(text.split("\n")).toEqual([
+      "namarr: 7 files waiting for approval (/dl)",
+      "• Severance (2022) S02E01: unsicher",
+      "• unbekannt.mkv: kein Treffer",
+      "• Severance (2022) S02E03: unsicher",
+      "• Severance (2022) S02E04: unsicher",
+      "• Severance (2022) S02E05: unsicher",
+      "… and 2 more",
+      "https://n.example/inbox",
+    ]);
+    expect(inboxText({ jobId: 3, source: "/dl", items: items.slice(0, 1) }, "de")).toBe(
+      "namarr: 1 Datei wartet auf Freigabe (/dl)\n• Severance (2022) S02E01: unsicher",
+    );
+  });
+
+  it("Link zur Inbox aus der öffentlichen Adresse", () => {
+    expect(inboxLink(undefined)).toBeUndefined();
+    expect(inboxLink(" ")).toBeUndefined();
+    expect(inboxLink("https://n.example")).toBe("https://n.example/inbox");
+    expect(inboxLink("https://n.example/namarr/")).toBe("https://n.example/namarr/inbox");
+    expect(inboxLink("https://n.example/namarr")).toBe("https://n.example/namarr/inbox");
+  });
+
+  it("Inbox-Benachrichtigung nur an Ziele, die sie wollen, mit Link und Daten", async () => {
+    const settings: Settings = {
+      language: "en-US",
+      folders: [],
+      formats: [],
+      defaultFormats: {},
+      publicUrl: "https://n.example",
+      notifications: [
+        { kind: "ntfy", url: "https://ntfy.sh/all" },
+        { kind: "webhook", url: "https://hook.example/inbox", events: ["inbox"] },
+        { kind: "discord", url: "https://d/jobs", events: ["job"] },
+      ],
+      libraryRefresh: [{ kind: "plex", url: "http://p", token: "t" }],
+    };
+    const fetchImpl = vi.fn(async (_url: string, _init: RequestInit) => new Response(""));
+    const summary = {
+      jobId: 4,
+      source: "/dl",
+      items: [{ itemId: 9, file: "a.mkv", title: "Dune", year: 2021, reason: msg("jobs_reason_belowThreshold") }],
+    };
+    await afterInbox(settings, summary, () => {}, fetchImpl);
+    expect(fetchImpl.mock.calls.map((c) => c[0])).toEqual(["https://ntfy.sh/all", "https://hook.example/inbox"]);
+    const ntfy = fetchImpl.mock.calls[0]![1];
+    expect((ntfy.headers as Record<string, string>).click).toBe("https://n.example/inbox");
+    const hook = JSON.parse(String(fetchImpl.mock.calls[1]![1].body));
+    expect(hook).toMatchObject({ source: "namarr", event: "inbox", link: "https://n.example/inbox", data: { jobId: 4 } });
+    // The reason is rendered for the reader, not sent as a message key
+    expect(hook.data.items[0].reason).not.toContain("\u0002");
+    expect(hook.text).toContain("Dune (2021): ");
+
+    fetchImpl.mockClear();
+    await afterExecution(settings, { jobId: 1, done: 0, failed: 1, skipped: 0, source: "/x" }, () => {}, fetchImpl);
+    expect(fetchImpl.mock.calls.map((c) => c[0])).toEqual(["https://ntfy.sh/all", "https://d/jobs"]);
+
+    fetchImpl.mockClear();
+    await afterInbox(settings, { ...summary, items: [] }, () => {}, fetchImpl);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("Inbox-Eintrag nennt die Episode aus dem Dateinamen, wenn der Anbieter sie nicht kennt", () => {
+    const best = { id: "1", provider: "demo", kind: "series" as const, title: "Severance", year: 2022 };
+    const reason = msg("matcher_reason_episodeNotFound");
+    const entries = ["severance.s02e05.mkv", "severance.s02e06.mkv"].map((f, i) =>
+      inboxEntry(
+        {
+          id: i,
+          sourcePath: `/dl/${f}`,
+          parsedJson: parse(f),
+          matchJson: { best, episodes: [], alternatives: [], confidence: 0.4, reasons: [reason] },
+        },
+        reason,
+      ),
+    );
+    expect(entries.map((e) => e.episode)).toEqual(["S02E05", "S02E06"]);
   });
 
   it("kein Library-Refresh, wenn nichts umbenannt wurde", async () => {

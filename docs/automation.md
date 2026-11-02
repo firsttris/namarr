@@ -27,7 +27,8 @@ A watch folder renames new downloads on its own:
 
 Uncertain matches from watch folders and the hook wait here with the reason (two candidates with a
 similar score, a double episode, a season guessed from an absolute number …). Approve them one by
-one, change the match, or approve everything above 80 % at once.
+one, change the match, or approve everything above 80 % at once. A [notification](#notifications)
+can tell you when something new arrives.
 
 ## Download client hook
 
@@ -116,3 +117,36 @@ endpoint off.
 - **Notifications** via ntfy, Gotify, Telegram, Discord or a webhook, in the language set for titles.
 
 Both are set up under *Settings*.
+
+## Notifications
+
+Each notification target picks what it is sent:
+
+- **Job summaries**: after a job ran, how many files were renamed, skipped or failed.
+- **Waiting for approval**: when a watch folder or the download client hook puts files into the
+  [inbox](#inbox). The message names the source and up to five files with their match (title, year,
+  episode) and the reason they wait, so you know what to approve without opening namarr.
+
+Both are on for a new target. Set the *public address of namarr* (for example
+`https://namarr.example`) and the approval message links to the inbox: ntfy and Gotify open it on a
+click, the other services show the link in the text.
+
+A webhook gets JSON with the event and the details:
+
+```json
+{
+  "source": "namarr",
+  "event": "inbox",
+  "text": "namarr: 1 file waiting for approval (/downloads/Severance.S02)\n• Severance (2022) S02E04E05: …",
+  "link": "https://namarr.example/inbox",
+  "data": {
+    "jobId": 12,
+    "source": "/downloads/Severance.S02",
+    "items": [
+      { "itemId": 41, "file": "severance.204-205.720p.mkv", "title": "Severance", "year": 2022, "episode": "S02E04E05", "reason": "…" }
+    ]
+  }
+}
+```
+
+After a job, `event` is `job` and `data` holds `jobId`, `done`, `skipped`, `failed` and `source`.
