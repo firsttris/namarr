@@ -50,7 +50,7 @@ expect, or in your own.
 | 🔍 **Preview & undo** | Test mode by default · diff view, keyboard control · conflicts incl. *keep better* (resolution, HDR, codecs, audio) · undo per file, job or point in time |
 | 🤖 **Automation** | Watch folders that wait for finished downloads · inbox for uncertain matches · hook for qBittorrent, SABnzbd, NZBGet · MCP server for AI agents |
 | 📚 **Libraries** | One default folder each for movies and series · move, copy or rename in place · folder browser for every path |
-| 🔔 **After a job** | Library refresh for Jellyfin, Emby, Plex · notifications via ntfy, Gotify, Telegram, Discord, webhook |
+| 🔔 **Notifications** | Library refresh for Jellyfin, Emby, Plex after a job · notifications via ntfy, Gotify, Telegram, Discord, webhook for job summaries and files waiting for approval |
 | 🌍 **UI** | English and German, including every server message |
 
 ## 🗂️ Metadata sources

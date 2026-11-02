@@ -405,6 +405,10 @@
   "settings_service": "Dienst",
   "settings_tokenOptional": "Token (optional)",
   "settings_addNotification": "Benachrichtigung hinzufügen",
+  "settings_notifyJob": "Job-Zusammenfassungen",
+  "settings_notifyInbox": "Warten auf Freigabe",
+  "settings_publicUrl": "Öffentliche Adresse von namarr",
+  "settings_publicUrlHint": "Optional. Benachrichtigungen über Dateien, die auf Freigabe warten, verlinken auf die Inbox unter dieser Adresse.",
   "login_token": "Zugangs-Token (NAMARR_TOKEN)",
   "login_submit": "Anmelden",
   "paths_outsideRoots": "Pfad liegt außerhalb der erlaubten Wurzelpfade: {path}",
@@ -506,6 +510,17 @@
   "notify_skipped": "{n} übersprungen",
   "notify_failed": "{n} fehlgeschlagen",
   "notify_summary": "namarr Job #{id}: {parts} ({source})",
+  "notify_inbox": [
+    {
+      "declarations": ["input n", "input source", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "namarr: {n} Datei wartet auf Freigabe ({source})",
+        "nPlural=other": "namarr: {n} Dateien warten auf Freigabe ({source})"
+      }
+    }
+  ],
+  "notify_inboxMore": "… und {n} weitere",
   "folders_addFolder": "+ Ordner hinzufügen",
   "folders_browse": "Durchsuchen …",
   "folders_browseFor": "Ordner wählen: {field}",

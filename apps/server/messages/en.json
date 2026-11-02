@@ -405,6 +405,10 @@
   "settings_service": "Service",
   "settings_tokenOptional": "Token (optional)",
   "settings_addNotification": "Add notification",
+  "settings_notifyJob": "Job summaries",
+  "settings_notifyInbox": "Waiting for approval",
+  "settings_publicUrl": "Public address of namarr",
+  "settings_publicUrlHint": "Optional. Notifications about files waiting for approval link to the inbox at this address.",
   "login_token": "Access token (NAMARR_TOKEN)",
   "login_submit": "Sign in",
   "paths_outsideRoots": "Path is outside the allowed root paths: {path}",
@@ -506,6 +510,17 @@
   "notify_skipped": "{n} skipped",
   "notify_failed": "{n} failed",
   "notify_summary": "namarr Job #{id}: {parts} ({source})",
+  "notify_inbox": [
+    {
+      "declarations": ["input n", "input source", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "namarr: {n} file waiting for approval ({source})",
+        "nPlural=other": "namarr: {n} files waiting for approval ({source})"
+      }
+    }
+  ],
+  "notify_inboxMore": "… and {n} more",
   "folders_addFolder": "+ Add folder",
   "folders_browse": "Browse …",
   "folders_browseFor": "Choose folder: {field}",

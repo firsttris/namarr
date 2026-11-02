@@ -1,4 +1,4 @@
-import type { LibraryFolder, MovieProvider, SeriesProvider, Settings } from "@namarr/db/types";
+import type { LibraryFolder, MovieProvider, NotificationEvent, SeriesProvider, Settings } from "@namarr/db/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -10,6 +10,16 @@ import { LANGS, type Lang, pickMsg, useLang, useLocalize } from "~/lib/i18n";
 import { msgGroup } from "~/lib/msg-groups";
 import { MOVIE_SOURCES, SERIES_SOURCES } from "~/lib/providers";
 import * as m from "~/paraglide/messages";
+
+const NOTIFY_EVENTS: [NotificationEvent, () => string][] = [
+  ["job", m.settings_notifyJob],
+  ["inbox", m.settings_notifyInbox],
+];
+type Target = Settings["notifications"][number];
+/** Unset events: every event (targets from before the choice). */
+const wants = (t: Target, event: NotificationEvent) => (t.events ?? NOTIFY_EVENTS.map(([e]) => e)).includes(event);
+const toggleEvent = (t: Target, event: NotificationEvent, on: boolean): NotificationEvent[] =>
+  NOTIFY_EVENTS.map(([e]) => e).filter((e) => (e === event ? on : wants(t, e)));
 
 export const Route = createFileRoute("/settings")({
   loader: () => getSettingsFn(),
@@ -31,6 +41,7 @@ function SettingsPage() {
   const [language, setLanguage] = useState(initial.language);
   const [folders, setFolders] = useState<LibraryFolder[]>(initial.folders);
   const [notifications, setNotifications] = useState<Settings["notifications"]>(initial.notifications);
+  const [publicUrl, setPublicUrl] = useState(initial.publicUrl ?? "");
   const [refresh, setRefresh] = useState<Settings["libraryRefresh"]>(initial.libraryRefresh);
   const localize = useLocalize();
   // Connection test per server row; an edit of the row clears its result.
@@ -68,6 +79,7 @@ function SettingsPage() {
           language,
           folders: folders.filter((f) => f.path.trim()).map((f) => ({ ...f, path: f.path.trim(), name: f.name.trim() || f.path.trim() })),
           notifications,
+          publicUrl: publicUrl.trim(),
           libraryRefresh: refresh,
         },
       }),
@@ -277,38 +289,57 @@ function SettingsPage() {
         <Panel className="flex flex-col gap-3 p-5">
           <h2 className="m-0 text-base font-semibold">{m.settings_notifications()}</h2>
           {notifications.map((n, i) => (
-            <div key={i} className="flex gap-2">
-              <Select
-                aria-label={m.settings_service()}
-                value={n.kind}
-                onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, kind: e.target.value as "ntfy" } : x)))}
-              >
-                <option value="ntfy">ntfy</option>
-                <option value="gotify">Gotify</option>
-                <option value="telegram">Telegram</option>
-                <option value="discord">Discord-Webhook</option>
-                <option value="webhook">Webhook</option>
-              </Select>
-              <input
-                aria-label={m.settings_url()}
-                className={cx(inputClass, "flex-grow")}
-                placeholder="https://ntfy.sh/mein-topic"
-                value={n.url}
-                onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, url: e.target.value } : x)))}
-              />
-              <input
-                aria-label={m.common_token()}
-                type="password"
-                className={inputClass}
-                placeholder={m.settings_tokenOptional()}
-                value={n.token ?? ""}
-                onChange={(e) =>
-                  setNotifications(notifications.map((x, k) => (k === i ? { ...x, token: e.target.value || undefined } : x)))
-                }
-              />
-              <Button aria-label={m.common_remove()} onClick={() => setNotifications(notifications.filter((_, k) => k !== i))}>
-                <XIcon />
-              </Button>
+            <div key={i} className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Select
+                  aria-label={m.settings_service()}
+                  value={n.kind}
+                  onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, kind: e.target.value as "ntfy" } : x)))}
+                >
+                  <option value="ntfy">ntfy</option>
+                  <option value="gotify">Gotify</option>
+                  <option value="telegram">Telegram</option>
+                  <option value="discord">Discord-Webhook</option>
+                  <option value="webhook">Webhook</option>
+                </Select>
+                <input
+                  aria-label={m.settings_url()}
+                  className={cx(inputClass, "flex-grow")}
+                  placeholder="https://ntfy.sh/mein-topic"
+                  value={n.url}
+                  onChange={(e) => setNotifications(notifications.map((x, k) => (k === i ? { ...x, url: e.target.value } : x)))}
+                />
+                <input
+                  aria-label={m.common_token()}
+                  type="password"
+                  className={inputClass}
+                  placeholder={m.settings_tokenOptional()}
+                  value={n.token ?? ""}
+                  onChange={(e) =>
+                    setNotifications(notifications.map((x, k) => (k === i ? { ...x, token: e.target.value || undefined } : x)))
+                  }
+                />
+                <Button aria-label={m.common_remove()} onClick={() => setNotifications(notifications.filter((_, k) => k !== i))}>
+                  <XIcon />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {NOTIFY_EVENTS.map(([event, label]) => (
+                  <label key={event} className="flex items-center gap-2 text-[13px] text-soft">
+                    <input
+                      type="checkbox"
+                      checked={wants(n, event)}
+                      onChange={(e) =>
+                        setNotifications(
+                          notifications.map((x, k) => (k === i ? { ...x, events: toggleEvent(x, event, e.target.checked) } : x)),
+                        )
+                      }
+                      className="h-4 w-4"
+                    />
+                    {label()}
+                  </label>
+                ))}
+              </div>
             </div>
           ))}
           <div>
@@ -316,6 +347,16 @@ function SettingsPage() {
               {m.settings_addNotification()}
             </Button>
           </div>
+          <Field label={m.settings_publicUrl()} htmlFor="s-public-url" hint={m.settings_publicUrlHint()}>
+            <input
+              id="s-public-url"
+              type="url"
+              className={inputClass}
+              placeholder="https://namarr.example"
+              value={publicUrl}
+              onChange={(e) => setPublicUrl(e.target.value)}
+            />
+          </Field>
         </Panel>
 
         <ErrorNote error={save.error} />

@@ -19,6 +19,7 @@ import {
   listOperations,
   listWatchFolders,
   MOVIE_PROVIDERS,
+  NOTIFICATION_EVENTS,
   SERIES_PROVIDERS,
   type Settings,
   setSettings,
@@ -238,8 +239,16 @@ export const saveSettings = createServerFn({ method: "POST" })
         )
         .optional(),
       notifications: z
-        .array(z.object({ kind: z.enum(["ntfy", "gotify", "telegram", "discord", "webhook"]), url: z.url(), token: z.string().optional() }))
+        .array(
+          z.object({
+            kind: z.enum(["ntfy", "gotify", "telegram", "discord", "webhook"]),
+            url: z.url(),
+            token: z.string().optional(),
+            events: z.array(z.enum(NOTIFICATION_EVENTS)).optional(),
+          }),
+        )
         .optional(),
+      publicUrl: z.union([z.url(), z.literal("")]).optional(),
       libraryRefresh: z.array(z.object({ kind: z.enum(["jellyfin", "plex", "emby"]), url: z.url(), token: z.string() })).optional(),
     }),
   )
@@ -275,6 +284,7 @@ export const saveSettings = createServerFn({ method: "POST" })
       tvdbPin: secret("tvdbPin"),
       anidbClient: data.anidbClient === undefined ? stored.anidbClient : data.anidbClient || undefined,
       anidbClientVersion: data.anidbClientVersion === undefined ? stored.anidbClientVersion : data.anidbClientVersion || undefined,
+      publicUrl: data.publicUrl === undefined ? stored.publicUrl : data.publicUrl || undefined,
     };
     setSettings(rt.db, patch);
     return { ok: true };
