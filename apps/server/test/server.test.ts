@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as zlib from "node:zlib";
-import { msg } from "@namarr/core";
+import { msg, parse } from "@namarr/core";
 import { createWatchFolder, type Db, getSettings, listJobs, openDatabase, type Settings, setSettings } from "@namarr/db";
 import { DemoProvider } from "@namarr/providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,7 +18,7 @@ import {
 } from "~/server/auth.server";
 import { assertSafeBinding, isTrustedProxy, readEnv } from "~/server/env.server";
 import { EventBus, sseResponse } from "~/server/events.server";
-import { JobService } from "~/server/jobs.server";
+import { inboxEntry, JobService } from "~/server/jobs.server";
 import {
   afterExecution,
   afterInbox,
@@ -289,6 +289,23 @@ describe("Benachrichtigungen und Library-Refresh", () => {
     fetchImpl.mockClear();
     await afterInbox(settings, { ...summary, items: [] }, () => {}, fetchImpl);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("Inbox-Eintrag nennt die Episode aus dem Dateinamen, wenn der Anbieter sie nicht kennt", () => {
+    const best = { id: "1", provider: "demo", kind: "series" as const, title: "Severance", year: 2022 };
+    const reason = msg("matcher_reason_episodeNotFound");
+    const entries = ["severance.s02e05.mkv", "severance.s02e06.mkv"].map((f, i) =>
+      inboxEntry(
+        {
+          id: i,
+          sourcePath: `/dl/${f}`,
+          parsedJson: parse(f),
+          matchJson: { best, episodes: [], alternatives: [], confidence: 0.4, reasons: [reason] },
+        },
+        reason,
+      ),
+    );
+    expect(entries.map((e) => e.episode)).toEqual(["S02E05", "S02E06"]);
   });
 
   it("kein Library-Refresh, wenn nichts umbenannt wurde", async () => {
