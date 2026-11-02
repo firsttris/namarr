@@ -110,13 +110,16 @@ export function cleanupStop(job: Pick<Job, "kind" | "sourcePaths">, file: string
 }
 
 /** What an inbox notification tells about one file: the match (title, year, episode) and why it waits. */
-export function inboxEntry(item: Pick<JobItem, "id" | "sourcePath" | "matchJson">, reason: string): InboxEntry {
+export function inboxEntry(item: Pick<JobItem, "id" | "sourcePath" | "matchJson" | "parsedJson">, reason: string): InboxEntry {
   const best = item.matchJson?.best;
   const episodes = item.matchJson?.episodes ?? [];
   const pad = (n: number) => String(n).padStart(2, "0");
+  // Episode unknown at the provider: the numbers the name gives, like the formatter does.
+  const season = episodes[0]?.season ?? item.parsedJson?.season;
+  const numbers = episodes.length ? episodes.map((e) => e.episode) : (item.parsedJson?.episodes ?? []);
   const episode =
-    best?.kind === "series" && episodes.length
-      ? `S${pad(episodes[0]!.season)}${episodes.map((e) => `E${pad(e.episode)}`).join("")}`
+    best?.kind === "series" && season !== undefined && numbers.length
+      ? `S${pad(season)}${numbers.map((n) => `E${pad(n)}`).join("")}`
       : undefined;
   return {
     itemId: item.id,
