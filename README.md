@@ -163,7 +163,7 @@ bun install
 NAMARR_DEMO=1 bun run dev   # http://localhost:8420 with an offline demo catalog
 ```
 
-**Stack**: Bun, TanStack Start (React, server functions), TanStack Query and Virtual, Tailwind,
+**Stack**: Bun, TanStack Start (React API on TanStack Redact, server functions), TanStack Query and Virtual, Tailwind,
 SQLite with Drizzle, Vitest and Playwright. More in [Development](https://firsttris.github.io/namarr/development.html).
 
 ## 🤝 Contributing

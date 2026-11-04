@@ -1,6 +1,7 @@
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { redact } from "@tanstack/redact/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import pkg from "../../package.json" with { type: "json" };
@@ -23,6 +24,9 @@ export default defineConfig(({ command }) => ({
     }),
     tanstackStart(),
     viteReact(),
+    // TanStack Redact instead of react/react-dom: same React 19 API, smaller client bundle.
+    // The code keeps importing from "react"; the plugin redirects those imports at build time.
+    redact(),
     tailwindcss(),
   ],
 }));
