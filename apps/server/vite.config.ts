@@ -15,7 +15,12 @@ export default defineConfig(({ command }) => ({
   ssr: command === "build" ? { noExternal: true, external: ["bun:sqlite"] } : { external: ["bun:sqlite"] },
   plugins: [
     // messages/{de,en}.json → src/paraglide (typed message functions); the language comes from lib/i18n.tsx
-    paraglideVitePlugin({ project: "./project.inlang", outdir: "./src/paraglide", strategy: ["baseLocale"] }),
+    paraglideVitePlugin({
+      project: "./project.inlang",
+      outdir: "./src/paraglide",
+      outputStructure: "message-modules",
+      strategy: ["baseLocale"],
+    }),
     tanstackStart(),
     viteReact(),
     tailwindcss(),
