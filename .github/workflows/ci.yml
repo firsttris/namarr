@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.x
+          bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - name: Lint
         run: bun run lint
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.x
+          bun-version-file: package.json
       - run: bun install --frozen-lockfile
       # Chromium from the Actions cache, per Playwright version; the system libraries install on
       # every run. The tests compare no screenshots, the runner stays the same as before

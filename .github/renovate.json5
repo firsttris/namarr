@@ -1,25 +1,24 @@
 // Renovate (GitHub App, https://github.com/apps/renovate): a pull request for each new release of
 // what namarr builds on, plus the "Dependency Dashboard" issue listing what is open. Their own pull
-// requests: Bun (image, CI, the docs and its types) and the static ffprobe the image copies from
-// mwader/static-ffmpeg (quality, HDR, audio tracks and tags come from its JSON). namarr's own image
-// moves with its releases.
+// requests: Bun (image, packageManager, the docs and its types) and the static ffprobe the image
+// copies from mwader/static-ffmpeg (quality, HDR, audio tracks and tags come from its JSON).
+// namarr's own image moves with its releases.
 // Everything else (the other packages, the actions, the images) comes with the shared settings of
 // firsttris/workflows (renovate/default.json5): minor and patch updates once a month in one pull
 // request that merges itself when CI is green, majors on request in the dashboard.
-// Check with `npx --package renovate renovate-config-validator .github/renovate.json5`.
+// Check with `bunx --package renovate renovate-config-validator .github/renovate.json5`.
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>firsttris/workflows//renovate/default.json5"],
   customManagers: [
     {
-      // The Bun of CI and the screenshots (bun-version: 1.4.x, the newest patch of a minor) and
-      // the version docs/development.md names
+      // The Bun version docs/development.md names (a minor). "packageManager": "bun@x.y.z" in
+      // package.json, the Bun of CI (setup-bun's bun-version-file) and the screenshots (npm in
+      // the Playwright image), needs no manager of its own: Renovate's package.json manager reads
+      // it as the dependency `bun`.
       customType: "regex",
-      managerFilePatterns: ["/^\\.github/workflows/[^/]+\\.ya?ml$/", "/^docs/development\\.md$/"],
-      matchStrings: [
-        "bun-version: (?<currentValue>\\d+\\.\\d+)\\.x",
-        "Requires \\[Bun\\]\\(https://bun\\.sh/\\) (?<currentValue>\\d+\\.\\d+)\\.",
-      ],
+      managerFilePatterns: ["/^docs/development\\.md$/"],
+      matchStrings: ["Requires \\[Bun\\]\\(https://bun\\.sh/\\) (?<currentValue>\\d+\\.\\d+)\\."],
       depNameTemplate: "oven-sh/bun",
       datasourceTemplate: "github-releases",
       extractVersionTemplate: "^bun-v(?<version>\\d+\\.\\d+)\\.\\d+$",
@@ -38,14 +37,14 @@
       enabled: false,
     },
     {
-      // Bun: the build and runtime images, bun-version in the workflows, the docs and the types, in
-      // one PR so they cannot drift apart
-      matchPackageNames: ["docker.io/oven/bun", "oven-sh/bun", "@types/bun"],
+      // Bun: the build and runtime images, packageManager (`bun`), the docs (`oven-sh/bun`) and the
+      // types, in one PR so they cannot drift apart
+      matchPackageNames: ["bun", "docker.io/oven/bun", "oven/bun", "oven-sh/bun", "@types/bun"],
       enabled: true,
       groupName: "Bun",
       sourceUrl: "https://github.com/oven-sh/bun",
       prBodyNotes: [
-        "The image (`oven/bun` and `-slim`), CI and the screenshots (`bun-version`), docs/development.md and `@types/bun` move together. The server bundle is built with `bun build --target=bun` and the database is `bun:sqlite`: check the release notes for changes to either, and that typecheck, tests, the parser benchmark and the e2e run of this PR are green.",
+        "The image (`oven/bun` and `-slim`), `packageManager` in package.json (CI's `bun-version-file` and the screenshots job's `npm install bun@…`), docs/development.md and `@types/bun` move together. The server bundle is built with `bun build --target=bun` and the database is `bun:sqlite`: check the release notes for changes to either, and that typecheck, tests, the parser benchmark and the e2e run of this PR are green.",
       ],
       schedule: ["at any time"],
       automerge: false,
