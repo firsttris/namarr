@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.4.4",
+  "packageManager": "bun@1.4.5",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -29,7 +29,7 @@
     "i18n": "bun run --cwd apps/server i18n"
   },
   "devDependencies": {
-    "@types/bun": "1.4.4",
+    "@types/bun": "1.4.5",
     "@types/node": "^26.6.3",
     "fast-check": "^4.10.2",
     "typescript": "^7.0.2",
